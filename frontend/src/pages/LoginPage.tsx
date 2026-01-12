@@ -213,13 +213,19 @@ const LoginPage: React.FC = () => {
               )}
 
               {/* Login Form */}
-              <Box component="form" onSubmit={handleSubmit}>
+              <Box 
+                component="form" 
+                onSubmit={(e: React.FormEvent) => {
+                  e.preventDefault();
+                  void handleSubmit(e);
+                }}
+              >
                 <TextField
                   fullWidth
                   label="Username / Department Code"
                   variant="outlined"
                   value={username}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value.toUpperCase())}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value.toUpperCase()); }}
                   sx={{
                     mb: 3,
                     '& .MuiOutlinedInput-root': {
@@ -247,7 +253,7 @@ const LoginPage: React.FC = () => {
                       <Chip
                         icon={dept.icon}
                         label={dept.code}
-                        onClick={() => handleDeptSelect(dept.code)}
+                        onClick={() => { handleDeptSelect(dept.code); }}
                         sx={{
                           bgcolor: selectedDept === dept.code ? unzaColors.primaryLight : 'transparent',
                           color: selectedDept === dept.code ? 'white' : unzaColors.primaryDark,
@@ -273,7 +279,7 @@ const LoginPage: React.FC = () => {
                       <Chip
                         label={user}
                         size="small"
-                        onClick={() => handleUserSelect(user)}
+                        onClick={() => { handleUserSelect(user); }}
                         sx={{
                           bgcolor: username === user ? unzaColors.secondary : unzaColors.accent + '20',
                           color: username === user ? 'white' : unzaColors.primaryDark,
