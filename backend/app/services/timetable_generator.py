@@ -1,9 +1,8 @@
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
-from typing import List, Dict, Callable
-from datetime import time, timedelta
-from ..models import Course, Lecturer, Room, StudentGroup, TimetableSlot, Timetable
-from ..models import LecturerAssignment, GroupAssignment, LecturerUnavailability
+from typing import Dict, Callable
+from datetime import time
+from ..models import Course, Lecturer, Room, StudentGroup, TimetableSlot
 
 class TimetableGenerator:
     def __init__(self, db: Session, timetable_id: int, progress_callback: Callable = None):

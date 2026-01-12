@@ -3,10 +3,10 @@ Security and Authentication Tests for TABLESYS
 Run this to verify login security and functionality
 """
 import requests
-import json
 from datetime import datetime
 
 API_BASE = "http://localhost:8000/api"
+REQUEST_TIMEOUT = 10  # seconds
 
 def print_test(name, status, message=""):
     status_icon = "✅" if status else "❌"
@@ -26,7 +26,8 @@ def test_login_valid_users():
         try:
             response = requests.post(
                 f"{API_BASE}/auth/login",
-                json={"username": username}
+                json={"username": username},
+                timeout=REQUEST_TIMEOUT
             )
             
             if response.status_code == 200:
@@ -37,16 +38,23 @@ def test_login_valid_users():
                 # Test /me endpoint
                 me_response = requests.get(
                     f"{API_BASE}/auth/me",
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=REQUEST_TIMEOUT
                 )
                 
                 if me_response.status_code == 200:
                     user_data = me_response.json()
-                    print_test(f"  Get user info", True, 
-                             f"Role: {user_data['role']}, Name: {user_data['full_name']}")
+                    print_test(
+                        "  Get user info", 
+                        True, 
+                        f"Role: {user_data['role']}, Name: {user_data['full_name']}"
+                    )
                 else:
-                    print_test(f"  Get user info", False, 
-                             f"Status: {me_response.status_code}")
+                    print_test(
+                        "  Get user info", 
+                        False, 
+                        f"Status: {me_response.status_code}"
+                    )
             else:
                 print_test(f"Login as '{username}'", False, 
                          f"Status: {response.status_code}, Error: {response.text}")
@@ -65,7 +73,8 @@ def test_login_invalid_users():
         try:
             response = requests.post(
                 f"{API_BASE}/auth/login",
-                json={"username": username}
+                json={"username": username},
+                timeout=REQUEST_TIMEOUT
             )
             
             if response.status_code == 401:
@@ -95,14 +104,16 @@ def test_case_insensitive_login():
         try:
             response = requests.post(
                 f"{API_BASE}/auth/login",
-                json={"username": input_username}
+                json={"username": input_username},
+                timeout=REQUEST_TIMEOUT
             )
             
             if response.status_code == 200:
                 token = response.json()['access_token']
                 me_response = requests.get(
                     f"{API_BASE}/auth/me",
-                    headers={"Authorization": f"Bearer {token}"}
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=REQUEST_TIMEOUT
                 )
                 actual_username = me_response.json()['username']
                 
@@ -124,26 +135,35 @@ def test_token_expiry():
     print("="*60)
     
     # Test with valid token
-    response = requests.post(f"{API_BASE}/auth/login", json={"username": "coordinator"})
+    response = requests.post(
+        f"{API_BASE}/auth/login",
+        json={"username": "coordinator"},
+        timeout=REQUEST_TIMEOUT
+    )
     if response.status_code == 200:
         token = response.json()['access_token']
         
         # Test valid token
         me_response = requests.get(
             f"{API_BASE}/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=REQUEST_TIMEOUT
         )
         print_test("Valid token accepted", me_response.status_code == 200)
         
         # Test invalid token
         me_response = requests.get(
             f"{API_BASE}/auth/me",
-            headers={"Authorization": "Bearer invalid_token_12345"}
+            headers={"Authorization": "Bearer invalid_token_12345"},
+            timeout=REQUEST_TIMEOUT
         )
         print_test("Invalid token rejected", me_response.status_code == 401)
         
         # Test no token
-        me_response = requests.get(f"{API_BASE}/auth/me")
+        me_response = requests.get(
+            f"{API_BASE}/auth/me",
+            timeout=REQUEST_TIMEOUT
+        )
         print_test("No token rejected", me_response.status_code == 401)
     else:
         print_test("Token validation", False, "Could not get initial token")
@@ -155,17 +175,26 @@ def test_role_based_access():
     print("="*60)
     
     # Login as coordinator
-    coord_response = requests.post(f"{API_BASE}/auth/login", json={"username": "coordinator"})
+    coord_response = requests.post(
+        f"{API_BASE}/auth/login",
+        json={"username": "coordinator"},
+        timeout=REQUEST_TIMEOUT
+    )
     coord_token = coord_response.json()['access_token']
     
     # Login as HOD
-    hod_response = requests.post(f"{API_BASE}/auth/login", json={"username": "AEN"})
+    hod_response = requests.post(
+        f"{API_BASE}/auth/login",
+        json={"username": "AEN"},
+        timeout=REQUEST_TIMEOUT
+    )
     hod_token = hod_response.json()['access_token']
     
     # Test coordinator access
     me_response = requests.get(
         f"{API_BASE}/auth/me",
-        headers={"Authorization": f"Bearer {coord_token}"}
+        headers={"Authorization": f"Bearer {coord_token}"},
+        timeout=REQUEST_TIMEOUT
     )
     user_data = me_response.json()
     print_test("Coordinator role", user_data['role'] == 'coordinator')
@@ -173,7 +202,8 @@ def test_role_based_access():
     # Test HOD access
     me_response = requests.get(
         f"{API_BASE}/auth/me",
-        headers={"Authorization": f"Bearer {hod_token}"}
+        headers={"Authorization": f"Bearer {hod_token}"},
+        timeout=REQUEST_TIMEOUT
     )
     user_data = me_response.json()
     print_test("HOD role", user_data['role'] == 'hod')
@@ -190,7 +220,8 @@ def test_cors_headers():
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST"
-            }
+            },
+            timeout=REQUEST_TIMEOUT
         )
         
         cors_allowed = response.headers.get("Access-Control-Allow-Origin")

@@ -2,7 +2,6 @@
 Initial data seeding script for TABLESYS
 Creates predefined users for easy access (username-only, no password)
 """
-from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine
 from app.models import Base, User, Department, UserRole
 from app.auth import get_password_hash

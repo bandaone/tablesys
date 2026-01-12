@@ -4,9 +4,9 @@ from typing import List
 import pandas as pd
 import io
 from ..database import get_db
-from ..schemas import Course, CourseCreate, CourseUpdate, CourseBulkUpload
+from ..schemas import Course, CourseCreate, CourseUpdate
 from ..models import Course as CourseModel, User
-from ..auth import get_current_user, get_current_active_coordinator, get_current_active_hod
+from ..auth import get_current_user, get_current_active_coordinator
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 

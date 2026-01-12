@@ -51,12 +51,12 @@ export const coursesAPI = {
     return response.data;
   },
   
-  create: async (data: any) => {
+  create: async (data: Record<string, unknown>) => {
     const response = await api.post('/courses/', data);
     return response.data;
   },
   
-  update: async (id: number, data: any) => {
+  update: async (id: number, data: Record<string, unknown>) => {
     const response = await api.put(`/courses/${id}`, data);
     return response.data;
   },

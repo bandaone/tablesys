@@ -41,6 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authAPI.login({ username });
       const { access_token } = response;
       
+      // Store token temporarily for the next request
+      localStorage.setItem('token', access_token);
+      
       // Fetch user details
       const userResponse = await axios.get('/api/auth/me', {
         headers: {
