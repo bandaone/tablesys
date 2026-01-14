@@ -41,14 +41,14 @@ def seed_database():
             # Coordinators
             {
                 "username": "coordinator",
-                "email": "",
+                "email": "coordinator@tablesys.local",
                 "full_name": "System Coordinator",
                 "role": UserRole.COORDINATOR,
                 "department_id": None
             },
             {
                 "username": "admin",
-                "email": "",
+                "email": "admin@tablesys.local",
                 "full_name": "System Administrator",
                 "role": UserRole.COORDINATOR,
                 "department_id": None
@@ -57,35 +57,35 @@ def seed_database():
             # HODs for each department
             {
                 "username": "AEN",
-                "email": "",
+                "email": "aen@tablesys.local",
                 "full_name": "Agricultural Engineering HOD",
                 "role": UserRole.HOD,
                 "department_id": dept_map.get("AEN")
             },
             {
                 "username": "MEC",
-                "email": "",
+                "email": "mec@tablesys.local",
                 "full_name": "Mechanical Engineering HOD",
                 "role": UserRole.HOD,
                 "department_id": dept_map.get("MEC")
             },
             {
                 "username": "EEE",
-                "email": "",
+                "email": "eee@tablesys.local",
                 "full_name": "Electrical & Electronics Engineering HOD",
                 "role": UserRole.HOD,
                 "department_id": dept_map.get("EEE")
             },
             {
                 "username": "CEE",
-                "email": "",
+                "email": "cee@tablesys.local",
                 "full_name": "Civil & Environmental Engineering HOD",
                 "role": UserRole.HOD,
                 "department_id": dept_map.get("CEE")
             },
             {
                 "username": "GEE",
-                "email": "",
+                "email": "gee@tablesys.local",
                 "full_name": "Geomatics Engineering HOD",
                 "role": UserRole.HOD,
                 "department_id": dept_map.get("GEE")
@@ -97,11 +97,11 @@ def seed_database():
             existing_user = db.query(User).filter(User.username == user_data["username"]).first()
             
             if not existing_user:
-                # Create user (password not used but still stored for compatibility)
+                # Create user (use simple short password since it's not used for auth)
                 user = User(
                     email=user_data["email"],
                     username=user_data["username"],
-                    hashed_password=get_password_hash("unused"),  # Not used for auth
+                    hashed_password=get_password_hash("pass"),  # Simple dummy password
                     full_name=user_data["full_name"],
                     role=user_data["role"],
                     department_id=user_data["department_id"],
