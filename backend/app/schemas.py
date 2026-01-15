@@ -9,7 +9,7 @@ class UserRole(str, Enum):
 
 # User Schemas
 class UserBase(BaseModel):
-    email: EmailStr
+    email: Optional[str] = None
     username: str
     full_name: str
     role: UserRole
@@ -19,7 +19,7 @@ class UserCreate(UserBase):
     password: str
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     full_name: Optional[str] = None
     department_id: Optional[int] = None
     is_active: Optional[bool] = None
