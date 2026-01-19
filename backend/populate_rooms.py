@@ -6,7 +6,7 @@ LOGIN_URL = f"{BASE_URL}/auth/login"
 ROOMS_URL = f"{BASE_URL}/rooms/"
 
 def login(username, password):
-    response = requests.post(LOGIN_URL, json={"username": username, "password": password})
+    response = requests.post(LOGIN_URL, json={"username": username, "password": password}, timeout=10)
     return response.json()["access_token"]
 
 def populate():
@@ -22,7 +22,7 @@ def populate():
             "equipment": ["Projector" if i % 2 == 0 else "Whiteboard"],
             "priority": "standard"
         }
-        requests.post(ROOMS_URL, json=data, headers=headers)
+        requests.post(ROOMS_URL, json=data, headers=headers, timeout=10)
     print("Populated 5 rooms")
 
 if __name__ == "__main__":

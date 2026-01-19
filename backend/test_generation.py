@@ -1,16 +1,16 @@
 
 import sys
 import os
-from datetime import time
+
 
 # Add current directory to path so we can import app modules
 sys.path.append(os.getcwd())
 
 from app.database import SessionLocal, engine
 from app.models import (
-    Base, User, Department, Room, Course, Lecturer, StudentGroup,
+    Base, Department, Room, Course, Lecturer, StudentGroup,
     LecturerAssignment, GroupAssignment, Timetable, TimetableSlot,
-    RoomType, RoomCategory, CourseType, GroupType, GroupDivisionType
+    RoomType, RoomCategory, GroupType
 )
 from app.services.timetable_generator import TimetableGenerator
 

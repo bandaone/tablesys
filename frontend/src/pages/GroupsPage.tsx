@@ -33,11 +33,13 @@ interface Group {
   level: number;
   size: number;
   department_id: number;
+  group_type?: 'general' | 'department' | 'lab_group' | 'tutorial_group';
+  display_code?: string;
 }
 
 const GroupsPage: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<unknown[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [error, setError] = useState('');
@@ -85,8 +87,8 @@ const GroupsPage: React.FC = () => {
         level: group.level,
         size: group.size,
         department_id: group.department_id,
-        group_type: (group as any).group_type || 'department',
-        display_code: (group as any).display_code || '',
+        group_type: group.group_type || 'department',
+        display_code: group.display_code || '',
       });
     } else {
       setEditingGroup(null);
@@ -288,7 +290,9 @@ const GroupsPage: React.FC = () => {
             <Select
               value={formData.group_type}
               label="Group Type"
+              label="Group Type"
               onChange={(e) => { setFormData({ ...formData, group_type: e.target.value as any }); }}
+            >
             >
               <MenuItem value="general">General</MenuItem>
               <MenuItem value="department">Department</MenuItem>

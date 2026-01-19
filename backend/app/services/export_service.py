@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from ..models import Timetable, TimetableSlot, Course, Room, StudentGroup, Lecturer
-from typing import Dict, List, Any
+from typing import Dict, Any
 from collections import defaultdict
 
 class ExportService:
@@ -21,7 +21,7 @@ class ExportService:
         
         export_data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         
-        hours = [f"{h:02d}:00" for h in range(7, 19)] # 07:00 to 18:00 (start times)
+
         
         for slot in slots:
             course = self.db.query(Course).get(slot.course_id)

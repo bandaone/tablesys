@@ -47,15 +47,15 @@ import { coursesAPI, departmentsAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
 const CoursesPage: React.FC = () => {
-  const [courses, setCourses] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [courses, setCourses] = useState<unknown[]>([]);
+  const [departments, setDepartments] = useState<unknown[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [editingCourse, setEditingCourse] = useState<unknown>(null);
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
@@ -221,8 +221,8 @@ const CoursesPage: React.FC = () => {
         practical_hours: 0,
       });
       fetchCourses();
-    } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to save course');
+    } catch (e: unknown) {
+      setError((e as any).response?.data?.detail || 'Failed to save course');
     }
   };
 
@@ -237,7 +237,7 @@ const CoursesPage: React.FC = () => {
           {deptFilter && (
             <Button
               variant="outlined"
-              onClick={() => setSearchParams({})}
+              onClick={() => { setSearchParams({}); }}
               sx={{ textTransform: 'none' }}
             >
               Show All Departments
@@ -247,7 +247,7 @@ const CoursesPage: React.FC = () => {
             <Button
               variant="outlined"
               color="error"
-              onClick={() => setClearAllDialogOpen(true)}
+              onClick={() => { setClearAllDialogOpen(true); }}
               sx={{ textTransform: 'none' }}
             >
               Clear All Courses
@@ -314,7 +314,7 @@ const CoursesPage: React.FC = () => {
       </Grid>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => { setError(''); }}>
           {error}
         </Alert>
       )}
@@ -394,7 +394,7 @@ const CoursesPage: React.FC = () => {
                                 <IconButton
                                   size="small"
                                   color="error"
-                                  onClick={() => handleDelete(course.id)}
+                                  onClick={() => { void handleDelete(course.id); }}
                                 >
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
@@ -420,7 +420,7 @@ const CoursesPage: React.FC = () => {
             <TextField
               label="Course Code"
               value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+              onChange={(e) => { setFormData({ ...formData, code: e.target.value.toUpperCase() }); }}
               fullWidth
               required
             />
@@ -429,9 +429,9 @@ const CoursesPage: React.FC = () => {
               <Select
                 value={formData.department_id}
                 label="Department"
-                onChange={(e) => setFormData({ ...formData, department_id: e.target.value as any })}
+                onChange={(e) => { setFormData({ ...formData, department_id: e.target.value as unknown as string }); }}
               >
-                {departments.map((dept) => (
+                {departments.map((dept: any) => (
                   <MenuItem key={dept.id} value={dept.id}>
                     {dept.name}
                   </MenuItem>
@@ -441,7 +441,7 @@ const CoursesPage: React.FC = () => {
             <TextField
               label="Course Name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, name: e.target.value }); }}
               fullWidth
               required
               sx={{ gridColumn: 'span 2' }}
@@ -451,7 +451,7 @@ const CoursesPage: React.FC = () => {
               <Select
                 value={formData.level}
                 label="Level"
-                onChange={(e) => setFormData({ ...formData, level: e.target.value as any })}
+                onChange={(e) => { setFormData({ ...formData, level: e.target.value as unknown as number }); }}
               >
                 {[2, 3, 4, 5].map((l) => (
                   <MenuItem key={l} value={l}>Year {l}</MenuItem>
@@ -462,36 +462,36 @@ const CoursesPage: React.FC = () => {
               label="Credits"
               type="number"
               value={formData.credits}
-              onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) || 0 })}
+              onChange={(e) => { setFormData({ ...formData, credits: parseInt(e.target.value) || 0 }); }}
               fullWidth
             />
             <TextField
               label="Lecture Hours"
               type="number"
               value={formData.lecture_hours}
-              onChange={(e) => setFormData({ ...formData, lecture_hours: parseInt(e.target.value) || 0 })}
+              onChange={(e) => { setFormData({ ...formData, lecture_hours: parseInt(e.target.value) || 0 }); }}
               fullWidth
             />
             <TextField
               label="Tutorial Hours"
               type="number"
               value={formData.tutorial_hours}
-              onChange={(e) => setFormData({ ...formData, tutorial_hours: parseInt(e.target.value) || 0 })}
+              onChange={(e) => { setFormData({ ...formData, tutorial_hours: parseInt(e.target.value) || 0 }); }}
               fullWidth
             />
             <TextField
               label="Practical Hours"
               type="number"
               value={formData.practical_hours}
-              onChange={(e) => setFormData({ ...formData, practical_hours: parseInt(e.target.value) || 0 })}
+              onChange={(e) => { setFormData({ ...formData, practical_hours: parseInt(e.target.value) || 0 }); }}
               fullWidth
               sx={{ gridColumn: 'span 2' }}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveCourse} variant="contained">
+          <Button onClick={() => { setOpenDialog(false); }}>Cancel</Button>
+          <Button onClick={() => { void handleSaveCourse(); }} variant="contained">
             {editingCourse ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
@@ -556,9 +556,9 @@ const CoursesPage: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenUploadDialog(false)}>Cancel</Button>
+          <Button onClick={() => { setOpenUploadDialog(false); }}>Cancel</Button>
           <Button
-            onClick={handleBulkUpload}
+            onClick={() => { void handleBulkUpload(); }}
             variant="contained"
             disabled={!selectedFile || loading}
           >
@@ -579,8 +579,8 @@ const CoursesPage: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClearAllDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleClearAll} variant="contained" color="error" disabled={loading}>
+          <Button onClick={() => { setClearAllDialogOpen(false); }}>Cancel</Button>
+          <Button onClick={() => { void handleClearAll(); }} variant="contained" color="error" disabled={loading}>
             {loading ? 'Deleting...' : 'Delete All Courses'}
           </Button>
         </DialogActions>

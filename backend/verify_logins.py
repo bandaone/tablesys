@@ -23,7 +23,8 @@ def verify_login():
             response = requests.post(
                 f"{BASE_URL}/api/auth/login",
                 json={"username": user["username"]},
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
+                timeout=10
             )
             
             if response.status_code == 200:

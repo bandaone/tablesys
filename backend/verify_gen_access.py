@@ -11,7 +11,7 @@ def verify_gen_access():
     print(f"User: {gen_user.username}, Role: {gen_user.role}, Dept: {gen_user.department_id}")
     
     # Simulate get_courses filtering logic
-    query = db.query(Course)
+    db.query(Course)
     if gen_user.role == UserRole.HOD and gen_user.department_id is not None:
         # For simplicity in this script, we just check the direct department_id
         # since we haven't uploaded courses yet, let's create a dummy one

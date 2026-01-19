@@ -31,6 +31,8 @@ interface Room {
   capacity: number;
   room_type: string;
   equipment: string[];
+  room_category?: string;
+  department_affinity?: string;
 }
 
 const RoomsPage: React.FC = () => {
@@ -95,8 +97,8 @@ const RoomsPage: React.FC = () => {
         building: room.building,
         capacity: room.capacity,
         room_type: room.room_type,
-        room_category: (room as any).room_category || 'lecture_hall_medium',
-        department_affinity: (room as any).department_affinity || '',
+        room_category: room.room_category || 'lecture_hall_medium',
+        department_affinity: room.department_affinity || '',
         equipment: room.equipment.join(', '),
       });
     } else {
@@ -187,6 +189,7 @@ const RoomsPage: React.FC = () => {
             <Button
               variant="outlined"
               color="error"
+              startIcon={<DeleteSweepIcon />}
               startIcon={<DeleteSweepIcon />}
               onClick={() => { void handleDeleteAll(); }}
               sx={{ mr: 2 }}

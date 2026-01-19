@@ -1,12 +1,12 @@
 
 import sys
 import os
-from datetime import time
+
 
 sys.path.append(os.getcwd())
 
 from app.database import SessionLocal
-from app.models import Timetable, TimetableSlot
+from app.models import Timetable
 from app.services.export_service import ExportService
 from app.utils.docx_generator import DocxGenerator
 

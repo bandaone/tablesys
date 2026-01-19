@@ -3,9 +3,8 @@ Clean re-seed script for TABLESYS
 Wipes conflicting tables and re-initializes with correct IDs
 """
 from app.database import SessionLocal, engine
-from app.models import Base, User, Department, UserRole, Course, TimetableSlot, LecturerAssignment, GroupAssignment, StudentGroup, Lecturer
+from app.models import Base, User, Department, UserRole, LecturerAssignment, GroupAssignment, StudentGroup, Lecturer
 from app.auth import get_password_hash
-from sqlalchemy import text
 
 def clean_reseed():
     db = SessionLocal()

@@ -38,11 +38,15 @@ interface Lecturer {
   email: string;
   department_id: number;
   max_hours_per_week: number;
+  teaching_preferences?: {
+    avoid_early_morning: boolean;
+    avoid_late_afternoon: boolean;
+  };
 }
 
 const LecturersPage: React.FC = () => {
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<unknown[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingLecturer, setEditingLecturer] = useState<Lecturer | null>(null);
   const [error, setError] = useState('');
@@ -91,8 +95,8 @@ const LecturersPage: React.FC = () => {
         email: lecturer.email,
         department_id: lecturer.department_id,
         max_hours_per_week: lecturer.max_hours_per_week,
-        avoid_early_morning: (lecturer as any).teaching_preferences?.avoid_early_morning || false,
-        avoid_late_afternoon: (lecturer as any).teaching_preferences?.avoid_late_afternoon || false,
+        avoid_early_morning: lecturer.teaching_preferences?.avoid_early_morning || false,
+        avoid_late_afternoon: lecturer.teaching_preferences?.avoid_late_afternoon || false,
       });
     } else {
       setEditingLecturer(null);
@@ -200,7 +204,7 @@ const LecturersPage: React.FC = () => {
                   <TableCell>{lecturer.email}</TableCell>
                   <TableCell>
                     <Chip
-                      label={departments.find(d => d.id === lecturer.department_id)?.code || 'N/A'}
+                      label={departments.find((d: any) => d.id === lecturer.department_id)?.code || 'N/A'}
                       size="small"
                       variant="outlined"
                     />
@@ -293,15 +297,19 @@ const LecturersPage: React.FC = () => {
             <FormGroup>
               <FormControlLabel
                 control={
-                  <Checkbox checked={formData.avoid_early_morning} onChange={(e) => setFormData({ ...formData, avoid_early_morning: e.target.checked })} />
+                  control = {
+                  < Checkbox checked={formData.avoid_early_morning} onChange={(e) => { setFormData({ ...formData, avoid_early_morning: e.target.checked }); }} />
                 }
-                label="Avoid Early Morning (07:00)"
+                }
+              label="Avoid Early Morning (07:00)"
               />
               <FormControlLabel
                 control={
-                  <Checkbox checked={formData.avoid_late_afternoon} onChange={(e) => setFormData({ ...formData, avoid_late_afternoon: e.target.checked })} />
+                  control = {
+                  < Checkbox checked={formData.avoid_late_afternoon} onChange={(e) => { setFormData({ ...formData, avoid_late_afternoon: e.target.checked }); }} />
                 }
-                label="Avoid Late Afternoon (17:00+)"
+                }
+              label="Avoid Late Afternoon (17:00+)"
               />
             </FormGroup>
           </FormControl>

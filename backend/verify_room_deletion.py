@@ -1,6 +1,5 @@
 
 import requests
-import json
 import sys
 
 BASE_URL = "http://localhost:3002/api"
@@ -8,7 +7,7 @@ LOGIN_URL = f"{BASE_URL}/auth/login"
 ROOMS_URL = f"{BASE_URL}/rooms/"
 
 def login(username, password):
-    response = requests.post(LOGIN_URL, json={"username": username, "password": password})
+    response = requests.post(LOGIN_URL, json={"username": username, "password": password}, timeout=10)
     if response.status_code == 200:
         return response.json()["access_token"]
     else:
@@ -25,7 +24,7 @@ def create_room(token, name):
         "equipment": ["Projector"],
         "priority": "standard"
     }
-    response = requests.post(ROOMS_URL, json=data, headers=headers)
+    response = requests.post(ROOMS_URL, json=data, headers=headers, timeout=10)
     if response.status_code == 201:
         return response.json()["id"]
     else:
@@ -34,12 +33,12 @@ def create_room(token, name):
 
 def delete_room(token, room_id):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.delete(f"{ROOMS_URL}{room_id}", headers=headers)
+    response = requests.delete(f"{ROOMS_URL}{room_id}", headers=headers, timeout=10)
     return response.status_code == 204
 
 def delete_all_rooms(token):
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.delete(ROOMS_URL, headers=headers)
+    response = requests.delete(ROOMS_URL, headers=headers, timeout=10)
     return response.status_code == 200
 
 def run_verification():
@@ -68,7 +67,7 @@ def run_verification():
         print("Successfully requested delete all rooms")
         # Verify count is 0
         headers = {"Authorization": f"Bearer {token}"}
-        rooms = requests.get(ROOMS_URL, headers=headers).json()
+        rooms = requests.get(ROOMS_URL, headers=headers, timeout=10).json()
         if len(rooms) == 0:
             print("Verified: Room count is 0")
         else:

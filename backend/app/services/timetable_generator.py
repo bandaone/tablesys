@@ -1,12 +1,11 @@
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
-from typing import Dict, Callable, List, Tuple
+from typing import Dict, Callable, List
 from datetime import time
-import json
 from ..models import (
-    Course, Lecturer, Room, StudentGroup, TimetableSlot, 
-    LecturerAssignment, GroupAssignment, RoomType, RoomCategory,
-    CourseType
+    Timetable, TimetableSlot, Room, Course, Lecturer,
+    StudentGroup, GroupAssignment, LecturerAssignment,
+    RoomType, UserRole, CourseType
 )
 
 class TimetableGenerator:

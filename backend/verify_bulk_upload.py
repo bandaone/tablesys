@@ -10,7 +10,7 @@ LOGIN_URL = f"{BASE_URL}/auth/login"
 UPLOAD_URL = f"{BASE_URL}/rooms/bulk-upload"
 ROOMS_URL = f"{BASE_URL}/rooms/"
 
-def login(username, password="pass"):
+def login(username, password):
     data = json.dumps({"username": username, "password": password}).encode('utf-8')
     req = urllib.request.Request(LOGIN_URL, data=data, headers={
         'Content-Type': 'application/json',

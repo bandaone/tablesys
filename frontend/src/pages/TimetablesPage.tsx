@@ -39,11 +39,27 @@ interface GenerationProgress {
   message: string;
 }
 
+interface Timetable {
+  id: number;
+  name: string;
+  semester: string;
+  year: number;
+  academic_half: string;
+  is_active: boolean;
+  min_score?: number;
+  max_score?: number;
+  avg_score?: number;
+  generation_metadata?: {
+    generated: boolean;
+    generated_at?: string;
+  };
+}
+
 const TimetablesPage: React.FC = () => {
-  const [timetables, setTimetables] = useState<any[]>([]);
+  const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
-  const [selectedTimetable, setSelectedTimetable] = useState<any>(null);
+  const [selectedTimetable, setSelectedTimetable] = useState<Timetable | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     semester: '',
@@ -54,7 +70,7 @@ const TimetablesPage: React.FC = () => {
   const [generationComplete, setGenerationComplete] = useState(false);
   const [generationError, setGenerationError] = useState('');
   const [levelProgress, setLevelProgress] = useState<{ [key: number]: boolean }>({});
-  
+
   const { isCoordinator } = useAuth();
 
   useEffect(() => {
@@ -97,10 +113,10 @@ const TimetablesPage: React.FC = () => {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      
+
       if (data.level) {
         setGenerationProgress(data);
-        
+
         if (data.status === 'completed') {
           setLevelProgress(prev => ({ ...prev, [data.level]: true }));
         }
@@ -164,7 +180,7 @@ const TimetablesPage: React.FC = () => {
                     <Chip label="Active" color="success" size="small" />
                   )}
                 </Box>
-                
+
                 <Typography color="text.secondary" gutterBottom>
                   {timetable.semester} {timetable.year}
                 </Typography>
@@ -205,8 +221,9 @@ const TimetablesPage: React.FC = () => {
             label="Name"
             fullWidth
             variant="outlined"
+            variant="outlined"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => { setFormData({ ...formData, name: e.target.value }); }}
           />
           <TextField
             margin="dense"
@@ -214,8 +231,9 @@ const TimetablesPage: React.FC = () => {
             fullWidth
             variant="outlined"
             placeholder="e.g., Semester 1"
+            placeholder="e.g., Semester 1"
             value={formData.semester}
-            onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+            onChange={(e) => { setFormData({ ...formData, semester: e.target.value }); }}
           />
           <TextField
             margin="dense"
@@ -223,15 +241,16 @@ const TimetablesPage: React.FC = () => {
             type="number"
             fullWidth
             variant="outlined"
+            variant="outlined"
             value={formData.year}
-            onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+            onChange={(e) => { setFormData({ ...formData, year: parseInt(e.target.value) }); }}
           />
           <FormControl fullWidth margin="dense">
             <InputLabel>Academic Half</InputLabel>
             <Select
               value={formData.academic_half}
               label="Academic Half"
-              onChange={(e) => setFormData({ ...formData, academic_half: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, academic_half: e.target.value }); }}
             >
               <MenuItem value="first_half">First Half</MenuItem>
               <MenuItem value="second_half">Second Half</MenuItem>
@@ -239,8 +258,8 @@ const TimetablesPage: React.FC = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateTimetable} variant="contained">
+          <Button onClick={() => { setOpenDialog(false); }}>Cancel</Button>
+          <Button onClick={() => { void handleCreateTimetable(); }} variant="contained">
             Create
           </Button>
         </DialogActions>
@@ -268,7 +287,7 @@ const TimetablesPage: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Generation Progress
                 </Typography>
-                
+
                 <Box sx={{ mb: 3 }}>
                   <LinearProgress
                     variant="determinate"

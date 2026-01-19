@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from ..database import get_db
 from ..services.export_service import ExportService
 from ..utils.docx_generator import DocxGenerator
-from typing import Any
 import os
 
 router = APIRouter(

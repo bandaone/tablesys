@@ -74,7 +74,7 @@ const DepartmentsPage: React.FC = () => {
           <Grid item xs={12} sm={6} md={4} key={dept.id}>
             <Card
               elevation={3}
-              onClick={() => navigate(`/courses?dept=${dept.id}`)}
+              onClick={() => { navigate(`/courses?dept=${dept.id}`); }}
               sx={{
                 height: '100%',
                 borderTop: `4px solid ${getDepartmentColor(dept.code)}`,
