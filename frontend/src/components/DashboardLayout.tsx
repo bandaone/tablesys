@@ -80,8 +80,8 @@ const DashboardLayout: React.FC = () => {
   const drawer = (
     <Box>
       <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
-        <SchoolIcon sx={{ mr: 2 }} />
-        <Typography variant="h6" noWrap component="div" fontWeight="bold">
+        <SchoolIcon sx={{ mr: 2, color: 'white' }} />
+        <Typography variant="h6" noWrap component="div" fontWeight="bold" sx={{ color: 'white' }}>
           TABLESYS
         </Typography>
       </Toolbar>
@@ -140,12 +140,12 @@ const DashboardLayout: React.FC = () => {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, color: 'white' }}>
             University of Zambia - Timetable Management
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Typography variant="body2" sx={{ display: { xs: 'none', md: 'block' }, color: 'white' }}>
               {user?.full_name} ({user?.role.toUpperCase()})
             </Typography>
             <IconButton

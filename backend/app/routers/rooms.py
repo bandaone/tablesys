@@ -76,6 +76,17 @@ async def delete_room(
     db.commit()
     return None
 
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def delete_all_rooms(
+    current_user: User = Depends(get_current_active_coordinator),
+    db: Session = Depends(get_db)
+):
+    """Delete all rooms. Coordinator only. Use before bulk re-upload."""
+    count = db.query(RoomModel).count()
+    db.query(RoomModel).delete()
+    db.commit()
+    return {"status": "success", "deleted": count, "message": f"Deleted {count} rooms"}
+
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_rooms(
     file: UploadFile = File(...),
@@ -84,7 +95,7 @@ async def bulk_upload_rooms(
 ):
     """
     Bulk upload rooms from Excel/CSV file. Coordinator only.
-    Expected columns: name, building, capacity, room_type, has_projector, has_computers
+    Expected columns: name, capacity, building, furniture_type, equipment, availability
     """
     if file.content_type not in ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"]:
         raise HTTPException(status_code=400, detail="File must be CSV or Excel format")
@@ -97,7 +108,10 @@ async def bulk_upload_rooms(
         else:
             df = pd.read_excel(io.BytesIO(contents))
         
-        required_columns = ['name', 'building', 'capacity', 'room_type']
+        # Clean column names: strip whitespace and convert to lowercase
+        df.columns = [c.strip().lower() for c in df.columns]
+
+        required_columns = ['name', 'capacity', 'building']
         missing_columns = [col for col in required_columns if col not in df.columns]
         
         if missing_columns:
@@ -106,34 +120,66 @@ async def bulk_upload_rooms(
                 detail=f"Missing required columns: {', '.join(missing_columns)}"
             )
         
-        if 'has_projector' not in df.columns:
-            df['has_projector'] = True
-        if 'has_computers' not in df.columns:
-            df['has_computers'] = False
-        
         created_count = 0
+        updated_count = 0
         skipped_count = 0
         errors = []
         
         for idx, row in df.iterrows():
             try:
-                existing = db.query(RoomModel).filter(RoomModel.name == str(row['name'])).first()
-                
-                if existing:
-                    skipped_count += 1
+                row_name = str(row['name']).strip()
+                if not row_name:
                     continue
+
+                # Parse Equipment (semicolon separated)
+                equipment_list = []
+                if 'equipment' in df.columns and pd.notna(row['equipment']):
+                    equipment_str = str(row['equipment'])
+                    equipment_list = [e.strip() for e in equipment_str.split(';') if e.strip()]
+
+                # Determine Priority based on usage or explicit column (default to standard)
+                priority = "standard"
+                if 'priority' in df.columns and pd.notna(row['priority']):
+                    priority_val = str(row['priority']).lower()
+                    if priority_val in ['high', 'standard']:
+                        priority = priority_val
+
+                # Mapping furniture_type to room_type (internal enum)
+                raw_furniture = str(row.get('furniture_type', '')).strip().lower()
+                room_type = "lecture_hall" # default
                 
-                room = RoomModel(
-                    name=str(row['name']),
-                    building=str(row['building']),
-                    capacity=int(row['capacity']),
-                    room_type=str(row['room_type']),
-                    has_projector=bool(row.get('has_projector', True)),
-                    has_computers=bool(row.get('has_computers', False))
-                )
+                if "lab" in raw_furniture:
+                    room_type = "lab"
+                elif "seminar" in raw_furniture:
+                    room_type = "seminar_room"
+                elif "drawing" in raw_furniture:
+                    room_type = "drawing_room"
+                elif "surveying" in raw_furniture:
+                    room_type = "surveying_room"
                 
-                db.add(room)
-                created_count += 1
+                existing = db.query(RoomModel).filter(RoomModel.name == row_name).first()
+                
+                room_data = {
+                    "name": row_name,
+                    "building": str(row.get('building', '')).strip(),
+                    "capacity": int(row['capacity']),
+                    "room_type": room_type,
+                    "furniture_type": str(row.get('furniture_type', '')).strip(),
+                    "equipment": equipment_list,
+                    "availability": str(row.get('availability', '')).strip() if pd.notna(row.get('availability')) else None,
+                    "priority": priority,
+                    "has_projector": any("projector" in e.lower() for e in equipment_list),
+                    "has_computers": any("computer" in e.lower() for e in equipment_list)
+                }
+
+                if existing:
+                    for key, value in room_data.items():
+                        setattr(existing, key, value)
+                    updated_count += 1
+                else:
+                    room = RoomModel(**room_data)
+                    db.add(room)
+                    created_count += 1
                 
             except Exception as e:
                 errors.append(f"Row {idx + 2}: {str(e)}")
@@ -144,9 +190,12 @@ async def bulk_upload_rooms(
         return {
             "status": "success",
             "created": created_count,
+            "updated": updated_count,
             "skipped": skipped_count,
             "errors": errors if errors else None
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")

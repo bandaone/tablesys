@@ -5,7 +5,7 @@ import pandas as pd
 import io
 from ..database import get_db
 from ..schemas import Course, CourseCreate, CourseUpdate
-from ..models import Course as CourseModel, User
+from ..models import Course as CourseModel, User, UserRole
 from ..auth import get_current_user, get_current_active_coordinator
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
@@ -17,11 +17,23 @@ async def get_courses(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all courses. HODs see only their department's courses."""
+    """Get all courses. HODs see their department's courses + general courses (dept_id=0)."""
     query = db.query(CourseModel)
     
-    if current_user.role == "hod" and current_user.department_id:
-        query = query.filter(CourseModel.department_id == current_user.department_id)
+    if current_user.role == UserRole.HOD and current_user.department_id is not None:
+        # HODs see their department courses 
+        # AND general/shared courses manually assigned to their groups
+        from ..models import GroupAssignment, StudentGroup
+        
+        # Subquery for courses assigned to their department's groups
+        assigned_course_ids = db.query(GroupAssignment.course_id).join(
+            StudentGroup, GroupAssignment.group_id == StudentGroup.id
+        ).filter(StudentGroup.department_id == current_user.department_id)
+        
+        query = query.filter(
+            (CourseModel.department_id == current_user.department_id) |
+            (CourseModel.id.in_(assigned_course_ids))
+        )
     
     courses = query.offset(skip).limit(limit).all()
     return courses
@@ -38,9 +50,10 @@ async def get_course(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     
-    # HODs can only view courses in their department
-    if current_user.role == "hod" and current_user.department_id != course.department_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # HODs can view courses in their department or general courses (dept_id=0)
+    if current_user.role == "hod":
+        if course.department_id != 0 and course.department_id != current_user.department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     
     return course
 
@@ -95,9 +108,42 @@ async def delete_course(
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
     
+    # Delete related records first to avoid foreign key constraint violations
+    from ..models import LecturerAssignment, GroupAssignment, TimetableSlot
+    
+    db.query(TimetableSlot).filter(TimetableSlot.course_id == course_id).delete()
+    db.query(GroupAssignment).filter(GroupAssignment.course_id == course_id).delete()
+    db.query(LecturerAssignment).filter(LecturerAssignment.course_id == course_id).delete()
+    
     db.delete(db_course)
     db.commit()
     return None
+
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def delete_all_courses(
+    current_user: User = Depends(get_current_active_coordinator),
+    db: Session = Depends(get_db)
+):
+    """Delete all courses. Coordinator only. Use before bulk re-upload."""
+    try:
+        count = db.query(CourseModel).count()
+        
+        # Delete related records first to avoid foreign key constraint violations
+        from ..models import LecturerAssignment, GroupAssignment, TimetableSlot
+        
+        # Delete all assignments and slots that reference courses
+        db.query(TimetableSlot).delete()
+        db.query(GroupAssignment).delete()
+        db.query(LecturerAssignment).delete()
+        
+        # Now delete all courses
+        db.query(CourseModel).delete()
+        db.commit()
+        
+        return {"status": "success", "deleted": count, "message": f"Deleted {count} courses"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting courses: {str(e)}")
 
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_courses(
@@ -146,9 +192,10 @@ async def bulk_upload_courses(
         
         for idx, row in df.iterrows():
             try:
-                # HODs can only upload courses for their department
+                # HODs can only upload courses for their department or general courses (dept_id=0)
                 if current_user.role == "hod":
-                    if current_user.department_id != int(row['department_id']):
+                    dept_id = int(row['department_id'])
+                    if dept_id != 0 and dept_id != current_user.department_id:
                         errors.append(f"Row {idx + 2}: Access denied - not your department")
                         skipped_count += 1
                         continue

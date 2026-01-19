@@ -5,7 +5,46 @@ from ..database import Base
 
 class UserRole(str, enum.Enum):
     COORDINATOR = "coordinator"
+
     HOD = "hod"
+
+class RoomType(str, enum.Enum):
+    LECTURE_HALL = "lecture_hall"
+    DRAWING_ROOM = "drawing_room"
+    SEMINAR_ROOM = "seminar_room"
+    LAB = "lab"
+    SURVEYING_ROOM = "surveying_room"
+    ANY = "any"
+
+class CourseType(str, enum.Enum):
+    DEPARTMENT_SPECIFIC = "department_specific"
+    GENERAL = "general"
+    MULTI_DEPARTMENT = "multi_department"
+
+class GroupDivisionType(str, enum.Enum):
+    FULL_GROUP = "full_group"
+    LAB_GROUPS = "lab_groups"
+    DRAWING_GROUPS = "drawing_groups"
+    TUTORIAL_GROUPS = "tutorial_groups"
+
+class GroupType(str, enum.Enum):
+    GENERAL = "general"
+    DEPARTMENT = "department"
+    LAB_GROUP = "lab_group"
+    DRAWING_GROUP = "drawing_group"
+    TUTORIAL_GROUP = "tutorial_group"
+
+class RoomCategory(str, enum.Enum):
+    LECTURE_HALL_LARGE = "lecture_hall_large"
+    LECTURE_HALL_MEDIUM = "lecture_hall_medium"
+    LECTURE_HALL_SMALL = "lecture_hall_small"
+    DRAWING_ROOM = "drawing_room"
+    COMPUTER_LAB = "computer_lab"
+    MECHANICAL_LAB = "mechanical_lab"
+    ELECTRICAL_LAB = "electrical_lab"
+    SURVEYING_ROOM = "surveying_room"
+    SEMINAR_ROOM = "seminar_room"
+    CONFERENCE_ROOM = "conference_room"
 
 class User(Base):
     __tablename__ = "users"
@@ -44,6 +83,12 @@ class Course(Base):
     tutorial_hours = Column(Integer, default=0)
     practical_hours = Column(Integer, default=0)
     
+    # New Fields
+    preferred_room_type = Column(Enum(RoomType), default=RoomType.ANY)
+    course_type = Column(Enum(CourseType), default=CourseType.DEPARTMENT_SPECIFIC)
+    session_configuration = Column(JSON, nullable=True) # { "lecture_sessions": 2, "requires_consecutive": false }
+    group_division_type = Column(Enum(GroupDivisionType), default=GroupDivisionType.FULL_GROUP)
+    
     department = relationship("Department", back_populates="courses")
     lecturer_assignments = relationship("LecturerAssignment", back_populates="course")
     group_assignments = relationship("GroupAssignment", back_populates="course")
@@ -58,6 +103,9 @@ class Lecturer(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     max_hours_per_week = Column(Integer, default=20)
     
+    # New Fields
+    teaching_preferences = Column(JSON, nullable=True) # { "preferred_days": [], "avoid_early_morning": false }
+    
     department = relationship("Department")
     assignments = relationship("LecturerAssignment", back_populates="lecturer")
     unavailability = relationship("LecturerUnavailability", back_populates="lecturer")
@@ -68,6 +116,13 @@ class LecturerAssignment(Base):
     id = Column(Integer, primary_key=True, index=True)
     lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    
+    # New Fields
+    session_type = Column(String, nullable=True) # lecture, tutorial, practical
+    room_preference = Column(Enum(RoomType), nullable=True)
+    group_division_required = Column(Boolean, default=False)
+    expertise_level = Column(String, default="primary") # primary, assistant
+    notes = Column(String, nullable=True)
     
     lecturer = relationship("Lecturer", back_populates="assignments")
     course = relationship("Course", back_populates="lecturer_assignments")
@@ -93,6 +148,16 @@ class Room(Base):
     room_type = Column(String, nullable=False)  # lecture, lab, tutorial
     has_projector = Column(Boolean, default=True)
     has_computers = Column(Boolean, default=False)
+    
+    # New Fields
+    room_category = Column(Enum(RoomCategory), nullable=True)
+    department_affinity = Column(String, nullable=True) # "AEN", "general", etc.
+    
+    # Enhanced Fields for Scheduling & Logistics
+    furniture_type = Column(String, nullable=True) # e.g., "Lecture Theatre", "Seminar Room"
+    equipment = Column(JSON, default=list) # List of equipment strings
+    availability = Column(String, nullable=True) # e.g., "Mon-Fri 07:00-19:00"
+    priority = Column(String, default="standard") # "high" or "standard"
 
 class StudentGroup(Base):
     __tablename__ = "student_groups"
@@ -102,6 +167,13 @@ class StudentGroup(Base):
     level = Column(Integer, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
     size = Column(Integer, nullable=False)
+    
+    # New Fields
+    group_type = Column(Enum(GroupType), default=GroupType.DEPARTMENT)
+    parent_group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=True)
+    display_code = Column(String, nullable=True) # "GEN1", "AEN", "D1"
+    
+    parent_group = relationship("StudentGroup", remote_side="StudentGroup.id", backref="subgroups")
     
     department = relationship("Department")
     assignments = relationship("GroupAssignment", back_populates="group")
@@ -143,6 +215,7 @@ class Timetable(Base):
     name = Column(String, nullable=False)
     semester = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
+    academic_half = Column(String, default="first_half") # "first_half" or "second_half"
     is_active = Column(Boolean, default=False)
     generation_metadata = Column(JSON, nullable=True)  # Stores level-by-level generation info
     

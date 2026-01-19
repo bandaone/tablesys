@@ -50,21 +50,21 @@ export const coursesAPI = {
     const response = await api.get('/courses/');
     return response.data;
   },
-  
+
   create: async (data: Record<string, unknown>) => {
     const response = await api.post('/courses/', data);
     return response.data;
   },
-  
+
   update: async (id: number, data: Record<string, unknown>) => {
     const response = await api.put(`/courses/${id}`, data);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/courses/${id}`);
   },
-  
+
   bulkUpload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -75,6 +75,11 @@ export const coursesAPI = {
     });
     return response.data;
   },
+
+  deleteAll: async () => {
+    const response = await api.delete('/courses/');
+    return response.data;
+  },
 };
 
 export const lecturersAPI = {
@@ -82,21 +87,21 @@ export const lecturersAPI = {
     const response = await api.get('/lecturers/');
     return response.data;
   },
-  
+
   create: async (data: any) => {
     const response = await api.post('/lecturers/', data);
     return response.data;
   },
-  
+
   update: async (id: number, data: any) => {
     const response = await api.put(`/lecturers/${id}`, data);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/lecturers/${id}`);
   },
-  
+
   bulkUpload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -114,21 +119,21 @@ export const roomsAPI = {
     const response = await api.get('/rooms/');
     return response.data;
   },
-  
+
   create: async (data: any) => {
     const response = await api.post('/rooms/', data);
     return response.data;
   },
-  
+
   update: async (id: number, data: any) => {
     const response = await api.put(`/rooms/${id}`, data);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/rooms/${id}`);
   },
-  
+
   bulkUpload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -139,6 +144,11 @@ export const roomsAPI = {
     });
     return response.data;
   },
+
+  deleteAll: async () => {
+    const response = await api.delete('/rooms/');
+    return response.data;
+  },
 };
 
 export const groupsAPI = {
@@ -146,21 +156,21 @@ export const groupsAPI = {
     const response = await api.get('/groups/');
     return response.data;
   },
-  
+
   create: async (data: any) => {
     const response = await api.post('/groups/', data);
     return response.data;
   },
-  
+
   update: async (id: number, data: any) => {
     const response = await api.put(`/groups/${id}`, data);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/groups/${id}`);
   },
-  
+
   bulkUpload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -178,12 +188,12 @@ export const departmentsAPI = {
     const response = await api.get('/departments/');
     return response.data;
   },
-  
+
   create: async (data: any) => {
     const response = await api.post('/departments/', data);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/departments/${id}`);
   },
@@ -194,22 +204,22 @@ export const timetablesAPI = {
     const response = await api.get('/timetables/');
     return response.data;
   },
-  
+
   get: async (id: number) => {
     const response = await api.get(`/timetables/${id}`);
     return response.data;
   },
-  
+
   create: async (data: any) => {
     const response = await api.post('/timetables/', data);
     return response.data;
   },
-  
+
   activate: async (id: number) => {
     const response = await api.post(`/timetables/${id}/activate`);
     return response.data;
   },
-  
+
   delete: async (id: number) => {
     await api.delete(`/timetables/${id}`);
   },

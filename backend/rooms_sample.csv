@@ -1,0 +1,33 @@
+name,capacity,building,furniture_type,equipment,availability
+MLT,300,School of Mines,Lecture Theatre,"Projector; Microphone; Whiteboard",Mon-Fri 07:00-19:00
+ENLT1,350,School of Engineering,Lecture Theatre,"Projector; Microphone; Whiteboard; Smart Board",Mon-Fri 07:00-19:00
+ENLT2,350,School of Engineering,Lecture Theatre,"Projector; Microphone; Whiteboard; Smart Board",Mon-Fri 07:00-19:00
+LT,150,School of Engineering,Lecture Theatre,"Projector; Whiteboard",Mon-Fri 07:00-19:00
+LR,60,School of Engineering,Lecture Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+S3,40,School of Engineering,Seminar Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+S4,40,School of Engineering,Seminar Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+S5,40,School of Engineering,Seminar Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+D1,30,School of Engineering,Drawing Room,"Drawing Tables; Drafting Equipment; Computers",Mon-Fri 07:00-19:00
+D2,30,School of Engineering,Drawing Room,"Drawing Tables; Drafting Equipment; Computers",Mon-Fri 07:00-19:00
+D3,30,School of Engineering,Drawing Room,"Drawing Tables; Drafting Equipment; Computers",Mon-Fri 07:00-19:00
+D4,30,School of Engineering,Drawing Room,"Drawing Tables; Drafting Equipment; Computers",Mon-Fri 07:00-19:00
+G01,35,Surveying Building,Lecture Room,"Whiteboard; Projector; Surveying Equipment",Mon-Fri 07:00-19:00
+G02,35,Surveying Building,Lecture Room,"Whiteboard; Projector; Surveying Equipment",Mon-Fri 07:00-19:00
+G03,35,Surveying Building,Lecture Room,"Whiteboard; Projector; Surveying Equipment",Mon-Fri 07:00-19:00
+G04,35,Surveying Building,Lecture Room,"Whiteboard; Projector; Surveying Equipment",Mon-Fri 07:00-19:00
+G05,35,Surveying Building,Lecture Room,"Whiteboard; Projector; Surveying Equipment",Mon-Fri 07:00-19:00
+NLR1,80,New Building,Lecture Room,"Projector; Whiteboard; Computers",Mon-Fri 07:00-19:00
+NLR2,80,New Building,Lecture Room,"Projector; Whiteboard; Computers",Mon-Fri 07:00-19:00
+CONF,25,Agricultural Engineering,Conference Room,"Projector; Whiteboard; Conference Table",Mon-Fri 07:00-19:00
+OM1,100,School of Agricultural Sciences,Lecture Theatre,"Projector; Microphone; Whiteboard",Mon-Fri 07:00-19:00
+OM2,100,School of Agricultural Sciences,Lecture Theatre,"Projector; Microphone; Whiteboard",Mon-Fri 07:00-19:00
+TRA,40,School of Agricultural Sciences,Tutorial Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+TRB,40,School of Agricultural Sciences,Tutorial Room,"Whiteboard; Projector",Mon-Fri 07:00-19:00
+BLT,30,School of Agricultural Sciences,Laboratory,"Lab Benches; Microscopes; Lab Equipment",Mon-Fri 07:00-19:00
+COMP,25,Agricultural Engineering,Computer Lab,"Computers; Projector; Software",Mon-Fri 07:00-19:00
+MLAB,25,Agricultural Engineering,Laboratory,"Lab Benches; Agricultural Machinery; Testing Equipment",Mon-Fri 07:00-19:00
+SPL,25,Agricultural Engineering,Laboratory,"Lab Benches; Soil Testing Equipment",Mon-Fri 07:00-19:00
+MPR,20,School of Engineering,Computer Lab,"Computers; Microprocessors; Electronics Equipment",Mon-Fri 07:00-19:00
+PLT1,150,Population Studies,Lecture Theatre,"Projector; Microphone; Whiteboard",Mon-Fri 07:00-19:00
+PLT2,150,Population Studies,Lecture Theatre,"Projector; Microphone; Whiteboard",Mon-Fri 07:00-19:00
+LT2,120,School of Natural Sciences,Lecture Theatre,"Projector; Whiteboard",Mon-Fri 07:00-19:00

@@ -84,6 +84,17 @@ async def delete_lecturer(
     db.commit()
     return None
 
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def delete_all_lecturers(
+    current_user: User = Depends(get_current_active_coordinator),
+    db: Session = Depends(get_db)
+):
+    """Delete all lecturers. Coordinator only. Use before bulk re-upload."""
+    count = db.query(LecturerModel).count()
+    db.query(LecturerModel).delete()
+    db.commit()
+    return {"status": "success", "deleted": count, "message": f"Deleted {count} lecturers"}
+
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_lecturers(
     file: UploadFile = File(...),

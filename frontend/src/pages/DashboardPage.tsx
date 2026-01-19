@@ -73,10 +73,10 @@ const DashboardPage: React.FC = () => {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Box>
-                    <Typography variant="h3" fontWeight="bold">
+                    <Typography variant="h3" fontWeight="bold" sx={{ color: 'white' }}>
                       {card.value}
                     </Typography>
-                    <Typography variant="h6">
+                    <Typography variant="h6" sx={{ color: 'white' }}>
                       {card.title}
                     </Typography>
                   </Box>

@@ -14,8 +14,8 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { 
-  School as SchoolIcon, 
+import {
+  School as SchoolIcon,
   Engineering as EngineeringIcon,
   ElectricalServices as ElectricalIcon,
   Agriculture as AgricultureIcon,
@@ -30,7 +30,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedDept, setSelectedDept] = useState('');
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -38,8 +38,8 @@ const LoginPage: React.FC = () => {
 
   // UNZA Official Colors
   const unzaColors = {
-    primaryDark: '#003366',
-    primaryLight: '#0055A4',
+    primaryDark: '#0D5C3C',
+    primaryLight: '#1B8858',
     secondary: '#FF8C00',
     accent: '#4A90E2',
     paper: '#FFFFFF',
@@ -50,11 +50,23 @@ const LoginPage: React.FC = () => {
 
   // School of Engineering Departments
   const departments = [
+    { code: 'GEN', name: 'General', icon: <SchoolIcon />, color: '#555555' },
     { code: 'AEN', name: 'Agricultural Engineering', icon: <AgricultureIcon />, color: '#2E7D32' },
     { code: 'MEC', name: 'Mechanical Engineering', icon: <EngineeringIcon />, color: '#D32F2F' },
     { code: 'EEE', name: 'Electrical & Electronics', icon: <ElectricalIcon />, color: '#1976D2' },
     { code: 'CEE', name: 'Civil & Environmental', icon: <EngineeringIcon />, color: '#F57C00' },
     { code: 'GEE', name: 'Geomatics Engineering', icon: <TerrainIcon />, color: '#7B1FA2' },
+  ];
+
+  // Users seeded in backend/seed_users.py
+  const AVAILABLE_USERS = [
+    { label: 'Coordinator', username: 'coordinator', role: 'COORDINATOR' },
+    { label: 'HOD GEN', username: 'hod_gen', role: 'HOD' },
+    { label: 'HOD AEN', username: 'hod_aen', role: 'HOD' },
+    { label: 'HOD MEC', username: 'hod_mec', role: 'HOD' },
+    { label: 'HOD EEE', username: 'hod_eee', role: 'HOD' },
+    { label: 'HOD CEE', username: 'hod_cee', role: 'HOD' },
+    { label: 'HOD GEE', username: 'hod_gee', role: 'HOD' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +87,7 @@ const LoginPage: React.FC = () => {
 
   const handleDeptSelect = (deptCode: string) => {
     setSelectedDept(deptCode);
-    setUsername(deptCode);
+    setUsername(`hod_${deptCode.toLowerCase()}`);
   };
 
   const handleUserSelect = (user: string) => {
@@ -87,77 +99,107 @@ const LoginPage: React.FC = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${unzaColors.primaryDark} 0%, ${unzaColors.primaryLight} 100%)`,
+        background: `linear-gradient(135deg, ${unzaColors.primaryDark}99 0%, ${unzaColors.primaryLight}99 100%)`, // Reduced opacity to let image show
+        backgroundImage: 'url(/unza_background_bright.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundBlendMode: 'overlay', // Changed from multiply to overlay for brightness
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         py: 4,
-        px: 2
+        px: 2,
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.2)', // Slight dark overlay for text contrast instead of green
+          backdropFilter: 'blur(2px)',
+          zIndex: 0
+        }
       }}
     >
-      <Container maxWidth="lg">
-        <Grid container spacing={4} alignItems="center">
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+        <Grid container spacing={4} alignItems="stretch" sx={{ minHeight: '80vh' }}>
           {/* Left Panel - UNZA Branding */}
           {!isMobile && (
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
               <Paper
                 elevation={0}
                 sx={{
-                  background: 'transparent',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
                   color: 'white',
                   p: 4,
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  borderRadius: 3,
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  width: '100%'
                 }}
               >
-                <SchoolIcon sx={{ fontSize: 80, mb: 3, opacity: 0.9 }} />
-                
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
+                <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <SchoolIcon sx={{ fontSize: 64, mb: 2, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                </Box>
+
+                <Typography
+                  variant="h3"
+                  sx={{
                     fontWeight: 700,
                     mb: 2,
-                    letterSpacing: 1
+                    letterSpacing: 1,
+                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
                   }}
                 >
-                  UNIVERSITY OF ZAMBIA
+                  THE UNIVERSITY OF ZAMBIA
                 </Typography>
-                
-                <Divider 
-                  sx={{ 
-                    my: 3, 
-                    borderColor: unzaColors.secondary,
+
+                <Divider
+                  sx={{
+                    my: 2,
+                    borderColor: 'rgba(255, 255, 255, 0.8)',
                     borderWidth: 2,
                     width: '60%',
                     mx: 'auto'
-                  }} 
+                  }}
                 />
-                
-                <Typography 
-                  variant="h5" 
-                  sx={{ 
+
+                <Typography
+                  variant="h5"
+                  sx={{
                     fontWeight: 500,
                     mb: 1,
-                    fontStyle: 'italic'
+                    fontStyle: 'italic',
+                    textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
                   }}
                 >
                   School of Engineering
                 </Typography>
-                
-                <Typography 
+
+                <Typography
                   variant="subtitle1"
-                  sx={{ 
-                    opacity: 0.9,
-                    mb: 4
+                  sx={{
+                    mb: 3,
+                    textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
                   }}
                 >
                   Office of the Dean • Great East Road Campus
                 </Typography>
-                
-                <Box sx={{ mt: 6 }}>
-                  <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
+
+                <Box sx={{ mt: 4 }}>
+                  <Typography variant="h4" sx={{ fontWeight: 600, mb: 1, textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
                     TABLESYS
                   </Typography>
-                  <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                  <Typography variant="subtitle1" sx={{ textShadow: '1px 1px 3px rgba(0,0,0,0.3)' }}>
                     Timetable Management System
                   </Typography>
                 </Box>
@@ -171,9 +213,13 @@ const LoginPage: React.FC = () => {
               elevation={8}
               sx={{
                 p: { xs: 3, sm: 4, md: 5 },
-                borderRadius: 2,
-                background: unzaColors.paper,
+                borderRadius: 3,
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
                 borderLeft: `6px solid ${unzaColors.secondary}`,
+                border: '2px solid rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
                 position: 'relative',
                 overflow: 'hidden'
               }}
@@ -189,14 +235,14 @@ const LoginPage: React.FC = () => {
                   background: unzaColors.primaryDark
                 }}
               />
-              
+
               <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <LockOpenIcon 
-                  sx={{ 
-                    fontSize: 48, 
+                <LockOpenIcon
+                  sx={{
+                    fontSize: 48,
                     color: unzaColors.primaryDark,
-                    mb: 2 
-                  }} 
+                    mb: 2
+                  }}
                 />
                 <Typography variant="h5" sx={{ fontWeight: 600, color: unzaColors.textDark }}>
                   System Access Portal
@@ -213,8 +259,8 @@ const LoginPage: React.FC = () => {
               )}
 
               {/* Login Form */}
-              <Box 
-                component="form" 
+              <Box
+                component="form"
                 onSubmit={(e: React.FormEvent) => {
                   e.preventDefault();
                   void handleSubmit(e);
@@ -225,7 +271,7 @@ const LoginPage: React.FC = () => {
                   label="Username / Department Code"
                   variant="outlined"
                   value={username}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value.toUpperCase()); }}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); }}
                   sx={{
                     mb: 3,
                     '& .MuiOutlinedInput-root': {
@@ -274,16 +320,16 @@ const LoginPage: React.FC = () => {
                   Available Users:
                 </Typography>
                 <Grid container spacing={1} sx={{ mb: 4 }}>
-                  {['coordinator', 'admin', 'AEN', 'MEC', 'EEE', 'CEE', 'GEE'].map((user) => (
-                    <Grid item key={user}>
+                  {AVAILABLE_USERS.map((user) => (
+                    <Grid item key={user.username}>
                       <Chip
-                        label={user}
+                        label={user.label}
                         size="small"
-                        onClick={() => { handleUserSelect(user); }}
+                        onClick={() => { handleUserSelect(user.username); }}
                         sx={{
-                          bgcolor: username === user ? unzaColors.secondary : unzaColors.accent + '20',
-                          color: username === user ? 'white' : unzaColors.primaryDark,
-                          fontWeight: username === user ? 600 : 400,
+                          bgcolor: username === user.username ? unzaColors.secondary : unzaColors.accent + '20',
+                          color: username === user.username ? 'white' : unzaColors.primaryDark,
+                          fontWeight: username === user.username ? 600 : 400,
                           '&:hover': {
                             bgcolor: unzaColors.secondary,
                             color: 'white'
@@ -316,9 +362,9 @@ const LoginPage: React.FC = () => {
               </Box>
 
               {/* Footer Note */}
-              <Alert 
-                severity="info" 
-                sx={{ 
+              <Alert
+                severity="info"
+                sx={{
                   mt: 4,
                   bgcolor: unzaColors.accent + '20',
                   border: `1px solid ${unzaColors.accent}`,

@@ -33,7 +33,10 @@ services:
       - ./backend:/app
     networks:
       - tablesys-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: >
+      sh -c "while ! pg_isready -h postgres -p 5432 -U tablesys; do sleep 1; done;
+             python seed_users.py;
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
@@ -41,7 +44,7 @@ services:
       dockerfile: Dockerfile
     container_name: tablesys-frontend
     ports:
-      - "3000:3000"
+      - "3002:3002"
     depends_on:
       - backend
     volumes:

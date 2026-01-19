@@ -1,0 +1,87 @@
+code,name,department_id,level,credits,lecture_hours,tutorial_hours,practical_hours
+CEE 2219,Statics and Introduction to Mechanics of Materials,2,2,4,2,1.5,0
+EEE 2019,Principles of Electrical and Electronics Engineering,3,2,3,2,1,2
+ENG 2129,Engineering Communication,0,2,2,2,1,0
+ENG 2139,Introduction to Information Technology,0,2,2,2,1,2
+ENG 2159,Engineering Workshop Technology,0,2,2,1,0,3
+MAT 2110,Engineering Mathematics I,0,2,4,3,3,0
+MEC 2009,Engineering Drawing I,5,2,3,2,1,4
+MEC 2309,Properties of Engineering Materials I,5,2,3,2,1,2
+AGG 3811,Rural Sociology,1,3,4,4,3,0
+CEE 3311,Fluid Mechanics I,2,3,3,3,1,2
+AGA 3335,Fundamentals of Animal Production,1,3,3,4,3,0
+MEC 3401,Thermodynamics I,5,3,4,2,1,2
+MAT 3110,Engineering Mathematics II,0,3,3,3,2,0
+MEC 3352,Strength of Materials I,5,3,4,2,1,2
+AGC 3135,Fundamentals of Field Crop Production,1,3,3,4,3,0
+AEN 3412,Soil and Water Conservation Engineering,1,3,4,4,3,0
+CEE 4311,Hydrology,2,4,4,4,3,0
+AEN 4311,Farm Power,1,4,4,4,3,0
+GEE 4812,Introduction to Geomatics,4,4,3,4,3,0
+MAT 4119,Engineering Mathematics III,0,4,3,2,1,1
+AEN 4512,Food Process Engineering,1,4,4,4,3,0
+ENG 4129,Engineering Management & Entrepreneurship,0,4,3,2,1,0
+AEN 4112,Agricultural Machinery Design,1,4,4,4,3,0
+AEN 4612,Instrumentation and Process Control,1,4,4,4,3,0
+ENG 4143,Industrial Training I,0,4,2,0,0,4
+EEE 3112,Electrical Engineering Practice,3,3,3,4,3,0
+EEE 3121,Signals and Systems,3,3,4,2,1,2
+EEE 3131,Digital Electronics,3,3,4,2,1,2
+EEE 3132,Computer Engineering,3,3,4,2,1,2
+EEE 3352,Electromechanics and Machines,3,3,4,2,1,2
+EEE 3571,Electronic Engineering I,3,3,4,2,1,2
+ENG 3165,Fluid Mechanics & Thermodynamics,0,3,3,3,1,2
+EEE 4021,Engineering Electromagnetics,3,4,4,2,1,2
+EEE 4221,Digital Signal Processing,3,4,4,2,1,2
+EEE 4242,Electrical Instrumentation,3,4,4,2,1,2
+EEE 4352,Electrical Machines,3,4,4,2,1,2
+EEE 4362,Electrical Power Systems I,3,4,4,2,1,2
+EEE 4571,Electronic Engineering II,3,4,4,2,1,2
+EEE 4135,Microcontroller Technology and Embedded Systems,3,4,4,2,1,2
+EEE 4670,Electronic Engineering III,3,4,4,2,1,2
+EEE 4682,Communications Principles,3,4,4,2,1,2
+EEE 5014,Project,3,5,6,1,0,8
+EEE 5240,Dynamic Systems and Control Engineering,3,5,4,2,1,2
+EEE 5351,Advanced Electrical Machines,3,5,4,2,1,2
+EEE 5451,Power Electronics,3,5,4,2,1,2
+EEE 5362,Electrical Power Systems II,3,5,4,2,1,2
+ENG 5129,Engineering Management & Society,0,5,3,2,1,0
+ENG 5143,Industrial Training II,0,5,2,0,0,4
+EEE 5581,Communications Networks,3,5,4,2,1,2
+EEE 5681,Communication Theory,3,5,4,2,1,2
+EEE 5682,Communication Systems,3,5,4,2,1,2
+GEE 3511,Land Management I,4,3,4,2,1,2
+GEE 3522,Land Management II,4,3,4,2,1,2
+GEE 3622,Principles of Data Acquisition and Processing,4,3,4,2,1,2
+GEE 3222,Data Representation and Visualizations,4,3,4,2,1,2
+CEE 3711,"Soil Science, Roads, Hydrology and Civil Engineering Drawing",2,3,3,2,1,1
+GEE 3711,Surveying,4,3,4,2,1,2
+CEE 4612,Highway Engineering,2,4,4,2,1,2
+GEE 4411,Geodesy I,4,4,4,2,1,2
+GEE 4311,Image Analysis,4,4,4,2,1,2
+GEE 4122,Numerical Methods and Programming,4,4,4,2,1,2
+GEE 4622,Spatial Modelling and Analysis,4,4,4,2,1,2
+GEE 4712,Engineering Surveying,4,4,4,2,1,2
+GEE 5411,Geodesy II,4,5,4,2,1,2
+GEE 5610,Geographic Information Infrastructure,4,5,4,2,1,2
+GEE 5804,Project,4,5,6,1,0,8
+CEE 5111,Construction Management,2,5,4,2,1,2
+GEE 5812,Integrated Mapping,4,5,4,2,1,2
+MEC 3001,Mechanical Engineering Drawing II,5,3,4,2,1,2
+MEC 3351,Strength of Materials I,5,3,4,2,1,2
+MEC 3102,"Production Technology, Electricity & Electronics",5,3,4,2,1,2
+MEC 3705,Dynamics,5,3,4,2,1,2
+MAT 3111,Engineering Mathematics II,0,3,3,3,2,0
+MAT 3112,Engineering Mathematics II,0,3,3,3,2,0
+MEC 4105,Production Technology I,5,4,4,2,1,2
+MEC 4301,Properties of Engineering Materials II,5,4,4,2,1,2
+MEC 4601,Fluid Mechanics II,5,4,4,2,1,2
+MAT 4111,Engineering Mathematics IV,0,4,3,2,1,1
+MEC 4055,Machine Design I,5,4,4,2,1,2
+MEC 4402,Thermodynamics II and Heat Engines,5,4,4,2,1,2
+MEC 4702,Vibrations and Control Engineering I,5,4,4,2,1,2
+MEC 5051,Machine Design II,5,5,4,2,1,2
+MEC 5105,Production Technology & Process Engineering,5,5,4,2,1,2
+MEC 5401,Heat Transfer,5,5,4,2,1,2
+MEC 5904,Final Year Project,5,5,6,1,0,8
+MEC 5205,Maintenance Engineering,5,5,4,2,1,2

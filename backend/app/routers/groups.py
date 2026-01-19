@@ -81,6 +81,17 @@ async def delete_group(
     db.commit()
     return None
 
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def delete_all_groups(
+    current_user: User = Depends(get_current_active_coordinator),
+    db: Session = Depends(get_db)
+):
+    """Delete all student groups. Coordinator only. Use before bulk re-upload."""
+    count = db.query(StudentGroupModel).count()
+    db.query(StudentGroupModel).delete()
+    db.commit()
+    return {"status": "success", "deleted": count, "message": f"Deleted {count} groups"}
+
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_groups(
     file: UploadFile = File(...),

@@ -1,0 +1,18 @@
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={clearAllDialogOpen} onClose={() => setClearAllDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Clear All Courses?</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            This will permanently delete all {stats.total} courses from the system. This action cannot be undone.
+          </Alert>
+          <Typography sx={{ mt: 2 }}>
+            Are you sure you want to proceed?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearAllDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleClearAll} variant="contained" color="error" disabled={loading}>
+            {loading ? 'Deleting...' : 'Delete All Courses'}
+          </Button>
+        </DialogActions>
+      </Dialog>

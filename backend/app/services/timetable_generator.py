@@ -1,8 +1,13 @@
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
-from typing import Dict, Callable
+from typing import Dict, Callable, List, Tuple
 from datetime import time
-from ..models import Course, Lecturer, Room, StudentGroup, TimetableSlot
+import json
+from ..models import (
+    Course, Lecturer, Room, StudentGroup, TimetableSlot, 
+    LecturerAssignment, GroupAssignment, RoomType, RoomCategory,
+    CourseType
+)
 
 class TimetableGenerator:
     def __init__(self, db: Session, timetable_id: int, progress_callback: Callable = None):
@@ -10,18 +15,11 @@ class TimetableGenerator:
         self.timetable_id = timetable_id
         self.progress_callback = progress_callback
         
-        # Time slots configuration (8:00 - 17:00, 1-hour slots)
+        # Time slots configuration (07:00 - 19:00, 1-hour slots)
         self.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        # 12 slots per day: 07:00, 08:00, ..., 18:00
         self.time_slots = [
-            (time(8, 0), time(9, 0)),
-            (time(9, 0), time(10, 0)),
-            (time(10, 0), time(11, 0)),
-            (time(11, 0), time(12, 0)),
-            (time(12, 0), time(13, 0)),
-            (time(13, 0), time(14, 0)),
-            (time(14, 0), time(15, 0)),
-            (time(15, 0), time(16, 0)),
-            (time(16, 0), time(17, 0)),
+            (time(7 + i, 0), time(8 + i, 0)) for i in range(12)
         ]
         
         self.all_slots = []  # Will store all generated slots
@@ -90,220 +88,366 @@ class TimetableGenerator:
         
         return True
     
+    def _parse_course_sessions(self, course: Course) -> List[Dict]:
+        """
+        Break down a course into required sessions (blocks) based on config.
+        Returns list of dicts: {'type': 'lecture', 'duration': 2, 'id': 0}
+        """
+        sessions = []
+        
+        # Parse session configuration
+        config = course.session_configuration or {}
+        # Default: respect consecutive requirements if present, else 1-hour blocks?
+        # Actually, if lecture_hours=4 and consecutive=2, we want 2 blocks of 2.
+        
+        requires_consecutive = config.get('requires_consecutive', 1)
+        if isinstance(requires_consecutive, bool):
+             requires_consecutive = 2 if requires_consecutive else 1
+        
+        requires_consecutive = int(requires_consecutive)
+        
+        # 1. Lectures
+        lecture_hours = course.lecture_hours
+        while lecture_hours > 0:
+            duration = min(requires_consecutive, lecture_hours)
+            sessions.append({
+                'type': 'lecture',
+                'duration': duration,
+                'course_id': course.id,
+                's_id': len(sessions)
+            })
+            lecture_hours -= duration
+            
+        # 2. Tutorials
+        # Tutorials usually 1 or 2 hours
+        tut_hours = course.tutorial_hours
+        while tut_hours > 0:
+            duration = min(tut_hours, 2) # Cap tutorial blocks at 2 hours usually
+            sessions.append({
+                'type': 'tutorial',
+                'duration': duration,
+                'course_id': course.id,
+                's_id': len(sessions)
+            })
+            tut_hours -= duration
+            
+        # 3. Practicals (Labs)
+        # Labs are often 3 hours
+        prac_hours = course.practical_hours
+        while prac_hours > 0:
+            duration = min(prac_hours, 3) # Cap lab blocks at 3 hours usually
+            sessions.append({
+                'type': 'practical',
+                'duration': duration,
+                'course_id': course.id,
+                's_id': len(sessions)
+            })
+            prac_hours -= duration
+            
+        return sessions
+
+    def _get_compatible_rooms(self, course: Course, session_type: str, all_rooms: List[Room]) -> List[Room]:
+        """Filter rooms based on course preferences and capability"""
+        compatible_rooms = []
+        
+        for room in all_rooms:
+            # 1. Check Department Affinity
+            if room.department_affinity:
+                # If room has affinity, course must match.
+                # Assuming department mapping or just checking if course.department.code matches
+                # simplified: if affinity is string, check if it is part of display code or dept name
+                # For now, strict check if available, or skip generic rooms
+                pass 
+                # Refined logic: If affinity is set, room is restricted.
+                # But we don't have easy link to Dept Code here without extra queries.
+                # Let's rely on room_type for now mostly.
+            
+            # 2. Check Room Type/Category
+            # Map Course Preferred Room Type to Room Type
+            # Course.preferred_room_type is enum RoomType (lecture_hall, lab, etc)
+            # Room.room_type is string (legacy) or room_category (new Enum)
+            
+            if course.preferred_room_type == RoomType.ANY:
+                # Allow any room that fits capacity (maybe)
+                # But prefer Lecture Halls for Lectures
+                if session_type == 'lecture' and 'lecture' in str(room.room_type).lower():
+                    compatible_rooms.append(room)
+                elif session_type == 'practical' and 'lab' in str(room.room_type).lower():
+                    compatible_rooms.append(room)
+                else:
+                    compatible_rooms.append(room)
+                continue
+
+            # Strict matching if preference is set
+            pref = course.preferred_room_type
+            
+            # Map Enum to string checks
+            if pref == RoomType.LECTURE_HALL:
+                if 'lecture' in str(room.room_type).lower() or 'class' in str(room.room_type).lower():
+                    compatible_rooms.append(room)
+            elif pref == RoomType.LAB:
+                if 'lab' in str(room.room_type).lower():
+                    compatible_rooms.append(room)
+            elif pref == RoomType.DRAWING_ROOM:
+                if 'drawing' in str(room.room_type).lower():
+                    compatible_rooms.append(room)
+            else:
+                # Default loose match
+                compatible_rooms.append(room)
+                
+        return compatible_rooms
+
     def generate_level_timetable(self, level: int, progress_start: float, progress_end: float) -> bool:
         """Generate timetable for a specific level using CP-SAT solver"""
         
-        # Get all courses for this level
+        # 1. Fetch Data
         courses = self.db.query(Course).filter(Course.level == level).all()
+        if not courses: return True
         
-        if not courses:
-            return True  # No courses for this level, skip
-        
-        self.send_progress(
-            level=level,
-            status='loading',
-            percentage=progress_start + 5,
-            message=f'Loading {len(courses)} courses for Level {level}...'
-        )
-        
-        # Get groups for this level
         groups = self.db.query(StudentGroup).filter(StudentGroup.level == level).all()
+        if not groups: return True
         
-        if not groups:
-            return True  # No groups, skip
+        all_rooms = self.db.query(Room).all()
         
-        # Get all available rooms
-        rooms = self.db.query(Room).all()
+        self.send_progress(level, 'building', progress_start + 10, f'Preparing constraints for {len(courses)} courses...')
         
-        # Create the CP-SAT model
         model = cp_model.CpModel()
         
-        self.send_progress(
-            level=level,
-            status='building',
-            percentage=progress_start + 10,
-            message=f'Building constraint model for Level {level}...'
-        )
+        # 2. Variables
+        # Key: (course_id, group_id, session_idx, day, start_time, room_id, lecturer_id) -> BoolVar
+        # To reduce size, we will only create valid variables
         
-        # Variables: assignment[course][group][day][time_slot][room][lecturer]
-        assignments = {}
+        vars_store = {} # Key -> BoolVar
+        course_sessions = {} # course_id -> list of session dicts
         
+        # Pre-process sessions
         for course in courses:
-            # Get lecturers assigned to this course
-            lecturer_assignments = self.db.query(LecturerAssignment).filter(
-                LecturerAssignment.course_id == course.id
-            ).all()
-            lecturers = [self.db.query(Lecturer).get(la.lecturer_id) for la in lecturer_assignments]
+            course_sessions[course.id] = self._parse_course_sessions(course)
             
-            if not lecturers:
-                continue
-            
-            # Get groups assigned to this course
-            group_assignments = self.db.query(GroupAssignment).filter(
-                GroupAssignment.course_id == course.id
-            ).all()
-            course_groups = [self.db.query(StudentGroup).get(ga.group_id) for ga in group_assignments]
-            
-            if not course_groups:
-                continue
-            
-            for group in course_groups:
-                for day_idx, day in enumerate(self.days):
-                    for time_idx, (start_time, end_time) in enumerate(self.time_slots):
-                        for room in rooms:
-                            for lecturer in lecturers:
-                                var_name = f'c{course.id}_g{group.id}_d{day_idx}_t{time_idx}_r{room.id}_l{lecturer.id}'
-                                assignments[(course.id, group.id, day_idx, time_idx, room.id, lecturer.id)] = \
-                                    model.NewBoolVar(var_name)
-        
-        self.send_progress(
-            level=level,
-            status='constraints',
-            percentage=progress_start + 30,
-            message=f'Adding constraints for Level {level}...'
-        )
-        
-        # Constraint 1: Each course-group combination must have the required number of hours
+        # Loop to create variables
         for course in courses:
-            group_assignments = self.db.query(GroupAssignment).filter(
-                GroupAssignment.course_id == course.id
-            ).all()
-            course_groups = [self.db.query(StudentGroup).get(ga.group_id) for ga in group_assignments]
+            # Lecturers
+            lecturer_assignments = self.db.query(LecturerAssignment).filter(LecturerAssignment.course_id == course.id).all()
+            possible_lecturers = [la.lecturer_id for la in lecturer_assignments]
+            if not possible_lecturers: continue # Skip courses with no lecturer? Or allow TBD? For now skip.
             
-            for group in course_groups:
-                # Calculate total required hours
-                total_hours = course.lecture_hours + course.tutorial_hours + course.practical_hours
+            # Groups
+            group_assignments = self.db.query(GroupAssignment).filter(GroupAssignment.course_id == course.id).all()
+            possible_groups = [ga.group_id for ga in group_assignments]
+            if not possible_groups: continue
+            
+            sessions = course_sessions[course.id]
+            
+            for session in sessions:
+                duration = session['duration']
+                s_id = session['s_id']
                 
-                # Sum all assignments for this course-group combination
-                course_group_vars = [
-                    assignments[(course.id, group.id, d, t, r, l)]
-                    for (c, g, d, t, r, l) in assignments.keys()
-                    if c == course.id and g == group.id
-                ]
+                # Filter valid rooms
+                valid_rooms = self._get_compatible_rooms(course, session['type'], all_rooms)
                 
-                if course_group_vars:
-                    model.Add(sum(course_group_vars) == total_hours)
-        
-        # Constraint 2: No room can be used by multiple courses at the same time
-        for day_idx in range(len(self.days)):
-            for time_idx in range(len(self.time_slots)):
-                for room in rooms:
-                    room_vars = [
-                        assignments[(c, g, d, t, r, l)]
-                        for (c, g, d, t, r, l) in assignments.keys()
-                        if d == day_idx and t == time_idx and r == room.id
-                    ]
-                    
-                    if room_vars:
-                        model.Add(sum(room_vars) <= 1)
-        
-        # Constraint 3: No lecturer can teach multiple courses at the same time
-        lecturers_in_level = set()
-        for course in courses:
-            lecturer_assignments = self.db.query(LecturerAssignment).filter(
-                LecturerAssignment.course_id == course.id
-            ).all()
-            for la in lecturer_assignments:
-                lecturers_in_level.add(la.lecturer_id)
-        
-        for lecturer_id in lecturers_in_level:
-            for day_idx in range(len(self.days)):
-                for time_idx in range(len(self.time_slots)):
-                    lecturer_vars = [
-                        assignments[(c, g, d, t, r, l)]
-                        for (c, g, d, t, r, l) in assignments.keys()
-                        if d == day_idx and t == time_idx and l == lecturer_id
-                    ]
-                    
-                    if lecturer_vars:
-                        model.Add(sum(lecturer_vars) <= 1)
-        
-        # Constraint 4: No group can have multiple courses at the same time
-        for group in groups:
-            for day_idx in range(len(self.days)):
-                for time_idx in range(len(self.time_slots)):
-                    group_vars = [
-                        assignments[(c, g, d, t, r, l)]
-                        for (c, g, d, t, r, l) in assignments.keys()
-                        if g == group.id and d == day_idx and t == time_idx
-                    ]
-                    
-                    if group_vars:
-                        model.Add(sum(group_vars) <= 1)
-        
-        # Constraint 5: Check for already scheduled slots from previous levels
-        for slot in self.all_slots:
-            for day_idx in range(len(self.days)):
-                if self.days[day_idx] == slot['day']:
-                    for time_idx, (start, end) in enumerate(self.time_slots):
-                        if start == slot['start_time']:
-                            # Block this room
-                            room_vars = [
-                                assignments[(c, g, d, t, r, l)]
-                                for (c, g, d, t, r, l) in assignments.keys()
-                                if d == day_idx and t == time_idx and r == slot['room_id']
-                            ]
-                            if room_vars:
-                                model.Add(sum(room_vars) == 0)
+                for group_id in possible_groups:
+                    # Constraint: Create variables for each potential slot
+                    for day_idx in range(len(self.days)):
+                        # Ensure session fits in day (duration)
+                        # Time slots are 0 to 11 (07:00 to 18:00 start)
+                        # Last valid start index = 12 - duration
+                        for start_t in range(12 - duration + 1):
                             
-                            # Block this lecturer
-                            lecturer_vars = [
-                                assignments[(c, g, d, t, r, l)]
-                                for (c, g, d, t, r, l) in assignments.keys()
-                                if d == day_idx and t == time_idx and l == slot['lecturer_id']
-                            ]
-                            if lecturer_vars:
-                                model.Add(sum(lecturer_vars) == 0)
+                            for room in valid_rooms:
+                                for lecturer_id in possible_lecturers:
+                                    # Create Variable
+                                    var_name = f'c{course.id}_g{group_id}_s{s_id}_d{day_idx}_t{start_t}_r{room.id}_l{lecturer_id}'
+                                    var = model.NewBoolVar(var_name)
+                                    
+                                    key = (course.id, group_id, s_id, day_idx, start_t, room.id, lecturer_id)
+                                    vars_store[key] = var
         
-        self.send_progress(
-            level=level,
-            status='solving',
-            percentage=progress_start + 50,
-            message=f'Solving constraints for Level {level}... This may take a moment.'
-        )
+        # 3. Constraints
         
-        # Solve the model
+        # C1. Each Session must be assigned exactly once per Group
+        for course in courses:
+            group_ids = [ga.group_id for ga in self.db.query(GroupAssignment).filter(GroupAssignment.course_id == course.id).all()]
+            for group_id in group_ids:
+                sessions = course_sessions[course.id]
+                for session in sessions:
+                    # Gather all vars for this specific session
+                    session_vars = []
+                    for k, var in vars_store.items():
+                        # k: (c, g, s, d, t, r, l)
+                        if k[0] == course.id and k[1] == group_id and k[2] == session['s_id']:
+                            session_vars.append(var)
+                    
+                    if session_vars:
+                        model.Add(sum(session_vars) == 1)
+        
+        # Helper to get "Active" status for resource at (day, time)
+        # We need to map Block Starts to Time Coverage
+        # A block starting at T with duration D covers [T, T+1, ..., T+D-1]
+        
+        # Optimization: Pre-calculate coverage maps?
+        # Iterate Day, Time, Resource -> Sum constraints
+        
+        for day_idx in range(len(self.days)):
+            for t_idx in range(12):
+                
+                # C2. Room Capacity / Overlap
+                for room in all_rooms:
+                    active_vars_room = []
+                    # Check all variables that might cover this time
+                    for k, var in vars_store.items():
+                        # k: (c, g, s, d, start_t, r, l)
+                        if k[3] == day_idx and k[5] == room.id:
+                            start_t = k[4]
+                            # Get duration
+                            duration = course_sessions[k[0]][k[2]]['duration']
+                            if start_t <= t_idx < start_t + duration:
+                                active_vars_room.append(var)
+                    
+                    # Add Previous Level Constraints (Already scheduled slots)
+                    # Check self.all_slots
+                    is_blocked_externally = False
+                    for slot in self.all_slots:
+                        if slot['day_of_week'] == day_idx and slot['room_id'] == room.id:
+                            slot_start_idx = self._time_to_idx(slot['start_time'])
+                            slot_end_idx = self._time_to_idx(slot['end_time'])
+                            # slot covers [start, end)
+                            # t_idx covers [t, t+1)
+                            # simplified: if t_idx matches any hour covered by slot
+                            if slot_start_idx <= t_idx < slot_end_idx:
+                                is_blocked_externally = True
+                                break
+                    
+                    if is_blocked_externally:
+                         if active_vars_room:
+                             model.Add(sum(active_vars_room) == 0)
+                    elif active_vars_room:
+                        model.Add(sum(active_vars_room) <= 1)
+
+
+                # C3. Lecturer Overlap
+                # Get all unique lecturers in this level
+                unique_lecturers = set(k[6] for k in vars_store.keys()) # k[6] is lecturer_id
+                
+                for lecturer_id in unique_lecturers:
+                    active_vars_lec = []
+                    for k, var in vars_store.items():
+                        if k[3] == day_idx and k[6] == lecturer_id:
+                            start_t = k[4]
+                            duration = course_sessions[k[0]][k[2]]['duration']
+                            if start_t <= t_idx < start_t + duration:
+                                active_vars_lec.append(var)
+                                
+                    # External check
+                    is_blocked_ext = False
+                    for slot in self.all_slots:
+                         if slot['day_of_week'] == day_idx and slot['lecturer_id'] == lecturer_id:
+                            slot_start_idx = self._time_to_idx(slot['start_time'])
+                            slot_end_idx = self._time_to_idx(slot['end_time'])
+                            if slot_start_idx <= t_idx < slot_end_idx:
+                                is_blocked_ext = True
+                                break
+                    
+                    if is_blocked_ext:
+                        if active_vars_lec:
+                             model.Add(sum(active_vars_lec) == 0)
+                    elif active_vars_lec:
+                        model.Add(sum(active_vars_lec) <= 1)
+
+                # C4. Group Overlap
+                unique_groups = set(k[1] for k in vars_store.keys())
+                for group_id in unique_groups:
+                    active_vars_group = []
+                    for k, var in vars_store.items():
+                        if k[3] == day_idx and k[1] == group_id:
+                            start_t = k[4]
+                            duration = course_sessions[k[0]][k[2]]['duration']
+                            if start_t <= t_idx < start_t + duration:
+                                active_vars_group.append(var)
+                    
+                    # External check (if group was used in previous level?? Unlikely given strict levels, but safe to check)
+                    # Actually, groups are usually distinct per level. But let's be safe.
+                    is_blocked_ext = False
+                    for slot in self.all_slots:
+                         if slot['day_of_week'] == day_idx and slot['group_id'] == group_id:
+                            slot_start_idx = self._time_to_idx(slot['start_time'])
+                            slot_end_idx = self._time_to_idx(slot['end_time'])
+                            if slot_start_idx <= t_idx < slot_end_idx:
+                                is_blocked_ext = True
+                                break
+                    
+                    if is_blocked_ext:
+                        if active_vars_group: model.Add(sum(active_vars_group) == 0)
+                    elif active_vars_group:
+                        model.Add(sum(active_vars_group) <= 1)
+
+        # 4. Soft Constraints & Objectives
+        # Lecturer Preferences: Avoid Early Morning (07:00 at index 0) / Late Afternoon (17:00+ at index 10, 11)
+        objective_terms = []
+        
+        for k, var in vars_store.items():
+            # k: (c, g, s, d, start_t, r, l)
+            lecturer_id = k[6]
+            start_t = k[4]
+            duration = course_sessions[k[0]][k[2]]['duration']
+            end_t = start_t + duration
+            
+            lecturer = self.db.query(Lecturer).get(lecturer_id)
+            if lecturer and lecturer.teaching_preferences:
+                prefs = lecturer.teaching_preferences
+                if isinstance(prefs, dict):
+                    # Avoid Early Morning (07:00 start)
+                    if prefs.get('avoid_early_morning') and start_t == 0:
+                        objective_terms.append(var) # Minimize this being true
+                    
+                    # Avoid Late Afternoon (Any part of session touches 17:00+ i.e. index >= 10)
+                    # 17:00 is index 10. 18:00 is index 11.
+                    if prefs.get('avoid_late_afternoon') and end_t > 10:
+                        objective_terms.append(var)
+
+        if objective_terms:
+            model.Minimize(sum(objective_terms))
+
+        # 5. Solve
+        self.send_progress(level, 'solving', progress_start + 60, f'Solving constraints for Level {level}...')
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 300  # 5 minutes max per level
+        solver.parameters.max_time_in_seconds = 300
+        
         status = solver.Solve(model)
         
-        if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            self.send_progress(
-                level=level,
-                status='extracting',
-                percentage=progress_start + 80,
-                message=f'Extracting solution for Level {level}...'
-            )
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            self.send_progress(level, 'extracting', progress_start + 90, 'solution found! processing...')
             
-            # Extract solution
-            for (course_id, group_id, day_idx, time_idx, room_id, lecturer_id), var in assignments.items():
+            # Extract
+            for k, var in vars_store.items():
                 if solver.Value(var) == 1:
-                    course = self.db.query(Course).get(course_id)
+                    course_id, group_id, s_id, day_idx, start_t, room_id, lecturer_id = k
+                    session_meta = course_sessions[course_id][s_id]
+                    duration = session_meta['duration']
                     
-                    # Determine session type based on hours
-                    session_type = 'lecture'
-                    if course.practical_hours > 0:
-                        session_type = 'practical'
-                    elif course.tutorial_hours > 0:
-                        session_type = 'tutorial'
-                    
-                    slot_data = {
-                        'course_id': course_id,
-                        'lecturer_id': lecturer_id,
-                        'room_id': room_id,
-                        'group_id': group_id,
-                        'day': self.days[day_idx],
-                        'day_of_week': day_idx,
-                        'start_time': self.time_slots[time_idx][0],
-                        'end_time': self.time_slots[time_idx][1],
-                        'session_type': session_type
-                    }
-                    self.all_slots.append(slot_data)
-            
+                    # Create slot for each hour of the block (to match DB structure)
+                    for i in range(duration):
+                        current_t = start_t + i
+                        slot_data = {
+                            'course_id': course_id,
+                            'lecturer_id': lecturer_id,
+                            'room_id': room_id,
+                            'group_id': group_id,
+                            'day': self.days[day_idx],
+                            'day_of_week': day_idx,
+                            'start_time': self.time_slots[current_t][0],
+                            'end_time': self.time_slots[current_t][1],
+                            'session_type': session_meta['type']
+                        }
+                        self.all_slots.append(slot_data)
             return True
         else:
             return False
-    
+
+    def _time_to_idx(self, t: time) -> int:
+        """Convert time object to 0-11 index (07:00 start)"""
+        # 07:00 -> 0
+        return t.hour - 7
+
     def save_timetable(self):
         """Save all generated slots to the database"""
         for slot_data in self.all_slots:

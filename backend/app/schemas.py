@@ -7,6 +7,44 @@ class UserRole(str, Enum):
     COORDINATOR = "coordinator"
     HOD = "hod"
 
+class RoomType(str, Enum):
+    LECTURE_HALL = "lecture_hall"
+    DRAWING_ROOM = "drawing_room"
+    SEMINAR_ROOM = "seminar_room"
+    LAB = "lab"
+    SURVEYING_ROOM = "surveying_room"
+    ANY = "any"
+
+class CourseType(str, Enum):
+    DEPARTMENT_SPECIFIC = "department_specific"
+    GENERAL = "general"
+    MULTI_DEPARTMENT = "multi_department"
+
+class GroupDivisionType(str, Enum):
+    FULL_GROUP = "full_group"
+    LAB_GROUPS = "lab_groups"
+    DRAWING_GROUPS = "drawing_groups"
+    TUTORIAL_GROUPS = "tutorial_groups"
+
+class GroupType(str, Enum):
+    GENERAL = "general"
+    DEPARTMENT = "department"
+    LAB_GROUP = "lab_group"
+    DRAWING_GROUP = "drawing_group"
+    TUTORIAL_GROUP = "tutorial_group"
+
+class RoomCategory(str, Enum):
+    LECTURE_HALL_LARGE = "lecture_hall_large"
+    LECTURE_HALL_MEDIUM = "lecture_hall_medium"
+    LECTURE_HALL_SMALL = "lecture_hall_small"
+    DRAWING_ROOM = "drawing_room"
+    COMPUTER_LAB = "computer_lab"
+    MECHANICAL_LAB = "mechanical_lab"
+    ELECTRICAL_LAB = "electrical_lab"
+    SURVEYING_ROOM = "surveying_room"
+    SEMINAR_ROOM = "seminar_room"
+    CONFERENCE_ROOM = "conference_room"
+
 # User Schemas
 class UserBase(BaseModel):
     email: Optional[str] = None
@@ -55,6 +93,10 @@ class CourseBase(BaseModel):
     lecture_hours: int
     tutorial_hours: int = 0
     practical_hours: int = 0
+    preferred_room_type: RoomType = RoomType.ANY
+    course_type: CourseType = CourseType.DEPARTMENT_SPECIFIC
+    session_configuration: Optional[dict] = None
+    group_division_type: GroupDivisionType = GroupDivisionType.FULL_GROUP
 
 class CourseCreate(CourseBase):
     pass
@@ -66,6 +108,10 @@ class CourseUpdate(BaseModel):
     lecture_hours: Optional[int] = None
     tutorial_hours: Optional[int] = None
     practical_hours: Optional[int] = None
+    preferred_room_type: Optional[RoomType] = None
+    course_type: Optional[CourseType] = None
+    session_configuration: Optional[dict] = None
+    group_division_type: Optional[GroupDivisionType] = None
 
 class Course(CourseBase):
     id: int
@@ -83,6 +129,7 @@ class LecturerBase(BaseModel):
     email: EmailStr
     department_id: int
     max_hours_per_week: int = 20
+    teaching_preferences: Optional[dict] = None
 
 class LecturerCreate(LecturerBase):
     pass
@@ -105,6 +152,11 @@ class LecturerBulkUpload(BaseModel):
 class LecturerAssignmentCreate(BaseModel):
     lecturer_id: int
     course_id: int
+    session_type: Optional[str] = None
+    room_preference: Optional[RoomType] = None
+    group_division_required: bool = False
+    expertise_level: str = "primary"
+    notes: Optional[str] = None
 
 class LecturerAssignment(LecturerAssignmentCreate):
     id: int
@@ -133,6 +185,13 @@ class RoomBase(BaseModel):
     room_type: str
     has_projector: bool = True
     has_computers: bool = False
+    room_category: Optional[RoomCategory] = None
+    department_affinity: Optional[str] = None
+    
+    furniture_type: Optional[str] = None
+    equipment: List[str] = []
+    availability: Optional[str] = None
+    priority: str = "standard"
 
 class RoomCreate(RoomBase):
     pass
@@ -143,6 +202,8 @@ class RoomUpdate(BaseModel):
     room_type: Optional[str] = None
     has_projector: Optional[bool] = None
     has_computers: Optional[bool] = None
+    room_category: Optional[RoomCategory] = None
+    department_affinity: Optional[str] = None
 
 class Room(RoomBase):
     id: int
@@ -159,6 +220,9 @@ class StudentGroupBase(BaseModel):
     level: int
     department_id: int
     size: int
+    group_type: GroupType = GroupType.DEPARTMENT
+    parent_group_id: Optional[int] = None
+    display_code: Optional[str] = None
 
 class StudentGroupCreate(StudentGroupBase):
     pass
@@ -167,6 +231,9 @@ class StudentGroupUpdate(BaseModel):
     name: Optional[str] = None
     level: Optional[int] = None
     size: Optional[int] = None
+    group_type: Optional[GroupType] = None
+    parent_group_id: Optional[int] = None
+    display_code: Optional[str] = None
 
 class StudentGroup(StudentGroupBase):
     id: int
@@ -210,6 +277,7 @@ class TimetableBase(BaseModel):
     name: str
     semester: str
     year: int
+    academic_half: str = "first_half"
 
 class TimetableCreate(TimetableBase):
     pass

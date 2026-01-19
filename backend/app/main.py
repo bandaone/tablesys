@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
-from .routers import auth, courses, lecturers, rooms, groups, departments, timetables
+from .routers import auth, courses, lecturers, rooms, groups, departments, timetables, export
 import os
 
 # Create database tables
@@ -17,6 +17,7 @@ app = FastAPI(
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:3002",
 ]
 
 # Add production origin if set
@@ -40,6 +41,7 @@ app.include_router(lecturers.router)
 app.include_router(rooms.router)
 app.include_router(groups.router)
 app.include_router(timetables.router)
+app.include_router(export.router)
 
 @app.get("/")
 async def root():

@@ -9,6 +9,10 @@ import DashboardLayout from './components/DashboardLayout';
 import DashboardPage from './pages/DashboardPage';
 import CoursesPage from './pages/CoursesPage';
 import TimetablesPage from './pages/TimetablesPage';
+import LecturersPage from './pages/LecturersPage';
+import RoomsPage from './pages/RoomsPage';
+import GroupsPage from './pages/GroupsPage';
+import DepartmentsPage from './pages/DepartmentsPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -41,10 +45,10 @@ const App: React.FC = () => {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="courses" element={<CoursesPage />} />
               <Route path="timetables" element={<TimetablesPage />} />
-              <Route path="lecturers" element={<div>Lecturers Page (Coming Soon)</div>} />
-              <Route path="rooms" element={<div>Rooms Page (Coming Soon)</div>} />
-              <Route path="groups" element={<div>Groups Page (Coming Soon)</div>} />
-              <Route path="departments" element={<div>Departments Page (Coming Soon)</div>} />
+              <Route path="lecturers" element={<LecturersPage />} />
+              <Route path="rooms" element={<RoomsPage />} />
+              <Route path="groups" element={<GroupsPage />} />
+              <Route path="departments" element={<DepartmentsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

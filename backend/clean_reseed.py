@@ -1,18 +1,24 @@
 """
-Initial data seeding script for TABLESYS
-Creates predefined users for easy access (username-only, no password)
+Clean re-seed script for TABLESYS
+Wipes conflicting tables and re-initializes with correct IDs
 """
 from app.database import SessionLocal, engine
-from app.models import Base, User, Department, UserRole
+from app.models import Base, User, Department, UserRole, Course, TimetableSlot, LecturerAssignment, GroupAssignment, StudentGroup, Lecturer
 from app.auth import get_password_hash
+from sqlalchemy import text
 
-def seed_database():
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-    
+def clean_reseed():
     db = SessionLocal()
-    
     try:
+        print("Cleaning up existing data...")
+        print("Cleaning up existing data...")
+        # Drop all tables to ensure schema updates are applied
+        Base.metadata.drop_all(bind=engine)
+        # Re-create all tables
+        Base.metadata.create_all(bind=engine)
+        print("Schema update and cleanup successful.")
+        print("Cleanup successful.")
+        
         # Expected Mapping:
         # 0: GEN - General
         # 1: AEN - Agricultural Engineering
@@ -30,19 +36,11 @@ def seed_database():
             {"id": 5, "name": "Mechanical Engineering", "code": "MEC"},
         ]
         
-        print("Seeding departments...")
+        print("\nSeeding departments...")
         for dept_data in departments_data:
-            existing = db.query(Department).filter(Department.id == dept_data["id"]).first()
-            if existing:
-                # Update if exists
-                existing.name = dept_data["name"]
-                existing.code = dept_data["code"]
-                print(f"Updated department ID {dept_data['id']}: {dept_data['code']}")
-            else:
-                # Create new with explicit ID
-                dept = Department(id=dept_data["id"], name=dept_data["name"], code=dept_data["code"])
-                db.add(dept)
-                print(f"Created department ID {dept_data['id']}: {dept_data['code']}")
+            dept = Department(id=dept_data["id"], name=dept_data["name"], code=dept_data["code"])
+            db.add(dept)
+            print(f"Created department ID {dept_data['id']}: {dept_data['code']}")
         
         db.commit()
         
@@ -60,32 +58,26 @@ def seed_database():
         
         print("\nSeeding users...")
         for user_data in users_data:
-            existing_user = db.query(User).filter(User.username == user_data["username"]).first()
-            if not existing_user:
-                user = User(
-                    email=user_data["email"],
-                    username=user_data["username"],
-                    hashed_password=get_password_hash("pass"),
-                    full_name=user_data["name"],
-                    role=user_data["role"],
-                    department_id=user_data["dept"],
-                    is_active=True
-                )
-                db.add(user)
-                print(f"Created user: {user_data['username']}")
-            else:
-                # Update user department just in case IDs changed
-                existing_user.department_id = user_data["dept"]
-                print(f"Updated user: {user_data['username']}")
+            user = User(
+                email=user_data["email"],
+                username=user_data["username"],
+                hashed_password=get_password_hash("pass"),
+                full_name=user_data["name"],
+                role=user_data["role"],
+                department_id=user_data["dept"],
+                is_active=True
+            )
+            db.add(user)
+            print(f"Created user: {user_data['username']}")
         
         db.commit()
-        print("\nDatabase seeded successfully!")
+        print("\nDatabase clean re-seeded successfully!")
         
     except Exception as e:
-        print(f"Error seeding database: {e}")
+        print(f"Error during re-seed: {e}")
         db.rollback()
     finally:
         db.close()
 
 if __name__ == "__main__":
-    seed_database()
+    clean_reseed()

@@ -18,6 +18,10 @@ import {
   ListItem,
   ListItemText,
   Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -44,6 +48,7 @@ const TimetablesPage: React.FC = () => {
     name: '',
     semester: '',
     year: new Date().getFullYear(),
+    academic_half: 'first_half',
   });
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [generationComplete, setGenerationComplete] = useState(false);
@@ -221,6 +226,17 @@ const TimetablesPage: React.FC = () => {
             value={formData.year}
             onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
           />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Academic Half</InputLabel>
+            <Select
+              value={formData.academic_half}
+              label="Academic Half"
+              onChange={(e) => setFormData({ ...formData, academic_half: e.target.value })}
+            >
+              <MenuItem value="first_half">First Half</MenuItem>
+              <MenuItem value="second_half">Second Half</MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)}>Cancel</Button>

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from .database import get_db
-from .models import User
+from .models import User, UserRole
 from .schemas import TokenData
 from .config import settings
 
@@ -65,7 +65,7 @@ async def get_current_user(
 async def get_current_active_coordinator(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    if current_user.role != "coordinator":
+    if current_user.role != UserRole.COORDINATOR:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions. Coordinator access required."
@@ -75,7 +75,7 @@ async def get_current_active_coordinator(
 async def get_current_active_hod(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    if current_user.role not in ["coordinator", "hod"]:
+    if current_user.role not in [UserRole.COORDINATOR, UserRole.HOD]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions. HOD or Coordinator access required."

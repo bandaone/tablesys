@@ -1,0 +1,68 @@
+code,name,department_id,level,credits,lecture_hours,tutorial_hours,practical_hours
+MAT 2110,Engineering Mathematics I,1,2,4,3,3,0
+MEC 2009,Engineering Mechanics,5,2,4,2,1,2
+EEE 2019,Electrical Engineering Fundamentals,3,2,3,2,1,2
+ENG 2139,Engineering Drawing I,1,2,3,1,0,4
+ENG 2159,Workshop Practice,1,2,2,1,0,3
+CEE 2219,Introduction to Civil Engineering,2,2,2,2,1,0
+MEC 2309,Thermodynamics I,5,2,3,2,1,2
+ENG 2129,Engineering Mathematics II,1,2,3,2,1,0
+MAT 3110,Mathematics III,1,3,3,3,2,0
+AGG 3811,Agricultural Engineering Principles,1,3,4,2,1,3
+AGA 3335,Farm Machinery,1,3,3,2,1,2
+CEE 3111,Fluid Mechanics,2,3,3,3,1,2
+CEE 3211,Structural Analysis I,2,3,4,2,1,2
+CEE 3311,Geotechnical Engineering I,2,3,4,2,1,2
+GGY 3051,Geology for Engineers,2,3,3,3,0,1
+EEE 3121,Circuit Theory,3,3,4,2,1,2
+EEE 3131,Electronics I,3,3,4,2,1,2
+EEE 3571,Electrical Machines I,3,3,4,2,1,2
+GEE 3511,Surveying I,4,3,4,2,1,2
+GEE 3721,Photogrammetry I,4,3,3,2,1,2
+CEE 3711,Construction Materials,2,3,3,2,1,1
+MEC 3001,Machine Design I,5,3,4,2,1,2
+MEC 3351,Manufacturing Processes,5,3,4,2,1,2
+MEC 3401,Heat Transfer,5,3,4,2,1,2
+AEN 4112,Soil and Water Engineering,1,4,4,2,1,2
+AEN 4311,Food Process Engineering,1,4,4,2,1,2
+CEE 4511,Structural Design I,2,4,4,2,1,2
+CEE 4211,Transportation Engineering,2,4,4,2,1,2
+CEE 4311,Hydraulics Engineering,2,4,4,2,1,2
+EEE 4135,Power Systems I,3,4,4,2,1,2
+EEE 4021,Control Systems I,3,4,4,2,1,2
+EEE 4221,Digital Electronics,3,4,4,2,1,2
+EEE 4571,Power Electronics,3,4,4,2,1,2
+EEE 4670,Electrical Machines II,3,4,4,2,1,2
+GEE 4122,Remote Sensing,4,4,4,2,1,2
+GEE 4331,GIS Applications,4,4,4,2,1,2
+GEE 4411,Cadastral Surveying,4,4,4,2,1,2
+MEC 4601,Mechanical Vibrations,5,4,4,2,1,2
+MEC 4702,CAD/CAM,5,4,4,2,1,2
+MEC 4301,Refrigeration & Air Conditioning,5,4,4,2,1,2
+ENG 4129,Engineering Management,1,4,3,2,1,0
+MAT 4119,Numerical Methods,1,4,3,2,1,1
+AEN 5211,Irrigation Engineering,1,5,4,2,1,2
+AEN 5321,Agricultural Structures,1,5,4,2,1,2
+AEN 5421,Farm Power and Machinery,1,5,4,2,1,2
+AEN 5714,Final Year Project,1,5,6,1,0,8
+CEE 5311,Advanced Structural Design,2,5,4,2,1,2
+CEE 5111,Environmental Engineering,2,5,4,2,1,2
+CEE 5211,Hydraulic Engineering,2,5,4,2,1,2
+CEE 5714,Final Year Project,2,5,6,1,0,8
+EEE 5581,Power Electronics II,3,5,4,2,1,2
+EEE 5240,Communication Systems,3,5,4,2,1,2
+EEE 5351,Digital Signal Processing,3,5,4,2,1,2
+EEE 5451,Microprocessor Systems,3,5,4,2,1,2
+EEE 5681,Electrical Drives,3,5,4,2,1,2
+EEE 5014,Final Year Project,3,5,6,1,0,8
+GEE 5610,Land Administration,4,5,4,2,1,2
+GEE 5411,Advanced Surveying,4,5,4,2,1,2
+GEE 5804,Final Year Project,4,5,6,1,0,8
+MEC 5401,Finite Element Analysis,5,5,4,2,1,2
+MEC 5455,Robotics and Automation,5,5,4,2,1,2
+MEC 5105,Internal Combustion Engines,5,5,4,2,1,2
+MEC 5051,HVAC Systems Design,5,5,4,2,1,2
+MEC 5552,Mechatronics,5,5,4,2,1,2
+MEC 5465,Manufacturing Systems,5,5,4,2,1,2
+MEC 5904,Final Year Project,5,5,6,1,0,8
+ENG 5129,Engineering Economics,1,5,3,2,1,0

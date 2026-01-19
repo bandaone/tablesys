@@ -1,0 +1,5 @@
+name,capacity,building,furniture_type,equipment,availability,priority
+Gen Lab,50,Engineering Block A,Lab,Projector;Computers;Whiteboard,Mon-Fri 08:00-17:00,standard
+HOD Office,5,Admin Block,Office,Desk;Chair;Printer,,high
+Lecture Theater 1,150,Engineering Block B,Lecture Theatre,Projector;Sound System;Mic,Mon-Fri 07:00-19:00,high
+Seminar Room 3,20,Engineering Block A,Seminar Room,Whiteboard;TV,Mon-Wed 09:00-12:00,standard
