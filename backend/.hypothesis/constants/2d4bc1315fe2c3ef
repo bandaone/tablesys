@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\auth.py
+# hypothesis_version: 6.151.9
+
+['/api/v1/auth', '/login', '/me', 'Account inactive', 'Bearer', 'Invalid credentials', 'WWW-Authenticate', 'access_token', 'authentication', 'bearer', 'department_id', 'reason', 'role', 'sub', 'token_type', 'user_id']

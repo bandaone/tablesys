@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\users.py
+# hypothesis_version: 6.151.9
+
+[404, '/', '/api/v1/users', '/me/change-password', '/me/profile', '/{user_id}', 'Email already in use', 'PASSWORD_CHANGED', 'PASSWORD_RESET', 'PROFILE_UPDATED', 'USER_CREATED', 'USER_DELETED', 'USER_UPDATED', 'User not found', 'changes', 'deleted_user_id', 'message', 'new_user_id', 'reset_user_id', 'role', 'self_initiated', 'status', 'success', 'updated_user_id', 'username', 'users']

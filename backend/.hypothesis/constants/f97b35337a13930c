@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\import_timetable.py
+# hypothesis_version: 6.151.9
+
+[100, 200, 1000, 2000, 2100, '/api/v1/import', '/timetable', ':', 'DR', 'Drawing Block', 'ENL', 'FRIDAY', 'LAB', 'LT', 'Laboratory Block', 'MLT', 'MONDAY', 'Main Campus', 'NLR', 'School of Mines', 'THURSDAY', 'TUESDAY', 'WEDNESDAY', 'Z', 'app.import_timetable', 'error', 'first_half', 'import', 'import_id', 'imported_at', 'imported_by', 'lecture_hall', 'pdf_upload', 'raw_slot_count', 'raw_slots', 'source', 'success', 'summary', 'term', 'timetable_import', 'year']

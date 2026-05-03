@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\middleware\tenant.py
+# hypothesis_version: 6.151.9
+
+['X-University-ID', 'courses', 'departments', 'do_orm_execute', 'lecturers', 'rooms', 'student_groups', 'template_profiles', 'tenant_id', 'timetables', 'users']

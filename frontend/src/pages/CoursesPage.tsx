@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import TableSkeleton from '../components/skeletons/TableSkeleton';
 import {
   Box,
   Button,
@@ -35,43 +36,68 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
+  Assessment as AssessmentIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Upload as UploadIcon,
   Download as DownloadIcon,
   ExpandMore as ExpandMoreIcon,
   School as SchoolIcon,
-  Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { coursesAPI, departmentsAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { CourseGroupAssigner } from '../components/CourseGroupAssigner';
+
+interface CourseRow {
+  id: number;
+  code: string;
+  name: string;
+  department_id: number;
+  level: number;
+  credits: number;
+  lecture_hours: number;
+  tutorial_hours: number;
+  practical_hours: number;
+  shared_with_department_ids?: number[];
+}
+
+interface DepartmentRow {
+  id: number;
+  code?: string;
+  name: string;
+}
 
 const CoursesPage: React.FC = () => {
-  const [courses, setCourses] = useState<unknown[]>([]);
-  const [departments, setDepartments] = useState<unknown[]>([]);
+  const [courses, setCourses] = useState<CourseRow[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingCourse, setEditingCourse] = useState<unknown>(null);
+  const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [groupAssignCourse, setGroupAssignCourse] = useState<any>(null);
+  const [groupAssignDialogOpen, setGroupAssignDialogOpen] = useState(false);
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState('');
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     department_id: '',
-    level: 2,
+    level: 100,
     credits: 3,
     lecture_hours: 2,
     tutorial_hours: 0,
     practical_hours: 0,
+    shared_with_department_ids: [] as number[],
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
   const deptFilter = searchParams.get('dept');
 
-  const { user, isCoordinator } = useAuth();
+  const { user, isCoordinator, isHOD } = useAuth();
 
   useEffect(() => {
     fetchCourses();
@@ -83,8 +109,8 @@ const CoursesPage: React.FC = () => {
       const data = await coursesAPI.getAll();
       setCourses(data);
     } catch (err) {
-      console.error('Error fetching courses:', err);
-    }
+      console.error('Error fetching courses:', err);    } finally {
+      setPageLoading(false);    }
   };
 
   const fetchDepartments = async () => {
@@ -142,11 +168,15 @@ const CoursesPage: React.FC = () => {
       const result = await coursesAPI.bulkUpload(selectedFile);
       setUploadResult(result);
       fetchCourses();
-      setTimeout(() => {
-        setOpenUploadDialog(false);
-        setSelectedFile(null);
-        setUploadResult(null);
-      }, 4000);
+      if (result.skipped === 0) {
+        setTimeout(() => {
+          setOpenUploadDialog(false);
+          setSelectedFile(null);
+          setUploadResult(null);
+          const input = document.getElementById('file-upload') as HTMLInputElement;
+          if (input) input.value = '';
+        }, 3000);
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error uploading file');
     } finally {
@@ -156,8 +186,8 @@ const CoursesPage: React.FC = () => {
 
   const downloadMasterCSV = () => {
     const link = document.createElement('a');
-    link.href = '/backend/engineering_courses_ master_corrected.csv';
-    link.download = 'engineering_courses_master_corrected.csv';
+    link.href = '/assets/course_import_template.csv';
+    link.download = 'course_import_template.csv';
     link.click();
   };
 
@@ -167,8 +197,13 @@ const CoursesPage: React.FC = () => {
   };
 
   const getDepartmentCode = (deptId: number) => {
-    const codes: Record<number, string> = { 0: 'GEN', 1: 'AEN', 2: 'CEE', 3: 'EEE', 4: 'GEE', 5: 'MEC' };
-    return codes[deptId] || 'UNK';
+    const dept = departments.find(d => d.id === deptId);
+    return dept ? (dept.code || dept.name.substring(0, 3).toUpperCase()) : 'UNK';
+  };
+
+  const canManageCourseMapping = (course: CourseRow) => {
+    if (isCoordinator) return true;
+    return isHOD && user?.department_id === course.department_id;
   };
 
   // Filter and Group courses by level
@@ -183,7 +218,7 @@ const CoursesPage: React.FC = () => {
   }, {} as Record<number, typeof courses>);
 
   // Sort courses within each level
-  Object.values(coursesByLevel).forEach(levelCourses => {
+  Object.values(coursesByLevel).forEach((levelCourses: CourseRow[]) => {
     levelCourses.sort((a, b) => a.code.localeCompare(b.code));
   });
 
@@ -202,6 +237,7 @@ const CoursesPage: React.FC = () => {
   };
 
   const handleSaveCourse = async () => {
+    setDialogError('');
     try {
       if (editingCourse) {
         await coursesAPI.update(editingCourse.id, formData);
@@ -210,19 +246,28 @@ const CoursesPage: React.FC = () => {
       }
       setOpenDialog(false);
       setEditingCourse(null);
+      setDialogError('');
       setFormData({
         code: '',
         name: '',
         department_id: '',
-        level: 2,
+        level: 1,
         credits: 3,
         lecture_hours: 2,
         tutorial_hours: 0,
         practical_hours: 0,
+        shared_with_department_ids: [],
       });
       fetchCourses();
     } catch (e: unknown) {
-      setError((e as any).response?.data?.detail || 'Failed to save course');
+      const err = (e as any);
+      const detail = err?.response?.data?.detail;
+      // detail can be a string or a FastAPI validation array
+      if (Array.isArray(detail)) {
+        setDialogError(detail.map((d: any) => d.msg || d).join(', '));
+      } else {
+        setDialogError(detail || err?.message || 'Failed to save course');
+      }
     }
   };
 
@@ -261,7 +306,7 @@ const CoursesPage: React.FC = () => {
           >
             Bulk Upload
           </Button>
-          {isCoordinator && (
+          {isHOD && (
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -320,8 +365,12 @@ const CoursesPage: React.FC = () => {
       )}
 
       {/* Course Tables by Level */}
+      {pageLoading ? (<TableSkeleton rows={8} columns={5} />) : (
       <Box>
-        {[2, 3, 4, 5].map(level => {
+        {Object.keys(coursesByLevel)
+          .map(Number)
+          .sort((a, b) => b - a)
+          .map(level => {
           const levelCourses = coursesByLevel[level] || [];
           if (levelCourses.length === 0) return null;
 
@@ -348,7 +397,7 @@ const CoursesPage: React.FC = () => {
                         <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Department</TableCell>
                         <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Credits</TableCell>
                         <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '18%' }}>Contact Hours</TableCell>
-                        {isCoordinator && (
+                        {(isCoordinator || isHOD) && (
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Actions</TableCell>
                         )}
                       </TableRow>
@@ -375,30 +424,61 @@ const CoursesPage: React.FC = () => {
                               L: {course.lecture_hours} | T: {course.tutorial_hours} | P: {course.practical_hours}
                             </Typography>
                           </TableCell>
-                          {isCoordinator && (
+                          {(isCoordinator || isHOD) && (
                             <TableCell>
-                              <Tooltip title="Edit">
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => {
-                                    setEditingCourse(course);
-                                    setFormData(course);
-                                    setOpenDialog(true);
-                                  }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => { void handleDelete(course.id); }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
+                              {canManageCourseMapping(course) && (
+                                <Tooltip title="Edit">
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => {
+                                      setEditingCourse(course);
+                                      setFormData({
+                                        code: course.code,
+                                        name: course.name,
+                                        department_id: String(course.department_id),
+                                        level: course.level,
+                                        credits: course.credits,
+                                        lecture_hours: course.lecture_hours,
+                                        tutorial_hours: course.tutorial_hours,
+                                        practical_hours: course.practical_hours,
+                                        shared_with_department_ids: course.shared_with_department_ids || [],
+                                      });
+                                      setDialogError('');
+                                      setOpenDialog(true);
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+
+                              {canManageCourseMapping(course) && (
+                                <Tooltip title="Manage Groups For This Course">
+                                  <IconButton
+                                    size="small"
+                                    color="info"
+                                    onClick={() => {
+                                      setGroupAssignCourse(course);
+                                      setGroupAssignDialogOpen(true);
+                                    }}
+                                  >
+                                    <AssessmentIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              
+                              {canManageCourseMapping(course) && (
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => { void handleDelete(course.id); }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </TableCell>
                           )}
                         </TableRow>
@@ -411,6 +491,7 @@ const CoursesPage: React.FC = () => {
           );
         })}
       </Box>
+      )}
 
       {/* Add/Edit Course Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
@@ -451,10 +532,36 @@ const CoursesPage: React.FC = () => {
               <Select
                 value={formData.level}
                 label="Level"
-                onChange={(e) => { setFormData({ ...formData, level: e.target.value as unknown as number }); }}
+                onChange={(e) => { setFormData({ ...formData, level: parseInt(e.target.value as string) || 1 }); }}
               >
-                {[2, 3, 4, 5].map((l) => (
-                  <MenuItem key={l} value={l}>Year {l}</MenuItem>
+                {[1, 2, 3, 4, 5, 6, 7].map(val => (
+                  <MenuItem key={val} value={val}>Year {val}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Shared Details (Depts)</InputLabel>
+              <Select
+                multiple
+                value={formData.shared_with_department_ids}
+                label="Shared Details (Depts)"
+                onChange={(e) => { 
+                  const val = e.target.value;
+                  setFormData({ ...formData, shared_with_department_ids: typeof val === 'string' ? val.split(',').map(Number) : val as number[] }); 
+                }}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {(selected as number[]).map((val) => {
+                      const dept = departments.find(d => d.id === val);
+                      return <Chip key={val} label={dept?.code || val} size="small" />;
+                    })}
+                  </Box>
+                )}
+              >
+                {departments.map((dept: any) => (
+                  <MenuItem key={dept.id} value={dept.id}>
+                    {dept.code}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -488,6 +595,9 @@ const CoursesPage: React.FC = () => {
               sx={{ gridColumn: 'span 2' }}
             />
           </Box>
+          {dialogError && (
+            <Alert severity="error" sx={{ mx: 3, mb: 1 }}>{dialogError}</Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setOpenDialog(false); }}>Cancel</Button>
@@ -498,72 +608,145 @@ const CoursesPage: React.FC = () => {
       </Dialog>
 
       {/* Bulk Upload Dialog */}
-      <Dialog open={openUploadDialog} onClose={() => setOpenUploadDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openUploadDialog}
+        onClose={() => {
+          setOpenUploadDialog(false);
+          setSelectedFile(null);
+          setUploadResult(null);
+          // Reset the file input element so the same file can be re-selected
+          const input = document.getElementById('file-upload') as HTMLInputElement;
+          if (input) input.value = '';
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Bulk Upload Courses</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Upload a CSV or Excel file with course data. Download the master template below for the correct format.
-            </Alert>
+            {!uploadResult && (
+              <>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Upload a <strong>CSV or Excel</strong> file with your course data.
+                  <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
+                    <li>Accepted formats: .csv, .xlsx, .xls</li>
+                    <li>Maximum file size: 5 MB</li>
+                    <li>Duplicate entries will be automatically skipped</li>
+                  </Box>
+                </Alert>
 
-            {isCoordinator && (
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={downloadMasterCSV}
-                fullWidth
-                sx={{ mb: 2, textTransform: 'none' }}
-              >
-                Download Master Course CSV (91 Courses)
-              </Button>
+                {isCoordinator && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadIcon />}
+                    onClick={downloadMasterCSV}
+                    fullWidth
+                    sx={{ mb: 2, textTransform: 'none' }}
+                  >
+                    Download Import Template
+                  </Button>
+                )}
+
+                <Divider sx={{ my: 2 }} />
+
+                <input
+                  accept=".csv,.xlsx,.xls"
+                  style={{ display: 'none' }}
+                  id="file-upload"
+                  type="file"
+                  onChange={handleFileSelect}
+                />
+                <label htmlFor="file-upload">
+                  <Button
+                    variant={selectedFile ? 'contained' : 'outlined'}
+                    component="span"
+                    fullWidth
+                    sx={{ py: 1.5, textTransform: 'none' }}
+                  >
+                    {selectedFile ? `✓ ${selectedFile.name}` : 'Select File'}
+                  </Button>
+                </label>
+              </>
             )}
-
-            <Divider sx={{ my: 2 }} />
-
-            <input
-              accept=".csv,.xlsx,.xls"
-              style={{ display: 'none' }}
-              id="file-upload"
-              type="file"
-              onChange={handleFileSelect}
-            />
-            <label htmlFor="file-upload">
-              <Button
-                variant="outlined"
-                component="span"
-                fullWidth
-                sx={{ py: 1.5, textTransform: 'none' }}
-              >
-                {selectedFile ? selectedFile.name : 'Select File'}
-              </Button>
-            </label>
 
             {loading && <LinearProgress sx={{ mt: 2 }} />}
 
             {uploadResult && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                Successfully created {uploadResult.created} courses.
-                {uploadResult.skipped > 0 && ` Skipped ${uploadResult.skipped} duplicates.`}
+              <Box>
+                <Alert
+                  severity={uploadResult.errors && uploadResult.errors.length > 0 ? 'warning' : 'success'}
+                  sx={{ mb: 2 }}
+                >
+                  <strong>{uploadResult.created} course{uploadResult.created !== 1 ? 's' : ''} successfully imported.</strong>
+                  {uploadResult.skipped > 0 && (
+                    <Box sx={{ mt: 0.5 }}>
+                      {uploadResult.skipped} row{uploadResult.skipped !== 1 ? 's' : ''} skipped (duplicates or errors).
+                    </Box>
+                  )}
+                </Alert>
+
                 {uploadResult.errors && uploadResult.errors.length > 0 && (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" color="error">
-                      Errors: {uploadResult.errors.join(', ')}
+                  <Box sx={{ maxHeight: 220, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                    <Typography variant="caption" fontWeight="bold" color="error" display="block" sx={{ mb: 1 }}>
+                      Rows that could not be imported:
                     </Typography>
+                    {uploadResult.errors.map((err: string, i: number) => (
+                      <Typography key={i} variant="caption" display="block" color="text.secondary" sx={{ mb: 0.5 }}>
+                        • {err}
+                      </Typography>
+                    ))}
                   </Box>
                 )}
-              </Alert>
+
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  sx={{ mt: 2, textTransform: 'none' }}
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setUploadResult(null);
+                    const input = document.getElementById('file-upload') as HTMLInputElement;
+                    if (input) input.value = '';
+                  }}
+                >
+                  Upload Another File
+                </Button>
+              </Box>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenUploadDialog(false); }}>Cancel</Button>
-          <Button
-            onClick={() => { void handleBulkUpload(); }}
-            variant="contained"
-            disabled={!selectedFile || loading}
-          >
-            {loading ? 'Uploading...' : 'Upload'}
-          </Button>
+          {uploadResult ? (
+            <Button
+              variant="contained"
+              onClick={() => {
+                setOpenUploadDialog(false);
+                setSelectedFile(null);
+                setUploadResult(null);
+                const input = document.getElementById('file-upload') as HTMLInputElement;
+                if (input) input.value = '';
+              }}
+            >
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button onClick={() => { 
+                setOpenUploadDialog(false); 
+                setSelectedFile(null); 
+                setUploadResult(null); 
+                const input = document.getElementById('file-upload') as HTMLInputElement;
+                if (input) input.value = '';
+              }}>Cancel</Button>
+              <Button
+                onClick={() => { void handleBulkUpload(); }}
+                variant="contained"
+                disabled={!selectedFile || loading}
+              >
+                {loading ? 'Uploading...' : 'Upload'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -582,6 +765,37 @@ const CoursesPage: React.FC = () => {
           <Button onClick={() => { setClearAllDialogOpen(false); }}>Cancel</Button>
           <Button onClick={() => { void handleClearAll(); }} variant="contained" color="error" disabled={loading}>
             {loading ? 'Deleting...' : 'Delete All Courses'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={groupAssignDialogOpen}
+        onClose={() => {
+          setGroupAssignDialogOpen(false);
+          setGroupAssignCourse(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Manage Groups For This Course</DialogTitle>
+        <DialogContent>
+          {groupAssignCourse && (
+            <CourseGroupAssigner
+              courseId={groupAssignCourse.id}
+              courseLevel={groupAssignCourse.level}
+              onSaved={() => { void fetchCourses(); }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setGroupAssignDialogOpen(false);
+              setGroupAssignCourse(null);
+            }}
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,0 +1,13 @@
+--- ../backend/app/services/notification_service.py
++++ ../backend/app/services/notification_service.py
+@@ -107,8 +107,8 @@
+                 "message": n.message,
+                 "type": n.type,
+                 "is_read": n.is_read,
+-                "created_at": n.created_at,
+-                "read_at": n.read_at,
++                "created_at": n.created_at.isoformat() if n.created_at else None,
++                "read_at": n.read_at.isoformat() if n.read_at else None,
+                 "action_link": n.action_link
+             }
+             for n in notifications

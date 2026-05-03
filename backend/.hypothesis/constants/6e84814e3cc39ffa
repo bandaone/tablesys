@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py
+# hypothesis_version: 6.151.9
+
+[400, 401, 403, 404, 409, 500, 'An error occurred', 'InternalServerError', 'Z', 'app', 'detail', 'development', 'error', 'message', 'method', 'path', 'production', 'request_id', 'status_code', 'timestamp', 'type']

@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\notification_service.py
+# hypothesis_version: 6.151.9
+
+['action_link', 'coordinator', 'created_at', 'hod', 'id', 'info', 'is_read', 'message', 'read_at', 'title', 'type']

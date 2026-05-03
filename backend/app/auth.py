@@ -9,9 +9,10 @@ from .database import get_db
 from .models import User, UserRole
 from .schemas import TokenData
 from .config import settings
+from .access_policy import enforce_active_account, enforce_user_roles
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -37,10 +38,26 @@ def authenticate_user(db: Session, username: str, password: str):
         return False
     return user
 
+from fastapi import Request
+
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
+    # Fallback to query parameter 'token' if the header token is missing or invalid.
+    # OAuth2PasswordBearer throws a 401 if it's missing, so we must intercept it or make it optional.
+    # Actually, if OAuth2PasswordBearer is used as above, it forces the header.
+    if not token:
+        token = request.query_params.get("token")
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -58,26 +75,42 @@ async def get_current_user(
     user = db.query(User).filter(User.username == token_data.username).first()
     if user is None:
         raise credentials_exception
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+    enforce_active_account(user.is_active)
+
+    # Enforce tenant context from authenticated identity so clients cannot
+    # escalate access by omitting/spoofing X-University-ID.
+    from .middleware.tenant import set_current_tenant_id
+    set_current_tenant_id(user.university_id)
+
     return user
 
 async def get_current_active_coordinator(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    if current_user.role != UserRole.COORDINATOR:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. Coordinator access required."
-        )
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.COORDINATOR],
+        "Not enough permissions. Coordinator access required.",
+    )
     return current_user
 
 async def get_current_active_hod(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    if current_user.role not in [UserRole.COORDINATOR, UserRole.HOD]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. HOD or Coordinator access required."
-        )
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.COORDINATOR, UserRole.HOD],
+        "Not enough permissions. HOD or Coordinator access required.",
+    )
+    return current_user
+
+async def get_current_superadmin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Platform-level guard — only the SUPERADMIN role passes."""
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.SUPERADMIN],
+        "Super-admin access required. This area is restricted to platform administrators.",
+    )
     return current_user

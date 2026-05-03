@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\course_group_links.py
+# hypothesis_version: 6.151.9
+
+[200, 404, 409, 422, ',', 'Course not found', 'Group not found', 'Link not found', 'course-group-links', 'created', 'drawing_group', 'group_id', 'id', 'lab_group', 'lecture', 'message', 'skipped', 'tutorial_group']

@@ -1,0 +1,92 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.1, pytest-7.4.3, pluggy-1.6.0 -- C:\SYSTEMS\TABLESYS\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+metadata: {'Python': '3.12.1', 'Platform': 'Windows-10-10.0.19045-SP0', 'Packages': {'pytest': '7.4.3', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '4.12.1', 'hypothesis': '6.151.9', 'asyncio': '0.21.1', 'cov': '4.1.0', 'html': '4.2.0', 'metadata': '3.1.1'}}
+rootdir: C:\SYSTEMS\TABLESYS\backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, hypothesis-6.151.9, asyncio-0.21.1, cov-4.1.0, html-4.2.0, metadata-3.1.1
+asyncio: mode=Mode.AUTO
+collecting ... collected 1 item
+
+tests/test_brain.py::test_invariant_capacity_and_overlap PASSED          [100%]
+
+---------- coverage: platform win32, python 3.12.1-final-0 -----------
+Name                                   Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------
+app\__init__.py                            0      0   100%
+app\auth.py                               60     39    35%   17, 20, 23-30, 33-38, 44-63, 68-73, 78-83, 89-94
+app\celery_app.py                          4      0   100%
+app\config.py                             45      5    89%   50, 54, 65, 67, 69
+app\database.py                           24      8    67%   28, 63-74
+app\lifecycle.py                          12      5    58%   11-17
+app\main.py                               86      3    97%   151, 214, 223
+app\middleware\__init__.py                 5      0   100%
+app\middleware\error_handler.py           47     21    55%   35-37, 80-150
+app\middleware\rate_limiter.py            81     60    26%   35-67, 71-85, 89-98, 102-109, 113-124, 128-138, 145-146, 164-172
+app\middleware\security_headers.py        19     13    32%   10-61
+app\middleware\tenant.py                  49     25    49%   18, 27-43, 53-69, 86-93, 103-105
+app\models\__init__.py                   302      0   100%
+app\routers\__init__.py                    0      0   100%
+app\routers\audit.py                     146     79    46%   51-55, 58-62, 65-80, 83, 101-106, 137-152, 176-177, 198-202, 221-222, 237-246, 271-291, 313-330, 358-383, 399-412
+app\routers\auth.py                       37     20    46%   31-99, 106
+app\routers\branding.py                   29      6    79%   42-61
+app\routers\course_group_links.py        105     82    22%   31-37, 50-57, 68-95, 113-154, 165-174, 190-235, 254-268
+app\routers\courses.py                   211    182    14%   21-44, 54-72, 81-91, 102-146, 158-220, 230-261, 270-302, 320-462
+app\routers\dashboard.py                  54     25    54%   21-26, 47-48, 64-65, 81-82, 100-101, 116-117, 133-134, 154-158, 182-183, 201-202, 214-215
+app\routers\departments.py                49     33    33%   15-23, 33-34, 44-69, 78-85
+app\routers\export.py                    111     78    30%   46, 50, 54, 58, 74-88, 107-121, 140-154, 174-188, 204-218, 234-248, 268-282
+app\routers\groups.py                    253    216    15%   19-30, 35-37, 52-77, 88-138, 149-203, 213-237, 246-264, 277-387, 408-476, 486-493, 503-511, 522-535, 545-561
+app\routers\import_timetable.py          172    109    37%   120-127, 132-143, 166-422
+app\routers\lecturers.py                 293    264    10%   21-40, 50-56, 67-119, 130-196, 206-231, 240-258, 282-499, 529-633
+app\routers\notifications.py              41     21    49%   32-39, 53-56, 68-77, 88-91, 107-111, 125-134
+app\routers\onboarding.py                 42     42     0%   5-88
+app\routers\print_views.py                89     73    18%   42-87, 122-167, 202-247, 278-325
+app\routers\public.py                     24      4    83%   38-45
+app\routers\reports.py                    80     46    42%   33-38, 54-55, 78-83, 106-111, 128-130, 150-159, 191-193, 220-270, 286-293
+app\routers\rooms.py                     198    164    17%   32-43, 47-52, 67-74, 89-127, 143-182, 197-220, 235-257, 271-289, 351-355, 363-364, 390-520
+app\routers\scheduler.py                  32     14    56%   25-39, 50-57, 69-71
+app\routers\search.py                     33     15    55%   34-37, 54-64, 83-92, 113-124, 143-152
+app\routers\student_portal.py            141     76    46%   76, 81, 86-94, 102-129, 145-174, 188-210, 224, 237-294, 322-357, 371-381
+app\routers\superadmin.py                171     81    53%   100-102, 113-117, 132-162, 177-202, 213-255, 272-287, 303-307, 317-322, 333-360
+app\routers\templates.py                 137     70    49%   104-123, 141-189, 208-231, 240-241, 263-266, 279-293, 312-317, 325
+app\routers\timetables.py                307    236    23%   31-35, 38-44, 47-60, 63, 69-74, 84-85, 94-99, 108-121, 135-259, 268-281, 290-297, 315-384, 411-420, 438-442, 453-457, 473-512, 537-578, 595-606, 626-634, 652-659, 678-697, 710-719, 745-764, 779-784, 798-806
+app\routers\users.py                     135     86    36%   64-65, 77-82, 96-155, 169-228, 241-265, 279-298, 312-329, 342-368
+app\schemas.py                           314      0   100%
+app\seeding_utils.py                      53     48     9%   7-106
+app\services\__init__.py                   0      0   100%
+app\services\analytics_service.py        107     88    18%   34, 45-55, 67-76, 81-112, 117-148, 153-183, 188-203, 223-235, 247-254, 259-266
+app\services\audit_service.py             81     66    19%   17, 52-71, 100-121, 133, 150, 169, 189-245, 270-287, 302-311
+app\services\dashboard_service.py        136    119    12%   20, 27-46, 53-67, 78-104, 119-155, 174-212, 219-263, 273-353, 366-389, 403-493, 499
+app\services\email_service.py             57     44    23%   22-28, 49-83, 104-157, 178-233, 254-337
+app\services\export_service.py            42     31    26%   22, 39-48, 56-67, 76-103, 113-119
+app\services\neural_brain.py              60     60     0%   1-121
+app\services\notification_service.py      67     51    24%   19-20, 45-65, 75-107, 130-137, 162-173, 185-195, 208-218, 230, 256-273, 298-320
+app\services\report_service.py           135    119    12%   22, 33-95, 121-199, 221-289, 309-342, 385-451, 463, 469
+app\services\search_service.py           101     90    11%   18, 37-149, 174-204, 239-267, 304-337, 370-392
+app\services\timetable_generator.py      480    455     5%   16-54, 71-99, 107-109, 122-130, 146-158, 163-172, 186-249, 256-310, 321-339, 343-360, 367-376, 400-450, 464-507, 513-978, 982, 986-1004
+app\services\validation_service.py       138    120    13%   38-42, 45, 58-59, 66-94, 107-137, 153-230, 236-278, 292-319, 325-340, 352-400, 406-447
+app\services\version_service.py          140    121    14%   18, 21, 31, 46, 54, 64-86, 101-122, 125-142, 162-204, 216-241, 253, 276-337, 362-406, 441-450
+app\tasks\__init__.py                      0      0   100%
+app\tasks\generation.py                   39     25    36%   21-74
+app\test_brain.py                         24     24     0%   1-30
+app\utils\__init__.py                      6      0   100%
+app\utils\audit_logger.py                 86     53    38%   25, 67-112, 134, 154, 185, 219, 241, 268, 292, 316, 353-383
+app\utils\conflict_detector.py            88     70    20%   47-52, 56, 73-81, 95, 104-115, 120-147, 151-176, 180-205, 214-238
+app\utils\docx_generator.py               82     70    15%   9-11, 14-17, 20-30, 33-50, 53-103, 107-113, 116-121
+app\utils\email_service.py                50     50     0%   18-174
+app\utils\excel_generator.py             119     88    26%   101, 105, 109-110, 114, 133-135, 151-160, 172-190, 193-203, 206-226, 229-235, 238-273, 277-280, 283-290
+app\utils\ip_utils.py                      6      4    33%   10-17
+app\utils\logging_utils.py                12      4    67%   28-29, 39, 49
+app\utils\pdf_generator.py               108     80    26%   102-105, 110-123, 147-173, 177-192, 197-216, 221-271, 275-303, 307-314, 318-330
+app\utils\pdf_timetable_parser.py        183    183     0%   14-521
+app\utils\sanitization.py                 46     28    39%   63, 84-93, 117-120, 150-171, 191-195, 210, 214, 218
+app\utils\template_exporter.py           162    162     0%   23-356
+app\utils\template_parser.py             242    220     9%   78, 108-111, 123-128, 136-151, 164-182, 203-241, 265-344, 360-384, 395-459, 473-525, 529-535, 542-548, 559-570
+--------------------------------------------------------------------
+TOTAL                                   6788   4674    31%
+Coverage HTML written to dir reports/htmlcov
+
+
+- Generated html report: file:///C:/SYSTEMS/TABLESYS/backend/reports/api_audit.html -
+======================= 1 passed, 22 warnings in 20.53s =======================

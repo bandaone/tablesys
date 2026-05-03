@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\notifications.py
+# hypothesis_version: 6.151.9
+
+[404, '/', '/dashboard', '/mark-all-read', '/test', '/unread-count', '/{notification_id}', 'Test Notification', 'count', 'created_at', 'id', 'info', 'message', 'notification', 'notifications', 'status', 'success', 'title', 'total', 'type', 'unread_count']

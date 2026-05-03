@@ -87,9 +87,9 @@ The system uses University of Zambia's official colors:
 
 ```
 Username: admin
-Password: admin123
+Password: value from TABLESYS_INITIAL_USER_PASSWORD in .env
 ```
-**⚠️ Change immediately after first login!**
+**⚠️ Rotate immediately after first login.**
 
 ## 📊 Key Features
 
@@ -187,8 +187,9 @@ WS     /api/timetables/generate/{id} - Generate with progress
 
 ### Backend Environment (.env)
 ```env
-DATABASE_URL=postgresql://tablesys:tablesys123@localhost:5432/tablesys_db
-SECRET_KEY=your-secret-key-here-change-in-production
+DATABASE_URL=postgresql://tablesys:<32+_char_db_password>@localhost:5432/tablesys_db
+SECRET_KEY=<64_char_random_hex_secret>
+TABLESYS_INITIAL_USER_PASSWORD=<24+_char_bootstrap_user_password>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -11,8 +11,8 @@ RUN npm install
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 3000
+# Expose port (matches vite.config.ts server.port)
+EXPOSE 3002
 
-# Run the application
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Run the development server
+CMD ["npm", "run", "dev"]

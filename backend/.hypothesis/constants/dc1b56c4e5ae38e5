@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\scheduler.py
+# hypothesis_version: 6.151.9
+
+[404, ',', '/api/v1/scheduler', '/cancel/{job_id}', '/status/{job_id}', 'Timetable not found', 'job_id', 'message', 'progress', 'result', 'scheduler', 'started', 'state', 'status']

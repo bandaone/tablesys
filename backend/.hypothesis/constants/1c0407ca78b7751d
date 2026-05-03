@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\config.py
+# hypothesis_version: 6.151.9
+
+[300, 480, 587, '.env', 'HS256', 'HS384', 'HS512', 'UNZA', 'University of Zambia', 'change-me', 'development', 'example', 'ignore', 'placeholder', 'redis://redis:6379/0', 'smtp.gmail.com', 'unza.zm', 'your-secret-key']

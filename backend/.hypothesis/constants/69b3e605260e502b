@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\utils\pdf_generator.py
+# hypothesis_version: 6.151.9
+
+[0.5, '#003366', '#E8EFF7', '#F5F5F5', '#FF8C00', '2ND YEAR', '3-AEN', '3-CEE', '3-EEE', '3-GEE', '3-MEC', '3RD YEAR', '4-AEN', '4-CEE', '4-EEE', '4-GEE', '4-MEC', '4TH YEAR', '5-AEN', '5-CEE', '5-EEE', '5-GEE', '5-MEC', '5TH YEAR', 'AEN', 'ALIGN', 'BACKGROUND', 'CEE', 'CENTER', 'CR   - Computer Lab', 'DR   - Drawing Room', 'DayHeader', 'EEE', 'FIRST HALF', 'FONTNAME', 'FONTSIZE', 'FRIDAY', 'GEE', 'GEN', 'GEN LG1', 'GEN LG2', 'GRID', 'HOURS', 'Heading1', 'Heading2', 'Helvetica', 'Helvetica-Bold', 'MEC', 'MIDDLE', 'MONDAY', 'Normal', 'ROWBACKGROUNDS', 'SECOND HALF', 'TEXTCOLOR', 'THURSDAY', 'TUESDAY', 'UnzaTitle', 'VALIGN', 'WEDNESDAY', 'academic_half', 'first_half', 'grid_data', 'year']

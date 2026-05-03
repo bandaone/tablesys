@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\public.py
+# hypothesis_version: 6.151.9
+
+[404, '/api/v1/public', '/university', 'public']

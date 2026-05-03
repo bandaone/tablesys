@@ -1,21 +1,22 @@
-// OWNER: Cursor | TASK: T3 | DATE: 2026-02-19
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     Box,
     Button,
-    Chip,
+    CircularProgress,
     Divider,
     FormControl,
     InputLabel,
     MenuItem,
     Select,
     SelectChangeEvent,
+    Snackbar,
     Stack,
     Typography,
 } from '@mui/material';
 import { TimetableSlot } from './TimetableCell';
-import { lecturersAPI, groupsAPI } from '../api';
+import { groupsAPI, lecturersAPI, timetablesAPI } from '../api';
+import { formatGroupLabel, formatPersonName } from '../utils/displayFormatters';
 
 interface LecturerOption {
     id: number;
@@ -28,7 +29,9 @@ interface GroupOption {
 }
 
 interface TimetableAssignmentPanelProps {
-    slot: TimetableSlot | null;
+    selectedSlot: TimetableSlot | null;
+    onSlotSelect: (slot: TimetableSlot | null) => void;
+    onAssignmentComplete?: () => void;
 }
 
 /**
@@ -39,18 +42,29 @@ interface TimetableAssignmentPanelProps {
  * student groups. Persistence wiring is intentionally deferred until the
  * corresponding backend endpoints and API client helpers are available.
  */
-const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slot }) => {
+const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({
+    selectedSlot,
+    onSlotSelect,
+    onAssignmentComplete,
+}) => {
     const [lecturers, setLecturers] = useState<LecturerOption[]>([]);
     const [groups, setGroups] = useState<GroupOption[]>([]);
-    const [selectedLecturerId, setSelectedLecturerId] = useState<number | ''>('');
-    const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [selectedLecturerId, setSelectedLecturerId] = useState<number | null>(null);
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+    const [optionsLoading, setOptionsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const [loading, setLoading] = useState(false);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success' as 'success' | 'error',
+    });
 
     useEffect(() => {
         const fetchOptions = async () => {
             try {
-                setLoading(true);
+                setOptionsLoading(true);
                 setError(null);
 
                 const [lecturerList, groupList] = await Promise.all([
@@ -74,7 +88,7 @@ const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slo
             } catch (err) {
                 setError('Failed to load lecturers and groups. Please try again.');
             } finally {
-                setLoading(false);
+                setOptionsLoading(false);
             }
         };
 
@@ -82,56 +96,125 @@ const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slo
     }, []);
 
     useEffect(() => {
-        if (!slot) {
-            setSelectedLecturerId('');
-            setSelectedGroupIds([]);
+        if (!selectedSlot) {
+            setSelectedLecturerId(null);
+            setSelectedGroupId(null);
             return;
         }
 
-        setSelectedLecturerId('');
-        setSelectedGroupIds([]);
-    }, [slot]);
+        setSelectedLecturerId(null);
+        setSelectedGroupId(null);
+    }, [selectedSlot]);
 
     const selectedLecturer = useMemo(
         () => lecturers.find((l) => l.id === selectedLecturerId),
         [lecturers, selectedLecturerId],
     );
 
+    const selectedGroup = useMemo(
+        () => groups.find((g) => g.id === selectedGroupId),
+        [groups, selectedGroupId],
+    );
+
     const handleLecturerChange = (event: SelectChangeEvent<number | ''>) => {
         const value = event.target.value;
-        setSelectedLecturerId(value === '' ? '' : Number(value));
+        setSelectedLecturerId(value === '' ? null : Number(value));
     };
 
-    const handleGroupsChange = (event: SelectChangeEvent<number[]>) => {
-        const {
-            target: { value },
-        } = event;
-        setSelectedGroupIds(typeof value === 'string' ? value.split(',').map((id) => Number(id)) : value);
+    const handleSaveAssignment = async () => {
+        if (!selectedSlot?.slot_id) {
+            setSnackbar({
+                open: true,
+                message: 'No slot selected',
+                severity: 'error',
+            });
+            return;
+        }
+
+        if (!selectedLecturerId) {
+            setSnackbar({
+                open: true,
+                message: 'Please select a lecturer',
+                severity: 'error',
+            });
+            return;
+        }
+
+        if (!selectedGroupId) {
+            setSnackbar({
+                open: true,
+                message: 'Please select a student group',
+                severity: 'error',
+            });
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            await timetablesAPI.assignSlot(selectedSlot.slot_id, {
+                lecturer_id: selectedLecturerId,
+                group_id: selectedGroupId,
+            });
+
+            setSnackbar({
+                open: true,
+                message: 'Assignment saved successfully',
+                severity: 'success',
+            });
+
+            onSlotSelect(null);
+
+            if (onAssignmentComplete) {
+                onAssignmentComplete();
+            }
+        } catch (error: any) {
+            let message = 'Failed to save assignment';
+
+            if (error.response?.status === 404) {
+                message = 'Time slot not found';
+            } else if (error.response?.status === 422) {
+                message = 'Invalid lecturer or group selection';
+            } else if (error.response?.status === 403) {
+                message = 'You do not have permission to assign slots';
+            } else if (error.response?.data?.detail) {
+                message = error.response.data.detail;
+            }
+
+            setSnackbar({
+                open: true,
+                message,
+                severity: 'error',
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSave = () => {
-        // The actual persistence logic will be implemented once
-        // the backend slot-assignment API and api.ts helper are available.
-        // For now, keep this as a no-op to avoid cross-domain violations.
-        // eslint-disable-next-line no-console
-        console.log('Assignment payload (not yet persisted):', {
-            slot,
-            lecturer_id: selectedLecturerId || null,
-            group_ids: selectedGroupIds,
-        });
-    };
-
-    if (!slot) {
+    if (!selectedSlot) {
         return (
             <Box sx={{ p: 3 }}>
                 <Typography variant="subtitle1" color="text.secondary">
                     Select a timetable cell to assign a lecturer and student groups.
                 </Typography>
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                >
+                    <Alert
+                        severity={snackbar.severity}
+                        onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
             </Box>
         );
     }
 
-    const saveDisabled = loading || !slot.slot_id;
+    const saveDisabled = loading || !selectedLecturerId || !selectedGroupId;
 
     return (
         <Box
@@ -149,16 +232,16 @@ const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slo
             </Typography>
 
             <Typography variant="body2" color="text.secondary">
-                Day: <strong>{slot.day}</strong>
+                Day: <strong>{selectedSlot.day}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-                Time: <strong>{slot.start_time} - {slot.end_time}</strong>
+                Time: <strong>{selectedSlot.start_time} - {selectedSlot.end_time}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-                Course: <strong>{slot.course_code}</strong>
+                Course: <strong>{selectedSlot.course_code}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-                Room: <strong>{slot.room}</strong>
+                Room: <strong>{selectedSlot.room}</strong>
             </Typography>
 
             <Divider sx={{ my: 1 }} />
@@ -175,44 +258,38 @@ const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slo
                     <Select
                         labelId="lecturer-select-label"
                         label="Lecturer"
-                        value={selectedLecturerId}
+                        value={selectedLecturerId ?? ''}
                         onChange={handleLecturerChange}
-                        disabled={loading}
+                        disabled={optionsLoading || loading}
                     >
                         <MenuItem value="">
                             <em>Unassigned</em>
                         </MenuItem>
                         {lecturers.map((lecturer) => (
                             <MenuItem key={lecturer.id} value={lecturer.id}>
-                                {lecturer.full_name}
+                                {formatPersonName(lecturer.full_name)}
                             </MenuItem>
                         ))}
                     </Select>
                 </FormControl>
 
                 <FormControl fullWidth size="small">
-                    <InputLabel id="groups-select-label">Student Groups</InputLabel>
+                    <InputLabel id="groups-select-label">Student Group</InputLabel>
                     <Select
                         labelId="groups-select-label"
-                        label="Student Groups"
-                        multiple
-                        value={selectedGroupIds}
-                        onChange={handleGroupsChange}
-                        disabled={loading}
-                        renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                {selected.map((value) => {
-                                    const group = groups.find((g) => g.id === value);
-                                    return group ? (
-                                        <Chip key={group.id} label={group.name} size="small" />
-                                    ) : null;
-                                })}
-                            </Box>
-                        )}
+                        label="Student Group"
+                        value={selectedGroupId ?? ''}
+                        onChange={(event: SelectChangeEvent<number>) =>
+                            setSelectedGroupId(event.target.value as number)
+                        }
+                        disabled={optionsLoading || loading}
                     >
+                        <MenuItem value="">
+                            <em>Unassigned</em>
+                        </MenuItem>
                         {groups.map((group) => (
                             <MenuItem key={group.id} value={group.id}>
-                                {group.name}
+                                {formatGroupLabel(group)}
                             </MenuItem>
                         ))}
                     </Select>
@@ -221,26 +298,48 @@ const TimetableAssignmentPanel: React.FC<TimetableAssignmentPanelProps> = ({ slo
 
             <Box sx={{ flexGrow: 1 }} />
 
-            {saveDisabled && (
+            {!selectedSlot.slot_id && (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                    Saving will be enabled once slot identifiers are exposed by the backend assignment API.
+                    Saving requires a slot identifier. Please refresh and ensure the backend is returning `slot_id` in the timetable view API.
                 </Alert>
             )}
 
             <Button
                 variant="contained"
                 color="primary"
-                onClick={handleSave}
+                fullWidth
+                onClick={handleSaveAssignment}
                 disabled={saveDisabled}
+                startIcon={loading ? <CircularProgress size={20} /> : null}
             >
-                Save Assignment
+                {loading ? 'Saving...' : 'Save Assignment'}
             </Button>
 
             {selectedLecturer && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                    Selected lecturer: {selectedLecturer.full_name}
+                    Selected lecturer: {formatPersonName(selectedLecturer.full_name)}
                 </Typography>
             )}
+
+            {selectedGroup && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Selected group: {selectedGroup.name}
+                </Typography>
+            )}
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    severity={snackbar.severity}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

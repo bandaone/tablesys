@@ -243,7 +243,7 @@ Common issues and their solutions for TABLESYS.
 1. **Verify default credentials**
    ```
    Username: admin
-   Password: admin123
+   Password: value from TABLESYS_INITIAL_USER_PASSWORD in .env
    ```
 
 2. **Check database has admin user**
@@ -505,7 +505,7 @@ Common issues and their solutions for TABLESYS.
 2. **Check DATABASE_URL**
    ```yaml
    # docker-compose.yml
-   DATABASE_URL: postgresql://tablesys:tablesys123@postgres:5432/tablesys_db
+   DATABASE_URL: postgresql://tablesys:${POSTGRES_PASSWORD}@postgres:5432/tablesys_db
    # Note: Use service name 'postgres', not 'localhost'
    ```
 

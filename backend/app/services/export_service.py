@@ -1,71 +1,161 @@
-from sqlalchemy.orm import Session
-from ..models import Timetable, TimetableSlot, Course, Room, StudentGroup, Lecturer
-from typing import Dict, Any
+"""
+Export Service
+
+Prepares structured grid data from the database that can be consumed by
+DocxGenerator, ExcelGenerator, or returned directly as JSON.
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
+from typing import Any, Dict, Optional
+
+from sqlalchemy.orm import Session
+
+from ..config import settings
+from ..models import Course, Lecturer, Room, StudentGroup, Timetable, TimetableSlot, University
+from ..utils.display_formatting import format_group_label, format_group_name, format_person_name, format_room_name
+from ..utils.group_audience import resolve_slot_audience_labels
+
 
 class ExportService:
-    def __init__(self, db: Session):
+    """Builds the timetable grid dict used by all export generators."""
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get_traditional_export_data(self, timetable_id: int) -> Dict[str, Any]:
-        """
-        Prepare data for the traditional grid view:
-        Rows: 07:00 - 19:00
-        Columns: 2nd Year (GEN LG1, LG2) | 3rd-5th (Depts)
-        """
-        timetable = self.db.query(Timetable).get(timetable_id)
-        slots = self.db.query(TimetableSlot).filter(TimetableSlot.timetable_id == timetable_id).all()
-        
-        # Structure: data[day][hour][column_key] = [Slot info]
-        # Column Keys: "GEN LG1", "GEN LG2", "AEN-3", "CEE-3", ...
-        
-        export_data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        
+    # ------------------------------------------------------------------
+    # Public
+    # ------------------------------------------------------------------
 
-        
+    def get_traditional_export_data(self, timetable_id: int) -> Dict[str, Any]:
+        timetable: Optional[Timetable] = (
+            self.db.query(Timetable)
+            .filter(Timetable.id == timetable_id)
+            .first()
+        )
+        if timetable is None:
+            raise ValueError(f"Timetable {timetable_id} not found.")
+
+        slots = (
+            self.db.query(TimetableSlot)
+            .filter(TimetableSlot.timetable_id == timetable_id)
+            .all()
+        )
+        return self._build_grid(timetable, slots)
+
+    def get_active_timetable_export_data(self) -> Dict[str, Any]:
+        timetable: Optional[Timetable] = (
+            self.db.query(Timetable).filter(Timetable.is_active == True).first()
+        )
+        if timetable is None:
+            raise ValueError("No active timetable found. Activate a timetable first.")
+
+        slots = (
+            self.db.query(TimetableSlot)
+            .filter(TimetableSlot.timetable_id == timetable.id)
+            .all()
+        )
+        return self._build_grid(timetable, slots)
+
+    def _get_university_id(self) -> Optional[int]:
+        """Attempt to resolve a university id from context — returns None if not scoped."""
+        return None  # No tenant filtering for direct ID lookups
+
+    # ------------------------------------------------------------------
+    # Private
+    # ------------------------------------------------------------------
+
+    def _build_grid(
+        self, timetable: Timetable, slots: list[TimetableSlot]
+    ) -> Dict[str, Any]:
+        _DAY_NAMES = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
+
+        grid: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        group_cache: Dict[int, StudentGroup] = {}
+        stream_children_cache: Dict[int, list[StudentGroup]] = {}
+
         for slot in slots:
-            course = self.db.query(Course).get(slot.course_id)
-            room = self.db.query(Room).get(slot.room_id)
-            group = self.db.query(StudentGroup).get(slot.group_id)
-            lecturer = self.db.query(Lecturer).get(slot.lecturer_id)
-            
-            # Determine Column Key
+            course: Optional[Course] = (
+                self.db.query(Course).filter(Course.id == slot.course_id).first()
+            )
+            room: Optional[Room] = (
+                self.db.query(Room).filter(Room.id == slot.room_id).first() if slot.room_id else None
+            )
+            group: Optional[StudentGroup] = (
+                self.db.query(StudentGroup).filter(StudentGroup.id == slot.group_id).first()
+            )
+            lecturer: Optional[Lecturer] = (
+                self.db.query(Lecturer).filter(Lecturer.id == slot.lecturer_id).first()
+                if slot.lecturer_id else None
+            )
+
+            # Course and group are mandatory; room and lecturer can be TBD
+            if not course or not group:
+                continue
+
             col_key = self._determine_column_key(group, course)
-            
-            day_name = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"][slot.day_of_week]
+            day_name = _DAY_NAMES[slot.day_of_week]
             start_hour = slot.start_time.strftime("%H:%M")
-            
-            entry = {
-                "course_code": course.code,
-                "room_name": room.name,
-                "group_name": group.name,
-                "lecturer_name": lecturer.full_name,
-                "session_type": slot.session_type
-            }
-            
-            export_data[day_name][start_hour][col_key].append(entry)
-            
+            audience_names = resolve_slot_audience_labels(
+                self.db,
+                slot,
+                group_cache=group_cache,
+                stream_children_cache=stream_children_cache,
+            ) or [format_group_label(group, prefer_code=True)]
+            audience_names = [format_group_name(name) for name in audience_names if name]
+
+            grid[day_name][start_hour][col_key].append(
+                {
+                    "course_code": course.code,
+                    "room_name": format_room_name(room.name) if room else "TBA",
+                    "group_name": " + ".join(audience_names),
+                    "lecturer_name": format_person_name(lecturer.full_name) if lecturer else "TBA",
+                    "session_type": slot.session_type,
+                }
+            )
+
         return {
             "timetable_name": timetable.name,
             "semester": timetable.semester,
             "year": timetable.year,
             "academic_half": getattr(timetable, "academic_half", "first_half"),
-            "grid_data": export_data
+            "university_name": self._resolve_university_name(timetable),
+            "university_short_name": self._resolve_university_short_name(timetable),
+            "grid_data": grid,
         }
 
+    def _resolve_university_name(self, timetable: Timetable) -> str:
+        if getattr(timetable, "university_id", None):
+            university = (
+                self.db.query(University)
+                .filter(University.id == timetable.university_id)
+                .first()
+            )
+            if university and university.name:
+                return university.name
+        return settings.UNIVERSITY_NAME
+
+    def _resolve_university_short_name(self, timetable: Timetable) -> str:
+        if getattr(timetable, "university_id", None):
+            university = (
+                self.db.query(University)
+                .filter(University.id == timetable.university_id)
+                .first()
+            )
+            if university and university.short_name:
+                return university.short_name
+            if university and university.name:
+                return university.name
+        return settings.UNIVERSITY_SHORT_NAME
+
     def _determine_column_key(self, group: StudentGroup, course: Course) -> str:
-        """Map a group to a specific column in the traditional format"""
-        # Logic to map 2nd year groups to GEN LG1/LG2
+        """Map a student group to its column key in the traditional grid."""
         if group.level == 2:
             if "LG1" in group.name or "GEN1" in group.name:
                 return "GEN LG1"
             return "GEN LG2"
-            
-        # Logic for 3rd-5th year: Map to Department
-        # In this format, columns are Dept headers under Year headers
-        # We'll return a key like "LEVEL-DEPT" e.g., "3-AEN"
-        
-        # Only extract the Dept code
+
         dept_code = group.department.code if group.department else "UNK"
-        
         return f"{group.level}-{dept_code}"
+

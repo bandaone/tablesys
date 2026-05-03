@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\export_service.py
+# hypothesis_version: 6.151.9
+
+['%H:%M', 'FRIDAY', 'GEN LG1', 'GEN LG2', 'GEN1', 'LG1', 'MONDAY', 'THURSDAY', 'TUESDAY', 'UNK', 'WEDNESDAY', 'academic_half', 'course_code', 'first_half', 'grid_data', 'group_name', 'lecturer_name', 'room_name', 'semester', 'session_type', 'timetable_name', 'year']

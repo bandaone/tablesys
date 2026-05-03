@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\export.py
+# hypothesis_version: 6.151.9
+
+[404, '/active/docx', '/active/excel', '/active/json', '/active/pdf', '/export', 'Not found', 'academic_half', 'application/pdf', 'description', 'export', 'exports', 'grid', 'grid_data', 'semester', 'timetable_name', 'year']

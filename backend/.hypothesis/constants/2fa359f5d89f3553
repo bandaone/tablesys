@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\email_service.py
+# hypothesis_version: 6.151.9
+
+[', ', 'From', 'Subject', 'To', 'alternative', 'html', 'plain']

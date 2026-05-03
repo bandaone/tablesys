@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\student_portal.py
+# hypothesis_version: 6.151.9
+
+['/api/v1/student', '/courses', '/login', '/me', '/register', '/timetable', '/update-password', 'Bearer', 'N/A', 'WWW-Authenticate', 'academic_year', 'access_token', 'auto', 'bcrypt', 'bearer', 'building', 'code', 'course_code', 'course_name', 'course_type', 'credit_hours', 'day_of_week', 'department', 'email', 'end_time', 'exp', 'full_name', 'group_name', 'id', 'lecturer', 'lecturer_name', 'message', 'name', 'program', 'room_number', 'semester', 'slots', 'start_time', 'student', 'student-portal', 'student_number', 'sub', 'timetable', 'token_type', 'total_slots', 'type', 'year_level']

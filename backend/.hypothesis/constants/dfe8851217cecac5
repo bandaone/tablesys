@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\reports.py
+# hypothesis_version: 6.151.9
+
+['/api/v1/reports', '/custom', '/lecturer-workload', '/quick-stats', '/room-utilization', '/types', 'Admin', 'Content-Disposition', 'Coordinator', 'HOD', 'application/json', 'csv', 'department_stats', 'error', 'generated_at', 'json', 'lecturer-workload', 'lecturer_stats', 'reports', 'room-utilization', 'room_stats', 'summary', 'timetable-summary']

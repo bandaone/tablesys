@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\middleware\rate_limiter.py
+# hypothesis_version: 6.151.9
+
+[0.01, 300, 'blocked_ips', 'blocked_list', 'blocked_until', 'ip', 'remaining_seconds', 'tracked_ips']

@@ -31,7 +31,7 @@
 CREATE DATABASE tablesys_db;
 
 -- Create user
-CREATE USER tablesys WITH PASSWORD 'tablesys123';
+CREATE USER tablesys WITH PASSWORD '<32+_char_strong_password>';
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE tablesys_db TO tablesys;
@@ -97,10 +97,10 @@ docker-compose down
 ## First-Time Login
 
 1. Navigate to http://localhost:3000
-2. Login with default credentials:
+2. Login with the seeded bootstrap credentials:
    - Username: `admin`
-   - Password: `admin123`
-3. **Important**: Change the default password immediately!
+   - Password: value from `TABLESYS_INITIAL_USER_PASSWORD` in your `.env`
+3. **Important**: Rotate this bootstrap password immediately after first login.
 
 ## Creating Additional Users
 

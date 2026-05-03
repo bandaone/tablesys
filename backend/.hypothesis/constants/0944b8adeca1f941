@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\analytics_service.py
+# hypothesis_version: 6.151.9
+
+[100, '07:00 - 12:00', '12:00 - 17:00', '17:00 - 20:00', 'High', 'Light', 'Low', 'Minimal', 'Moderate', 'N/A', 'Overloaded', 'afternoon', 'building', 'capacity', 'count', 'course_count', 'course_distribution', 'department', 'evening', 'lecturer_id', 'lecturer_name', 'lecturer_workload', 'max_hours', 'morning', 'percentage', 'room_id', 'room_name', 'room_type', 'room_utilization', 'slots_used', 'status', 'summary', 'time_range', 'timetable_id', 'timetable_name', 'total_contact_hours', 'total_hours', 'total_slots', 'unique_courses', 'unique_groups', 'unique_lecturers', 'unique_rooms', 'utilization_rate', 'workload_percentage']

@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\print_views.py
+# hypothesis_version: 6.151.9
+
+[100, 404, '%H:%M', '/api/v1/print', '/group/{group_id}', '/room/{room_id}', '/weekly-overview', 'Friday', 'Lecturer not found', 'Monday', 'N/A', 'Room not found', 'TBA', 'Thursday', 'Tuesday', 'Wednesday', 'building', 'capacity', 'course_code', 'course_name', 'credits', 'day', 'days', 'department', 'email', 'end_time', 'full_name', 'group', 'group_name', 'id', 'lecturer', 'level', 'level_filter', 'name', 'print', 'room', 'room_type', 'schedule', 'semester', 'size', 'staff_number', 'start_time', 'timetable', 'total_hours', 'total_slots', 'year']

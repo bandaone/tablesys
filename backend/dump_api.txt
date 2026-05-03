@@ -1,0 +1,63 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.1, pytest-7.4.3, pluggy-1.6.0 -- C:\SYSTEMS\TABLESYS\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\SYSTEMS\TABLESYS\backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, asyncio-0.21.1, cov-4.1.0
+asyncio: mode=Mode.AUTO
+collecting ... collected 16 items
+
+tests/test_api.py::TestHealthCheck::test_root_endpoint_returns_200 --- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pytest\__main__.py", line 5, in <module>
+    raise SystemExit(pytest.console_main())
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 169, in main
+    ret: Union[ExitCode, int] = config.hook.pytest_cmdline_main(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\main.py", line 318, in pytest_cmdline_main
+    return wrap_session(config, _main)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\main.py", line 306, in wrap_session
+    config.hook.pytest_sessionfinish(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\runner.py", line 108, in pytest_sessionfinish
+    session._setupstate.teardown_exact(None)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\runner.py", line 526, in teardown_exact
+    fin()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\fixtures.py", line 701, in <lambda>
+    subrequest.node.addfinalizer(lambda: fixturedef.finish(request=subrequest))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\fixtures.py", line 1024, in finish
+    func()
+  File "c:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pytest_asyncio\plugin.py", line 466, in _provide_clean_event_loop
+    new_loop = policy.new_event_loop()
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\events.py", line 716, in new_event_loop
+    return self._loop_factory()
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\windows_events.py", line 315, in __init__
+    super().__init__(proactor)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\proactor_events.py", line 634, in __init__
+    logger.debug('Using proactor: %s', proactor.__class__.__name__)
+Message: 'Using proactor: %s'
+Arguments: ('IocpProactor',)
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py:715: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+============================ 22 warnings in 2.98s =============================

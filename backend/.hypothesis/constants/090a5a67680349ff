@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\auth.py
+# hypothesis_version: 6.151.9
+
+[400, 'Bearer', 'Inactive user', 'WWW-Authenticate', 'api/auth/login', 'auto', 'bcrypt', 'exp', 'sub']

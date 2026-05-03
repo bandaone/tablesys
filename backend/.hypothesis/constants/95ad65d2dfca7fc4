@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\utils\template_parser.py
+# hypothesis_version: 6.151.9
+
+['.', 'AEN', 'BBA', 'BIO', 'CEE', 'CHEM', 'CS', 'EEE', 'Friday', 'GEE', 'GEN', 'IT', 'LAW', 'MEC', 'MED', 'Monday', 'PHYS', 'Thursday', 'Tuesday', 'Wednesday', 'col_group_map', 'col_index', 'containers', 'csv', 'day', 'docx', 'duration', 'end', 'end_hour', 'excel', 'file_type', 'group_label', 'header_row_indices', 'lab', 'lect', 'lecture', 'prac', 'practical', 'row_index', 'session_type', 'shape', 'source', 'start', 'start_hour', 'time_col_index', 'total_cols', 'total_rows', 'tut', 'tutorial', 'w:gridSpan', 'w:t', 'w:tc', 'w:tcPr', 'w:tr', 'w:val', 'xls', 'xlsx']

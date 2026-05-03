@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\utils\audit_logger.py
+# hypothesis_version: 6.151.9
+
+[100, ',', '/api/auth/login', '/api/auth/logout', '/system/background', 'Background Worker', 'GENERATE_TIMETABLE', 'LOGIN_FAILURE', 'LOGIN_SUCCESS', 'LOGOUT', 'POST', 'PROCESS', 'RATE_LIMIT_BLOCK', 'SCREAM', 'SYSTEM', 'SYSTEM_ERROR', 'Unknown', 'User-Agent', 'X-Forwarded-For', 'Z', 'action', 'audit', 'count', 'details', 'error_message', 'event_type', 'ip_address', 'logs/audit.log', 'r', 'request_id', 'resource', 'resource_id', 'resource_type', 'success', 'system', 'timestamp', 'timetable_generator', 'timetable_id', 'unknown', 'user_agent', 'user_id', 'username', 'utf-8']

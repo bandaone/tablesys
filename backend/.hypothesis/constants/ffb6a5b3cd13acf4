@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\seeding_utils.py
+# hypothesis_version: 6.151.9
+
+['AEN', 'CEE', 'EEE', 'GEE', 'GEN', 'General', 'MEC', 'admin', 'code', 'coordinator', 'id', 'name', 'pass']

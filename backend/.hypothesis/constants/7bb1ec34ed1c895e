@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\database.py
+# hypothesis_version: 6.151.9
+
+[1800, 3600, '-c timezone=utc', 'connect_timeout', 'development', 'max_overflow', 'options', 'pool_recycle', 'pool_size']

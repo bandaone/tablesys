@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\templates.py
+# hypothesis_version: 6.151.9
+
+[201, 400, 404, 422, 1024, '.', '/', '/api/v1/templates', '/save', '/upload-preview', '/{profile_id}', 'application/msword', 'containers', 'csv', 'doc', 'docx', 'is_active', 'session_type', 'shape', 'template-profiles', 'text/csv', 'unknown', 'xls', 'xlsx']

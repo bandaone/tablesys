@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\celery_app.py
+# hypothesis_version: 6.151.9
+
+[3600, 'UTC', 'app.tasks.generation', 'json', 'tablesys']

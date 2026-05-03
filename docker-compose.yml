@@ -1,19 +1,23 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: tablesys-db
     environment:
-      POSTGRES_DB: tablesys_db
-      POSTGRES_USER: tablesys
-      POSTGRES_PASSWORD: tablesys123
+      POSTGRES_DB: ${POSTGRES_DB:-tablesys_db}
+      POSTGRES_USER: ${POSTGRES_USER:-tablesys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}      # Required — no default
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - tablesys-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tablesys} -d ${POSTGRES_DB:-tablesys_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   backend:
     build:
@@ -21,22 +25,41 @@ services:
       dockerfile: Dockerfile
     container_name: tablesys-backend
     environment:
-      DATABASE_URL: postgresql://tablesys:tablesys123@postgres:5432/tablesys_db
-      SECRET_KEY: your-secret-key-change-in-production
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tablesys}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tablesys_db}
+      SECRET_KEY: ${SECRET_KEY}                    # Required — no default
+      TABLESYS_INITIAL_USER_PASSWORD: ${TABLESYS_INITIAL_USER_PASSWORD}  # Required for deterministic secure bootstrap login
+      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-superadmin@tablesys.local}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      # University Identity — change these for each deployment
+      UNIVERSITY_NAME: ${UNIVERSITY_NAME:-TABLESYS Platform}
+      UNIVERSITY_SHORT_NAME: ${UNIVERSITY_SHORT_NAME:-TABLESYS}
+      UNIVERSITY_EMAIL_DOMAIN: ${UNIVERSITY_EMAIL_DOMAIN:-tablesys.cloud}
+      APP_TITLE: ${APP_TITLE:-TABLESYS — Timetable Management System}
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      # Email
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     networks:
       - tablesys-network
     command: >
-      sh -c "while ! pg_isready -h postgres -p 5432 -U tablesys; do sleep 1; done;
-             python seed_users.py;
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "python seed_users.py &&
+             alembic stamp head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   frontend:
     build:
@@ -44,7 +67,7 @@ services:
       dockerfile: Dockerfile
     container_name: tablesys-frontend
     ports:
-      - "3002:3002"
+      - "${FRONTEND_PORT:-3002}:3002"
     depends_on:
       - backend
     volumes:
@@ -53,7 +76,53 @@ services:
     networks:
       - tablesys-network
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+
+  redis:
+    image: redis:7-alpine
+    container_name: tablesys-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - tablesys-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tablesys-worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tablesys}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tablesys_db}
+      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      UNIVERSITY_NAME: ${UNIVERSITY_NAME:-TABLESYS Platform}
+      UNIVERSITY_SHORT_NAME: ${UNIVERSITY_SHORT_NAME:-TABLESYS}
+      UNIVERSITY_EMAIL_DOMAIN: ${UNIVERSITY_EMAIL_DOMAIN:-tablesys.cloud}
+      APP_TITLE: ${APP_TITLE:-TABLESYS — Timetable Management System}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3002}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - tablesys-network
+    command: >
+      sh -c "celery -A app.celery_app worker --loglevel=info"
 
 volumes:
   postgres_data:

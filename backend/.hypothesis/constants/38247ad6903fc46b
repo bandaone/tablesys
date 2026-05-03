@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\schemas.py
+# hypothesis_version: 6.151.9
+
+['07:00', '19:00', 'Friday', 'L', 'Monday', 'Thursday', 'Tuesday', 'Wednesday', 'admin', 'any', 'auditorium', 'computer_lab', 'conference_room', 'coordinator', 'department', 'department_specific', 'drawing_group', 'drawing_groups', 'drawing_room', 'electrical_lab', 'first_half', 'full_group', 'general', 'hod', 'lab', 'lab_coordinator', 'lab_group', 'lab_groups', 'lecture', 'lecture_hall', 'lecture_hall_large', 'lecture_hall_medium', 'lecture_hall_small', 'mechanical_lab', 'multi_department', 'numeric', 'practical', 'primary', 'seminar_room', 'stream', 'superadmin', 'surveying_room', 'tutorial_group', 'tutorial_groups', 'tutorial_room']

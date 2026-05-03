@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\dashboard.py
+# hypothesis_version: 6.151.9
+
+['/', '/activity', '/api/v1/dashboard', '/departments', '/health', '/overview', '/readiness', '/resources', '/timetables', '/users', '/weekly', 'Admin', 'dashboard']

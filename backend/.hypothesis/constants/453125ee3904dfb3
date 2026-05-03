@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py
+# hypothesis_version: 6.151.9
+
+[100, 200, 1000, 5000, '/', '/api/v1/audit', '/cleanup', '/export/json', '/statistics', '/stream', '/user/{user_id}', '/{log_id}', 'Admin', 'Audit log not found', 'CLEANUP', 'Content-Disposition', 'Coordinator', 'application/json', 'audit-logs', 'audit_log', 'audit_stream', 'data', 'days', 'deleted_count', 'message', 'ping', 'pong', 'success', 'type', 'user-agent']

@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\middleware\security_headers.py
+# hypothesis_version: 6.151.9
+
+['1; mode=block', 'DENY', 'ENVIRONMENT', 'Permissions-Policy', 'Referrer-Policy', 'X-Frame-Options', 'X-XSS-Protection', 'development', 'https', 'nosniff']

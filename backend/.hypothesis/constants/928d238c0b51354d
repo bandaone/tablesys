@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\version_service.py
+# hypothesis_version: 6.151.9
+
+['academic_half', 'added', 'added_slots', 'backup_version_id', 'base_version_number', 'changes', 'course_id', 'created_at', 'created_by', 'day_of_week', 'description', 'details', 'diff', 'end_time', 'full', 'full_name', 'generation_metadata', 'group_id', 'id', 'is_active', 'lecturer_id', 'message', 'modified', 'modified_slots', 'name', 'new', 'old', 'removed', 'removed_slot_keys', 'removed_slots', 'room_id', 'semester', 'slot_count', 'slots', 'slots_restored', 'start_time', 'state', 'status', 'storage_mode', 'success', 'summary', 'timetable', 'timetable_patch', 'username', 'version1', 'version2', 'version_number', 'year']

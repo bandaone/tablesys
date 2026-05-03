@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py
+# hypothesis_version: 6.151.9
+
+[100, 150, 200, 300, 400, 403, 404, 409, 422, 500, 600, ',', '/', '/api/v1/groups', '/bulk-upload', '/{group_id}', '/{group_id}/streams', ';', 'All Groups Cleared', 'CREATE', 'DELETE', 'GEN', 'Group Deleted', 'Group not found', 'New Student Group', 'Permission denied', 'UPDATE', 'alpha', 'coordinator', 'count_deleted', 'created', 'custom', 'deleted', 'department', 'department_code', 'department_id', 'department_name', 'detail', 'display_code', 'drawing_group', 'errors', 'field', 'general', 'group', 'group_bulk', 'group_name', 'group_type', 'hod', 'info', 'lab', 'lab_coordinator', 'lab_group', 'level', 'main', 'message', 'name', 'name (or group_name)', 'parent_group_id', 'replace', 'size', 'skipped', 'status', 'stream', 'student-groups', 'success', 'text/csv', 'tutorial_group', 'university_id', 'updates', 'utf-8', 'warning']

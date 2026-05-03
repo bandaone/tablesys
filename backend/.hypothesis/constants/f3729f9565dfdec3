@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\validation_service.py
+# hypothesis_version: 6.151.9
+
+[0.9, 100, 'Timetable not found', 'avoid_early_morning', 'avoid_late_afternoon', 'break_time', 'capacity', 'course', 'course_id', 'day', 'double_booking', 'end_time', 'entity_id', 'entity_type', 'error', 'errors', 'field', 'group_id', 'info', 'lecturer', 'lecturer_assignment', 'lecturer_id', 'level_mismatch', 'lunch_break', 'message', 'room', 'room_assignment', 'room_id', 'severity', 'start_time', 'time_preference', 'time_slot', 'total_issues', 'utilization', 'valid', 'warning', 'warnings', 'workload']

@@ -1,0 +1,133 @@
+C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py:331: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+Plugin: helpconfig, Hook: pytest_cmdline_parse
+KeyboardInterrupt: 
+For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+  config = pluginmanager.hook.pytest_cmdline_parse(
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pytest\__main__.py", line 5, in <module>
+    raise SystemExit(pytest.console_main())
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+    raise exception
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 43, in run_old_style_hookwrapper
+    teardown.send(result)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_result.py", line 103, in get_result
+    raise exc.with_traceback(tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 38, in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+    raise exception
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 53, in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_result.py", line 103, in get_result
+    raise exc.with_traceback(tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 38, in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 53, in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_result.py", line 103, in get_result
+    raise exc.with_traceback(tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 38, in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 1153, in pytest_load_initial_conftests
+    self.pluginmanager._set_initial_conftests(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 563, in _set_initial_conftests
+    self._try_load_conftest(anchor, importmode, rootpath)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 580, in _try_load_conftest
+    self._getconftestmodules(anchor, importmode, rootpath)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 609, in _getconftestmodules
+    mod = self._importconftest(conftestpath, importmode, rootpath)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\config\__init__.py", line 641, in _importconftest
+    mod = import_path(conftestpath, mode=importmode, root=rootpath)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\pathlib.py", line 567, in import_path
+    importlib.import_module(module_name)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\_pytest\assertion\rewrite.py", line 186, in exec_module
+    exec(co, module.__dict__)
+  File "C:\SYSTEMS\TABLESYS\backend\tests\conftest.py", line 19, in <module>
+    from app.main import app
+  File "C:\SYSTEMS\TABLESYS\backend\app\main.py", line 16, in <module>
+    from .routers import auth, courses, lecturers, rooms, groups, departments, timetables, export, import_timetable, users, print_views, notifications, search, dashboard, reports, student_portal, audit, templates, scheduler
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\auth.py", line 9, in <module>
+    from ..middleware.rate_limiter import RateLimiter
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\__init__.py", line 2, in <module>
+    from .error_handler import (
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 20, in <module>
+    from ..utils.logging_utils import set_request_id
+  File "C:\SYSTEMS\TABLESYS\backend\app\utils\__init__.py", line 2, in <module>
+    from .docx_generator import DocxGenerator
+  File "C:\SYSTEMS\TABLESYS\backend\app\utils\docx_generator.py", line 1, in <module>
+    from docx import Document
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\docx\__init__.py", line 11, in <module>
+    from docx.api import Document
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\docx\api.py", line 12, in <module>
+    from docx.package import Package
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\docx\package.py", line 7, in <module>
+    from docx.image.image import Image
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\docx\image\__init__.py", line 8, in <module>
+    from docx.image.gif import Gif
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 990, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1086, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1186, in get_data
+KeyboardInterrupt
+^C

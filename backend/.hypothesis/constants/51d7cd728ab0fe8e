@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\services\audit_service.py
+# hypothesis_version: 6.151.9
+
+[100, 'action', 'actions', 'changes', 'count', 'end', 'entities', 'entity_id', 'entity_name', 'entity_type', 'error_message', 'id', 'ip_address', 'period', 'start', 'status', 'success', 'timestamp', 'total_logs', 'unique_users', 'user_email', 'user_id']

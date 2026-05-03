@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\main.py
+# hypothesis_version: 6.151.9
+
+[600, 1024, '%(message)s', '%Y-%m-%d %H:%M:%S', '*', '/', '/api/v1/media', '/docs', '/health', '/media', '1.0.0', 'DELETE', 'GET', 'PATCH', 'POST', 'PUT', 'app', 'audit', 'docs', 'error', 'healthy', 'logs', 'logs/app.log', 'logs/audit.log', 'logs/error.log', 'media', 'media_root', 'message', 'production', 'status', 'university', 'utf-8', 'version']

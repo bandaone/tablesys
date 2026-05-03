@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\search.py
+# hypothesis_version: 6.151.9
+
+[100, 200, '/', '/api/v1/search', '/courses', '/groups', '/lecturers', '/rooms', 'Building name', 'Course type', 'Department ID', 'Group type', 'Maximum capacity', 'Maximum results', 'Minimum capacity', 'Only available rooms', 'Program code', 'Results per type', 'Room category', 'Search query', 'Year level', 'courses', 'groups', 'lecturers', 'rooms', 'search', 'total']

@@ -24,7 +24,7 @@ Use this checklist to ensure proper system setup and configuration.
   ```
 - [ ] Create database user: `tablesys`
   ```sql
-  CREATE USER tablesys WITH PASSWORD 'tablesys123';
+  CREATE USER tablesys WITH PASSWORD '<32+_char_strong_password>';
   ```
 - [ ] Grant privileges
   ```sql
@@ -57,12 +57,13 @@ Use this checklist to ensure proper system setup and configuration.
 - [ ] Verify .env file exists
 - [ ] Open .env file and verify settings:
   ```
-  DATABASE_URL=postgresql://tablesys:tablesys123@localhost:5432/tablesys_db
-  SECRET_KEY=your-secret-key-here-change-in-production
+  DATABASE_URL=postgresql://tablesys:<32+_char_db_password>@localhost:5432/tablesys_db
+  SECRET_KEY=<64_char_random_hex_secret>
+  TABLESYS_INITIAL_USER_PASSWORD=<24+_char_bootstrap_user_password>
   ALGORITHM=HS256
   ACCESS_TOKEN_EXPIRE_MINUTES=30
   ```
-- [ ] Update SECRET_KEY with a secure value (for production)
+- [ ] Generate and set strong SECRET_KEY + TABLESYS_INITIAL_USER_PASSWORD
 - [ ] Verify virtual environment was created: `venv/` folder exists
 - [ ] Verify database tables were created (check PostgreSQL)
 
@@ -92,9 +93,9 @@ Use this checklist to ensure proper system setup and configuration.
 - [ ] Navigate to http://localhost:3000
 - [ ] Login page loads successfully
 - [ ] University of Zambia colors are visible (Dark Blue, Orange)
-- [ ] Login with default credentials:
+- [ ] Login with bootstrap credentials:
   - Username: `admin`
-  - Password: `admin123`
+  - Password: value from `TABLESYS_INITIAL_USER_PASSWORD` in `.env`
 - [ ] Dashboard loads successfully
 - [ ] Navigation menu is visible
 - [ ] User name appears in top right

@@ -1,91 +1,54 @@
 """
-Initial data seeding script for TABLESYS
-Creates predefined users for easy access (username-only, no password)
+Reset and Initial data seeding script for TABLESYS
+WARNING: THIS DROPS ALL TABLES AND CREATES A FRESH STATE WITH ONE SUPERADMIN.
 """
+import os
+import sys
+
+# Ensure app is in path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.database import SessionLocal, engine
-from app.models import Base, User, Department, UserRole
+from app.models import Base, User, UserRole
 from app.auth import get_password_hash
 
-def seed_database():
-    # Create all tables
+def reset_and_seed_database():
+    # 1. Drop all tables to guarantee a fresh state
+    print("Dropping all tables...")
+    Base.metadata.drop_all(bind=engine)
+    
+    # 2. Recreate all tables
+    print("Recreating tables...")
     Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
     
     try:
-        # Expected Mapping:
-        # 0: GEN - General
-        # 1: AEN - Agricultural Engineering
-        # 2: CEE - Civil and Environmental Engineering
-        # 3: EEE - Electrical and Electronic Engineering
-        # 4: GEE - Geomatics Engineering
-        # 5: MEC - Mechanical Engineering
+        # 3. Create SuperAdmin
+        print("\nSeeding SuperAdmin...")
         
-        departments_data = [
-            {"id": 0, "name": "General", "code": "GEN"},
-            {"id": 1, "name": "Agricultural Engineering", "code": "AEN"},
-            {"id": 2, "name": "Civil & Environmental Engineering", "code": "CEE"},
-            {"id": 3, "name": "Electrical & Electronics Engineering", "code": "EEE"},
-            {"id": 4, "name": "Geomatics Engineering", "code": "GEE"},
-            {"id": 5, "name": "Mechanical Engineering", "code": "MEC"},
-        ]
-        
-        print("Seeding departments...")
-        for dept_data in departments_data:
-            existing = db.query(Department).filter(Department.id == dept_data["id"]).first()
-            if existing:
-                # Update if exists
-                existing.name = dept_data["name"]
-                existing.code = dept_data["code"]
-                print(f"Updated department ID {dept_data['id']}: {dept_data['code']}")
-            else:
-                # Create new with explicit ID
-                dept = Department(id=dept_data["id"], name=dept_data["name"], code=dept_data["code"])
-                db.add(dept)
-                print(f"Created department ID {dept_data['id']}: {dept_data['code']}")
-        
+        superadmin = User(
+            email="superadmin@tablesys.com",
+            username="superadmin",
+            hashed_password=get_password_hash("Admin123!"),
+            full_name="TABLESYS Super Administrator",
+            role=UserRole.SUPERADMIN,
+            is_active=True
+        )
+        db.add(superadmin)
         db.commit()
         
-        # Create predefined users
-        users_data = [
-            {"username": "coordinator", "email": "coordinator@tablesys.local", "name": "System Coordinator", "role": UserRole.COORDINATOR, "dept": None},
-            {"username": "admin", "email": "admin@tablesys.local", "name": "System Administrator", "role": UserRole.COORDINATOR, "dept": None},
-            {"username": "GEN", "email": "gen@tablesys.local", "name": "General Department HOD", "role": UserRole.HOD, "dept": 0},
-            {"username": "AEN", "email": "aen@tablesys.local", "name": "Agricultural Engineering HOD", "role": UserRole.HOD, "dept": 1},
-            {"username": "CEE", "email": "cee@tablesys.local", "name": "Civil Engineering HOD", "role": UserRole.HOD, "dept": 2},
-            {"username": "EEE", "email": "eee@tablesys.local", "name": "Electrical Engineering HOD", "role": UserRole.HOD, "dept": 3},
-            {"username": "GEE", "email": "gee@tablesys.local", "name": "Geomatics Engineering HOD", "role": UserRole.HOD, "dept": 4},
-            {"username": "MEC", "email": "mec@tablesys.local", "name": "Mechanical Engineering HOD", "role": UserRole.HOD, "dept": 5},
-        ]
+        print(f"Created SuperAdmin:")
+        print(f"Username: superadmin")
+        print(f"Password: Admin123!")
         
-        print("\nSeeding users...")
-        for user_data in users_data:
-            existing_user = db.query(User).filter(User.username == user_data["username"]).first()
-            if not existing_user:
-                user = User(
-                    email=user_data["email"],
-                    username=user_data["username"],
-                    hashed_password=get_password_hash("pass"),
-                    full_name=user_data["name"],
-                    role=user_data["role"],
-                    department_id=user_data["dept"],
-                    is_active=True
-                )
-                db.add(user)
-                print(f"Created user: {user_data['username']}")
-            else:
-                # Update user department just in case IDs changed
-                existing_user.department_id = user_data["dept"]
-                print(f"Updated user: {user_data['username']}")
-        
-        db.commit()
-        print("\nDatabase seeded successfully!")
+        print("\nDatabase reset and seeded successfully! System is clean.")
         
     except Exception as e:
-        print(f"Error seeding database: {e}")
+        print(f"Error resetting database: {e}")
         db.rollback()
     finally:
         db.close()
 
 if __name__ == "__main__":
-    seed_database()
+    reset_and_seed_database()

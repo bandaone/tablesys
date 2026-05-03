@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\utils\conflict_detector.py
+# hypothesis_version: 6.151.9
+
+['%H:%M', 'Friday', 'Monday', 'Saturday', 'Sunday', 'Thursday', 'Tuesday', 'Wednesday', 'by_severity', 'by_type', 'conflicts', 'day_of_week', 'description', 'end_time', 'group', 'high', 'id', 'lecturer', 'medium', 'name', 'resource', 'room', 'severity', 'slot_ids', 'start_time', 'total_conflicts', 'type']

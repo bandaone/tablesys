@@ -1,0 +1,21 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.1, pytest-7.4.3, pluggy-1.6.0 -- C:\SYSTEMS\TABLESYS\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\SYSTEMS\TABLESYS\backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, asyncio-0.21.1, cov-4.1.0
+asyncio: mode=Mode.AUTO
+collecting ... collected 10 items
+
+tests/test_auth.py::TestPasswordAuthentication::test_valid_login_returns_token PASSED [ 10%]
+tests/test_auth.py::TestPasswordAuthentication::test_invalid_username_returns_401 PASSED [ 20%]
+tests/test_auth.py::TestPasswordAuthentication::test_invalid_password_returns_401 PASSED [ 30%]
+tests/test_auth.py::TestPasswordAuthentication::test_empty_credentials_returns_error PASSED [ 40%]
+tests/test_auth.py::TestPasswordAuthentication::test_token_validation PASSED [ 50%]
+tests/test_auth.py::TestPasswordAuthentication::test_invalid_token_returns_401 PASSED [ 60%]
+tests/test_auth.py::TestRoleBasedAccess::test_coordinator_can_access_all_endpoints PASSED [ 70%]
+tests/test_auth.py::TestRoleBasedAccess::test_hod_can_access_their_department PASSED [ 80%]
+tests/test_auth.py::TestRoleBasedAccess::test_unauthenticated_requests_return_401 PASSED [ 90%]
+tests/test_auth.py::TestRoleBasedAccess::test_get_current_user_info PASSED [100%]
+
+======================= 10 passed, 38 warnings in 5.12s =======================

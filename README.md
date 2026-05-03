@@ -101,6 +101,25 @@ npm run dev
   - Docker
   - Docker Compose
 
+## Mobile Timetable Planning
+
+Preparation for the mobile-first timetable experience lives in:
+
+- [docs/access-layer-architecture.md](docs/access-layer-architecture.md)
+- [docs/student-access-implementation-checklist.md](docs/student-access-implementation-checklist.md)
+- [docs/student-access-docker-manual-test.md](docs/student-access-docker-manual-test.md)
+- [docs/mobile-timetable-blueprint.md](docs/mobile-timetable-blueprint.md)
+- [docs/mobile-implementation-roadmap.md](docs/mobile-implementation-roadmap.md)
+- [docs/adr/0001-mobile-delivery-architecture.md](docs/adr/0001-mobile-delivery-architecture.md)
+
+These documents define the access-layer approach for students and lecturers, the recommended PWA direction, the published snapshot backend model, the mobile API shape, offline strategy, and phased build order.
+
+Important product boundary:
+
+- HODs, coordinators, admins, and superadmins continue using the main web platform for timetable management and generation.
+- Students and lecturers get a separate access layer for fast timetable consumption.
+- The access layer is mobile-first but not mobile-only. It should work well on phones, laptops, and desktop browsers.
+
 ## API Documentation
 
 Once the backend is running, access the interactive API documentation at:
@@ -192,10 +211,17 @@ npm run build
 
 ### Backend (.env)
 ```
-DATABASE_URL=postgresql://tablesys:tablesys123@localhost:5432/tablesys_db
-SECRET_KEY=your-secret-key-here-change-in-production
+DATABASE_URL=postgresql://tablesys:<32+_char_db_password>@localhost:5432/tablesys_db
+SECRET_KEY=<64_char_random_hex_secret>
+TABLESYS_INITIAL_USER_PASSWORD=<24+_char_bootstrap_user_password>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+Generate secure values (example):
+
+```bash
+python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32)); print('TABLESYS_INITIAL_USER_PASSWORD=' + secrets.token_urlsafe(24))"
 ```
 
 ## Color Scheme (UNZA Brand)

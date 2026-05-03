@@ -1,0 +1,1780 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.1, pytest-7.4.3, pluggy-1.6.0 -- C:\SYSTEMS\TABLESYS\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\SYSTEMS\TABLESYS\backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, asyncio-0.21.1, cov-4.1.0
+asyncio: mode=Mode.AUTO
+collecting ... collected 50 items
+
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_invalid_level PASSED [  2%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_invalid_credits PASSED [  4%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_negative_hours PASSED [  6%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_excessive_total_hours PASSED [  8%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_empty_code PASSED [ 10%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_empty_name PASSED [ 12%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_invalid_department FAILED [ 14%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_duplicate_code PASSED [ 16%]
+tests/test_routers_validation.py::TestCoursesValidation::test_get_nonexistent_course PASSED [ 18%]
+tests/test_routers_validation.py::TestCoursesValidation::test_update_nonexistent_course PASSED [ 20%]
+tests/test_routers_validation.py::TestCoursesValidation::test_create_course_valid PASSED [ 22%]
+tests/test_routers_validation.py::TestCoursesValidation::test_update_course_valid PASSED [ 24%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_invalid_email PASSED [ 26%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_invalid_max_hours_high PASSED [ 28%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_invalid_max_hours_zero PASSED [ 30%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_empty_staff_number PASSED [ 32%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_empty_full_name PASSED [ 34%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_invalid_department PASSED [ 36%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_duplicate_staff_number PASSED [ 38%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_duplicate_email PASSED [ 40%]
+tests/test_routers_validation.py::TestLecturersValidation::test_update_nonexistent_lecturer PASSED [ 42%]
+tests/test_routers_validation.py::TestLecturersValidation::test_create_lecturer_valid PASSED [ 44%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_zero_capacity FAILED [ 46%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_excessive_capacity FAILED [ 48%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_invalid_type FAILED [ 50%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_empty_name FAILED [ 52%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_invalid_department FAILED [ 54%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_duplicate_name FAILED [ 56%]
+tests/test_routers_validation.py::TestRoomsValidation::test_update_nonexistent_room PASSED [ 58%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_lecture_hall FAILED [ 60%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_lab FAILED [ 62%]
+tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_tutorial FAILED [ 64%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_zero_size PASSED [ 66%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_excessive_size PASSED [ 68%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_invalid_level PASSED [ 70%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_empty_name PASSED [ 72%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_invalid_department PASSED [ 74%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_duplicate_name FAILED [ 76%]
+tests/test_routers_validation.py::TestGroupsValidation::test_update_nonexistent_group PASSED [ 78%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_valid FAILED [ 80%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_minimum_size FAILED [ 82%]
+tests/test_routers_validation.py::TestGroupsValidation::test_create_group_maximum_size FAILED [ 84%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_department_empty_name PASSED [ 86%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_department_empty_code PASSED [ 88%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_department_duplicate_code PASSED [ 90%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_department_duplicate_name PASSED [ 92%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_delete_nonexistent_department PASSED [ 94%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_department_valid PASSED [ 96%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_create_multiple_departments_different_codes PASSED [ 98%]
+tests/test_routers_validation.py::TestDepartmentsValidation::test_get_all_departments PASSED [100%]
+
+================================== FAILURES ===================================
+_________ TestCoursesValidation.test_create_course_invalid_department _________
+tests\test_routers_validation.py:165: in test_create_course_invalid_department
+    assert response.status_code == 422
+E   assert 500 == 422
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:49 - audit - INFO - {"timestamp": "2026-03-21T09:05:49.184621Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "9774cc99-e707-4a85-861c-906448eb7565"}
+2026-03-21 11:05:49 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:49 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:49.184621Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "9774cc99-e707-4a85-861c-906448eb7565"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:49 - app - ERROR - Unhandled exception: HTTPException.__init__() got an unexpected keyword argument 'field'
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 159, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\anyio\streams\memory.py", line 132, in receive
+    raise EndOfStream from None
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\courses.py", line 113, in create_course
+    raise HTTPException(status_code=422, detail="Invalid department_id", field="department_id")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: HTTPException.__init__() got an unexpected keyword argument 'field'
+2026-03-21 11:05:49 - audit - INFO - {"timestamp": "2026-03-21T09:05:49.232073Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/courses/", "action": "SCREAM", "success": false, "details": {"error_message": "HTTPException.__init__() got an unexpected keyword argument 'field'"}, "request_id": "d1eaa188-9be9-41d3-b1e9-91daeeb00d8e"}
+2026-03-21 11:05:49 - httpx - INFO - HTTP Request: POST http://test/api/v1/courses/ "HTTP/1.1 500 Internal Server Error"
+------------------------------ Captured log call ------------------------------
+ERROR    app:error_handler.py:115 Unhandled exception: HTTPException.__init__() got an unexpected keyword argument 'field'
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 159, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\anyio\streams\memory.py", line 132, in receive
+    raise EndOfStream from None
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\courses.py", line 113, in create_course
+    raise HTTPException(status_code=422, detail="Invalid department_id", field="department_id")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: HTTPException.__init__() got an unexpected keyword argument 'field'
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:49.232073Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/courses/", "action": "SCREAM", "success": false, "details": {"error_message": "HTTPException.__init__() got an unexpected keyword argument 'field'"}, "request_id": "d1eaa188-9be9-41d3-b1e9-91daeeb00d8e"}
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/courses/ "HTTP/1.1 500 Internal Server Error"
+_____________ TestRoomsValidation.test_create_room_zero_capacity ______________
+tests\test_routers_validation.py:480: in test_create_room_zero_capacity
+    assert "capacity" in response.json()["detail"].lower()
+E   AttributeError: 'list' object has no attribute 'lower'
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:57 - asyncio - ERROR - Task exception was never retrieved
+future: <Task finished name='Task-542' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+2026-03-21 11:05:57 - audit - INFO - {"timestamp": "2026-03-21T09:05:57.423238Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "c7614416-b761-4de1-812c-416ff9217876"}
+2026-03-21 11:05:57 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:57 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+ERROR    asyncio:base_events.py:1805 Task exception was never retrieved
+future: <Task finished name='Task-542' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:57.423238Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "c7614416-b761-4de1-812c-416ff9217876"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:57 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+___________ TestRoomsValidation.test_create_room_excessive_capacity ___________
+tests\test_routers_validation.py:494: in test_create_room_excessive_capacity
+    assert "capacity" in response.json()["detail"].lower()
+E   AttributeError: 'list' object has no attribute 'lower'
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:57 - audit - INFO - {"timestamp": "2026-03-21T09:05:57.831300Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "6ca069ad-f822-4a53-9bd7-f1f2e70cbb3b"}
+2026-03-21 11:05:57 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:57 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:57.831300Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "6ca069ad-f822-4a53-9bd7-f1f2e70cbb3b"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:57 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+______________ TestRoomsValidation.test_create_room_invalid_type ______________
+tests\test_routers_validation.py:508: in test_create_room_invalid_type
+    assert "type" in response.json()["detail"].lower()
+E   AttributeError: 'list' object has no attribute 'lower'
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:58 - audit - INFO - {"timestamp": "2026-03-21T09:05:58.245797Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "0f8ab070-8028-439d-90e4-02a0ac9a6864"}
+2026-03-21 11:05:58 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:58 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:58.245797Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "0f8ab070-8028-439d-90e4-02a0ac9a6864"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:58 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+_______________ TestRoomsValidation.test_create_room_empty_name _______________
+tests\test_routers_validation.py:522: in test_create_room_empty_name
+    assert "name" in response.json()["detail"].lower()
+E   AttributeError: 'list' object has no attribute 'lower'
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:58 - asyncio - ERROR - Task exception was never retrieved
+future: <Task finished name='Task-737' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+2026-03-21 11:05:58 - audit - INFO - {"timestamp": "2026-03-21T09:05:58.697711Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "c89dcb7b-f033-4d0d-a15c-36abf85d075e"}
+2026-03-21 11:05:58 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:58 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+ERROR    asyncio:base_events.py:1805 Task exception was never retrieved
+future: <Task finished name='Task-737' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:58.697711Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "c89dcb7b-f033-4d0d-a15c-36abf85d075e"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:58 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+___________ TestRoomsValidation.test_create_room_invalid_department ___________
+tests\test_routers_validation.py:539: in test_create_room_invalid_department
+    assert "department" in response.json()["detail"].lower()
+E   AttributeError: 'list' object has no attribute 'lower'
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:58 - asyncio - ERROR - Task exception was never retrieved
+future: <Task finished name='Task-809' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+2026-03-21 11:05:59 - asyncio - ERROR - Task exception was never retrieved
+future: <Task finished name='Task-834' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+2026-03-21 11:05:59 - audit - INFO - {"timestamp": "2026-03-21T09:05:59.125194Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "f438a85e-9bd9-49ba-9529-00de54bfb2e6"}
+2026-03-21 11:05:59 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:59 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+ERROR    asyncio:base_events.py:1805 Task exception was never retrieved
+future: <Task finished name='Task-809' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+ERROR    asyncio:base_events.py:1805 Task exception was never retrieved
+future: <Task finished name='Task-834' coro=<RedisAuditConnectionManager.broadcast() done, defined at C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py:82> exception=ConnectionError('Error 11001 connecting to redis:6379. 11001.')>
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 274, in connect
+    await self.retry.call_with_retry(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\retry.py", line 59, in call_with_retry
+    return await do()
+           ^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 681, in _connect
+    reader, writer = await asyncio.open_connection(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 48, in open_connection
+    transport, _ = await loop.create_connection(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1077, in create_connection
+    infos = await self._ensure_resolved(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1453, in _ensure_resolved
+    return await loop.getaddrinfo(host, port, family=family, type=type,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 898, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 963, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\audit.py", line 83, in broadcast
+    await self.redis.publish("audit_stream", json.dumps(message))
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\client.py", line 605, in execute_command
+    conn = self.connection or await pool.get_connection(command_name, **options)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1076, in get_connection
+    await self.ensure_connection(connection)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 1109, in ensure_connection
+    await connection.connect()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\redis\asyncio\connection.py", line 282, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. 11001.
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:59.125194Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "f438a85e-9bd9-49ba-9529-00de54bfb2e6"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:59 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+_____________ TestRoomsValidation.test_create_room_duplicate_name _____________
+tests\test_routers_validation.py:553: in test_create_room_duplicate_name
+    assert response1.status_code in [200, 201]
+E   assert 422 in [200, 201]
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:05:59 - audit - INFO - {"timestamp": "2026-03-21T09:05:59.546026Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "5b622247-3aa0-4780-b68c-069dadbafd6d"}
+2026-03-21 11:05:59 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:05:59 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:05:59.546026Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "5b622247-3aa0-4780-b68c-069dadbafd6d"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:05:59 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+___________ TestRoomsValidation.test_create_room_valid_lecture_hall ___________
+tests\test_routers_validation.py:585: in test_create_room_valid_lecture_hall
+    assert response.status_code in [200, 201]
+E   assert 422 in [200, 201]
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:00 - audit - INFO - {"timestamp": "2026-03-21T09:06:00.420918Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "40f4211e-1424-471c-adae-1ce1be027be8"}
+2026-03-21 11:06:00 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:00 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:00.420918Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "40f4211e-1424-471c-adae-1ce1be027be8"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:00 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+_______________ TestRoomsValidation.test_create_room_valid_lab ________________
+tests\test_routers_validation.py:602: in test_create_room_valid_lab
+    assert response.status_code in [200, 201]
+E   assert 422 in [200, 201]
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:00 - audit - INFO - {"timestamp": "2026-03-21T09:06:00.867114Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "7751162e-4a12-438b-9012-3f36d32fcc03"}
+2026-03-21 11:06:00 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:00 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:00.867114Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "7751162e-4a12-438b-9012-3f36d32fcc03"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:00 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+_____________ TestRoomsValidation.test_create_room_valid_tutorial _____________
+tests\test_routers_validation.py:617: in test_create_room_valid_tutorial
+    assert response.status_code in [200, 201]
+E   assert 422 in [200, 201]
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:01 - audit - INFO - {"timestamp": "2026-03-21T09:06:01.501459Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "713f59a4-59a3-48a4-9868-59a25679752d"}
+2026-03-21 11:06:01 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:01 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:01.501459Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "713f59a4-59a3-48a4-9868-59a25679752d"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:01 - httpx - INFO - HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/rooms/ "HTTP/1.1 422 Unprocessable Entity"
+____________ TestGroupsValidation.test_create_group_duplicate_name ____________
+tests\test_routers_validation.py:722: in test_create_group_duplicate_name
+    assert response1.status_code in [200, 201]
+E   assert 500 in [200, 201]
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:04 - audit - INFO - {"timestamp": "2026-03-21T09:06:04.277650Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "2b245a02-f640-41f1-b572-aa96bd7acf30"}
+2026-03-21 11:06:04 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:04 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+2026-03-21 11:06:04 - httpx - INFO - HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:04.277650Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "2b245a02-f640-41f1-b572-aa96bd7acf30"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1729 HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:04 - app - ERROR - Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-03-21 11:06:04 - audit - INFO - {"timestamp": "2026-03-21T09:06:04.686817Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "a26c53a8-e5f7-4e20-b4b5-429fb4fa48d7"}
+2026-03-21 11:06:04 - httpx - INFO - HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+------------------------------ Captured log call ------------------------------
+ERROR    app:error_handler.py:115 Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:04.686817Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (1, null, DUPGRP, 200, 1, 50, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'DUPGRP', 'level': 200, 'department_id': 1, 'size': 50, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "a26c53a8-e5f7-4e20-b4b5-429fb4fa48d7"}
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+________________ TestGroupsValidation.test_create_group_valid _________________
+tests\test_routers_validation.py:755: in test_create_group_valid
+    assert response.status_code in [200, 201]
+E   assert 500 in [200, 201]
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:05 - audit - INFO - {"timestamp": "2026-03-21T09:06:05.549511Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "8e67b6da-ba58-43ba-8a36-715b8f5ff242"}
+2026-03-21 11:06:05 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:05 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+2026-03-21 11:06:05 - httpx - INFO - HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:05.549511Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "8e67b6da-ba58-43ba-8a36-715b8f5ff242"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1729 HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:05 - app - ERROR - Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-03-21 11:06:05 - audit - INFO - {"timestamp": "2026-03-21T09:06:05.718708Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "9cd979f1-619f-44c5-b3aa-fe89c2d9ef5b"}
+2026-03-21 11:06:05 - httpx - INFO - HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+------------------------------ Captured log call ------------------------------
+ERROR    app:error_handler.py:115 Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:05.718708Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (2, null, VALIDGRP, 300, 1, 75, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'VALIDGRP', 'level': 300, 'department_id': 1, 'size': 75, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "9cd979f1-619f-44c5-b3aa-fe89c2d9ef5b"}
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+_____________ TestGroupsValidation.test_create_group_minimum_size _____________
+tests\test_routers_validation.py:773: in test_create_group_minimum_size
+    assert response.status_code in [200, 201]
+E   assert 500 in [200, 201]
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:06 - audit - INFO - {"timestamp": "2026-03-21T09:06:06.128966Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "4fc63b5b-9347-4836-8d12-699a5e528dd4"}
+2026-03-21 11:06:06 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:06.128966Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "4fc63b5b-9347-4836-8d12-699a5e528dd4"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1729 HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:06 - app - ERROR - Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-03-21 11:06:06 - audit - INFO - {"timestamp": "2026-03-21T09:06:06.296961Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "f53e50ff-8039-4340-86d9-e986fd423665"}
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+------------------------------ Captured log call ------------------------------
+ERROR    app:error_handler.py:115 Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:06.296961Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (3, null, MINGRP, 200, 1, 1, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'MINGRP', 'level': 200, 'department_id': 1, 'size': 1, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "f53e50ff-8039-4340-86d9-e986fd423665"}
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+_____________ TestGroupsValidation.test_create_group_maximum_size _____________
+tests\test_routers_validation.py:788: in test_create_group_maximum_size
+    assert response.status_code in [200, 201]
+E   assert 500 in [200, 201]
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+[[DEBUG VERIFICATION]]: Received username: 'coordinator', password: 'pass', len: 4
+---------------------------- Captured stderr setup ----------------------------
+2026-03-21 11:06:06 - audit - INFO - {"timestamp": "2026-03-21T09:06:06.702091Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "65de66dc-61a6-4efa-aa57-0b0496082f6a"}
+2026-03-21 11:06:06 - app.middleware.rate_limiter - INFO - AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+----------------------------- Captured log setup ------------------------------
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:06.702091Z", "event_type": "LOGIN_SUCCESS", "user_id": null, "username": "coordinator", "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/auth/login", "action": "POST", "success": true, "details": {"user_id": 1, "role": "coordinator", "department_id": null}, "request_id": "65de66dc-61a6-4efa-aa57-0b0496082f6a"}
+INFO     app.middleware.rate_limiter:rate_limiter.py:78 AUTH SUCCESS: 127.0.0.1 - cleared failed attempts
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1729 HTTP Request: GET http://test/api/v1/departments/ "HTTP/1.1 200 OK"
+---------------------------- Captured stderr call -----------------------------
+2026-03-21 11:06:06 - app - ERROR - Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2026-03-21 11:06:06 - audit - INFO - {"timestamp": "2026-03-21T09:06:06.867932Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "c723954f-eae6-42d4-9715-c3228966552b"}
+2026-03-21 11:06:06 - httpx - INFO - HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+------------------------------ Captured log call ------------------------------
+ERROR    app:error_handler.py:115 Unhandled exception: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.NotNullViolation: null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\SYSTEMS\TABLESYS\backend\app\middleware\error_handler.py", line 85, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 165, in call_next
+    raise app_exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\backend\app\routers\groups.py", line 116, in create_group
+    db.commit()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\SYSTEMS\TABLESYS\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "university_id" of relation "student_groups" violates not-null constraint
+DETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).
+
+[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]
+[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+INFO     audit:audit_logger.py:96 {"timestamp": "2026-03-21T09:06:06.867932Z", "event_type": "SYSTEM_ERROR", "user_id": null, "username": null, "ip_address": "127.0.0.1", "user_agent": "python-httpx/0.25.2", "resource": "/api/v1/groups/", "action": "SCREAM", "success": false, "details": {"error_message": "(psycopg2.errors.NotNullViolation) null value in column \"university_id\" of relation \"student_groups\" violates not-null constraint\nDETAIL:  Failing row contains (4, null, MAXGRP, 200, 1, 500, DEPARTMENT, null, null, null).\n\n[SQL: INSERT INTO student_groups (university_id, name, level, department_id, size, group_type, parent_group_id, display_code, preferred_venues) VALUES (%(university_id)s, %(name)s, %(level)s, %(department_id)s, %(size)s, %(group_type)s, %(parent_group_id)s, %(display_code)s, %(preferred_venues)s::JSON) RETURNING student_groups.id]\n[parameters: {'university_id': None, 'name': 'MAXGRP', 'level': 200, 'department_id': 1, 'size': 500, 'group_type': 'DEPARTMENT', 'parent_group_id': None, 'display_code': None, 'preferred_venues': 'null'}]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}, "request_id": "c723954f-eae6-42d4-9715-c3228966552b"}
+INFO     httpx:_client.py:1729 HTTP Request: POST http://test/api/v1/groups/ "HTTP/1.1 500 Internal Server Error"
+=========================== short test summary info ===========================
+FAILED tests/test_routers_validation.py::TestCoursesValidation::test_create_course_invalid_department
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_zero_capacity
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_excessive_capacity
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_invalid_type
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_empty_name
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_invalid_department
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_duplicate_name
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_lecture_hall
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_lab
+FAILED tests/test_routers_validation.py::TestRoomsValidation::test_create_room_valid_tutorial
+FAILED tests/test_routers_validation.py::TestGroupsValidation::test_create_group_duplicate_name
+FAILED tests/test_routers_validation.py::TestGroupsValidation::test_create_group_valid
+FAILED tests/test_routers_validation.py::TestGroupsValidation::test_create_group_minimum_size
+FAILED tests/test_routers_validation.py::TestGroupsValidation::test_create_group_maximum_size
+================ 14 failed, 36 passed, 145 warnings in 26.72s =================
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1831, in call_exception_handler
+    self.default_exception_handler(context)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1805, in default_exception_handler
+    logger.error('\n'.join(log_lines), exc_info=exc_info)
+Message: "Task was destroyed but it is pending!\ntask: <Task pending name='Task-2498' coro=<RedisAuditConnectionManager.broadcast() running at C:\\SYSTEMS\\TABLESYS\\backend\\app\\routers\\audit.py:83> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at C:\\Users\\Dennis Banda\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\futures.py:387, Task.task_wakeup()]>>"
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1831, in call_exception_handler
+    self.default_exception_handler(context)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1805, in default_exception_handler
+    logger.error('\n'.join(log_lines), exc_info=exc_info)
+Message: "Task was destroyed but it is pending!\ntask: <Task pending name='Task-2620' coro=<RedisAuditConnectionManager.broadcast() running at C:\\SYSTEMS\\TABLESYS\\backend\\app\\routers\\audit.py:83> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at C:\\Users\\Dennis Banda\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\futures.py:387, Task.task_wakeup()]>>"
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1831, in call_exception_handler
+    self.default_exception_handler(context)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1805, in default_exception_handler
+    logger.error('\n'.join(log_lines), exc_info=exc_info)
+Message: "Task was destroyed but it is pending!\ntask: <Task pending name='Task-2689' coro=<RedisAuditConnectionManager.broadcast() running at C:\\SYSTEMS\\TABLESYS\\backend\\app\\routers\\audit.py:83> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at C:\\Users\\Dennis Banda\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\futures.py:387, Task.task_wakeup()]>>"
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1831, in call_exception_handler
+    self.default_exception_handler(context)
+  File "C:\Users\Dennis Banda\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1805, in default_exception_handler
+    logger.error('\n'.join(log_lines), exc_info=exc_info)
+Message: "Task was destroyed but it is pending!\ntask: <Task pending name='Task-2758' coro=<RedisAuditConnectionManager.broadcast() running at C:\\SYSTEMS\\TABLESYS\\backend\\app\\routers\\audit.py:83> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at C:\\Users\\Dennis Banda\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\futures.py:387, Task.task_wakeup()]>>"
+Arguments: ()

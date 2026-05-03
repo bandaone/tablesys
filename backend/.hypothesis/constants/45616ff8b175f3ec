@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\tasks\generation.py
+# hypothesis_version: 6.151.9
+
+[3600, 'error', 'generated', 'job_id', 'levels_processed', 'message', 'status', 'success', 'timetable_id']

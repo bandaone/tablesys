@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\courses.py
+# hypothesis_version: 6.151.9
+
+[100, 200, 300, 400, 403, 404, 409, 422, 500, 600, ',', '/', '/api/v1/courses', '/bulk-upload', '/{course_id}', ';', 'Access denied', 'All Courses Cleared', 'CREATE', 'Course Deleted', 'Course not found', 'DELETE', 'GEN', 'New Course Added', 'UPDATE', 'body', 'code', 'count_deleted', 'course', 'course_bulk', 'course_code', 'courses', 'created', 'credits', 'deleted', 'department_code', 'department_id', 'department_name', 'detail', 'error', 'errors', 'field', 'filename', 'hod', 'info', 'lecture_hours', 'level', 'loc', 'message', 'msg', 'name', 'practical_hours', 'replace', 'skipped', 'status', 'success', 'text/csv', 'tutorial_hours', 'type', 'updates', 'utf-8', 'value_error', 'warning']

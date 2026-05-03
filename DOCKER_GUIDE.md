@@ -23,7 +23,8 @@ That's it! The system will:
 
 ### Access the System
 
-- **Frontend:** http://localhost:3000
+- **Frontend:** http://localhost:3002
+- **Student Portal:** http://localhost:3002/student
 - **Backend API:** http://localhost:8000
 - **API Docs:** http://localhost:8000/docs
 - **Database:** localhost:5432
@@ -46,6 +47,10 @@ That's it! The system will:
 - **BIO** - Biology HOD
 
 ## Docker Commands
+
+For the student access layer manual-test flow, use:
+
+- [docs/student-access-docker-manual-test.md](docs/student-access-docker-manual-test.md)
 
 ### Start Services
 ```bash
@@ -109,7 +114,7 @@ docker-compose exec postgres psql -U tablesys -d tablesys_db
 - **Port:** 5432
 - **Database:** tablesys_db
 - **User:** tablesys
-- **Password:** tablesys123
+- **Password:** value from POSTGRES_PASSWORD in `.env` (32+ chars recommended)
 - **Volume:** postgres_data (persistent storage)
 
 ### Backend Container
@@ -121,7 +126,7 @@ docker-compose exec postgres psql -U tablesys -d tablesys_db
 
 ### Frontend Container
 - **Build:** ./frontend/Dockerfile
-- **Port:** 3000
+- **Port:** 3002
 - **Framework:** React + Vite
 - **Hot-reload:** Enabled
 - **Dependencies:** Installed from package.json
@@ -130,8 +135,9 @@ docker-compose exec postgres psql -U tablesys -d tablesys_db
 
 ### Backend (.env in docker-compose.yml)
 ```yaml
-DATABASE_URL: postgresql://tablesys:tablesys123@postgres:5432/tablesys_db
-SECRET_KEY: your-secret-key-change-in-production
+DATABASE_URL: postgresql://tablesys:${POSTGRES_PASSWORD}@postgres:5432/tablesys_db
+SECRET_KEY: ${SECRET_KEY}
+TABLESYS_INITIAL_USER_PASSWORD: ${TABLESYS_INITIAL_USER_PASSWORD}
 ALGORITHM: HS256
 ACCESS_TOKEN_EXPIRE_MINUTES: 30
 ```

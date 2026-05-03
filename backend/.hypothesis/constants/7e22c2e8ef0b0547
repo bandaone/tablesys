@@ -1,0 +1,4 @@
+# file: C:\SYSTEMS\TABLESYS\backend\app\routers\departments.py
+# hypothesis_version: 6.151.9
+
+[100, 200, 404, 409, 422, '/', '/api/v1/departments', '/{department_id}', 'Department not found', 'code', 'departments', 'detail', 'field', 'name']
