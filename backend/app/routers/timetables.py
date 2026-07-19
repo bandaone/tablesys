@@ -5,17 +5,21 @@ import asyncio
 from datetime import datetime
 from ..database import get_db
 from ..schemas import Timetable, TimetableCreate, TimetableWithSlots, SlotAssignmentRequest, ManualSlotCreate, TimetableSlot as TimetableSlotSchema
-from ..models import Timetable as TimetableModel, TimetableSlot, Course, Room, Lecturer, User, StudentGroup, University, UserRole
-from ..auth import get_current_user, get_current_active_coordinator
+from ..models import ActivityType, Timetable as TimetableModel, TimetableSlot, Course, Room, Lecturer, User, StudentGroup, University, UserRole, LabSession, LabSessionStatus, Department
+from ..auth import get_current_user, get_current_active_lab_coordinator
 from ..services.timetable_generator import TimetableGenerator
 from ..utils.conflict_detector import ConflictDetector
 from ..services.analytics_service import AnalyticsService
 from ..services.validation_service import ValidationService
 from ..services.version_service import VersionService
 from ..services.notification_service import NotificationService
+from ..services.generation_observability import finalize_generation_run, mark_generation_started, utc_now
+from ..utils.course_profile import COURSE_PROFILE_STATUS_COMPLETE
 from ..utils.audit_logger import AuditLogger
 from ..utils.group_audience import resolve_slot_audience_labels
 from ..config import settings
+from ..middleware.quota import enforce_generation_quota
+from ..utils.school_scope import ensure_user_can_manage_school, filter_timetable_query_for_user
 import json
 import redis.asyncio as aioredis
 from pydantic import BaseModel
@@ -55,6 +59,26 @@ class ApplyOverridesRequest(BaseModel):
     keeps only the LAST entry to avoid ambiguity.
     """
     overrides: List[SlotOverride]
+
+
+def _activity_type_map(db: Session, university_id: Optional[int]) -> dict[str, dict[str, str]]:
+    if not university_id:
+        return {}
+    rows = (
+        db.query(ActivityType)
+        .filter(
+            ActivityType.university_id == university_id,
+            ActivityType.is_active == True,
+        )
+        .all()
+    )
+    return {
+        str(row.key).strip().lower(): {
+            "display_name": row.display_name,
+            "color": row.color or "#3B82F6",
+        }
+        for row in rows
+    }
 
 
 class RedisConnectionManager:
@@ -199,7 +223,7 @@ async def get_timetables(
     db: Session = Depends(get_db)
 ):
     """Get all timetables."""
-    timetables = db.query(TimetableModel).offset(skip).limit(limit).all()
+    timetables = filter_timetable_query_for_user(db.query(TimetableModel), current_user).offset(skip).limit(limit).all()
     return timetables
 
 @router.get("/{timetable_id:int}", response_model=TimetableWithSlots)
@@ -209,7 +233,10 @@ async def get_timetable(
     db: Session = Depends(get_db)
 ):
     """Get a specific timetable with all slots."""
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
@@ -219,13 +246,16 @@ async def get_timetable(
 @router.post("/", response_model=Timetable, status_code=status.HTTP_201_CREATED)
 async def create_timetable(
     timetable: TimetableCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """Create a new timetable (without generating slots). Coordinator only."""
     timetable_data = timetable.model_dump()
     grid_config = timetable_data.pop("grid_config", None)
     timetable_data["university_id"] = resolve_university_id(db, current_user)
+    if timetable_data.get("school_id") is None:
+        raise HTTPException(status_code=422, detail="A timetable must belong to a school.")
+    ensure_user_can_manage_school(db, current_user, timetable_data.get("school_id"))
 
     db_timetable = TimetableModel(**timetable_data)
     if grid_config:
@@ -247,7 +277,8 @@ async def generate_timetable_ws(
     end_time: Optional[str] = Query(None, description="Generation end time in HH:MM format"),
     lunch_start: Optional[str] = Query(None, description="Lunch break start time in HH:MM format"),
     lunch_end: Optional[str] = Query(None, description="Lunch break end time in HH:MM format"),
-    current_user: User = Depends(get_current_user) # Inject current user for logging
+    profile: str = Query("balanced", description="Scheduling profile"),
+    current_user: User = Depends(get_current_active_lab_coordinator) # Inject current user for logging
 ):
     """
     Generate timetable with real-time progress updates via WebSocket.
@@ -272,7 +303,10 @@ async def generate_timetable_ws(
         db = next(get_db())
         
         # Check if timetable exists
-        timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+        timetable = filter_timetable_query_for_user(
+            db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+            current_user,
+        ).first()
         
         if not timetable:
             await websocket.send_json({
@@ -289,6 +323,14 @@ async def generate_timetable_ws(
             )
             return
 
+        quota_info = enforce_generation_quota(db, getattr(current_user, "university_id", None))
+        if quota_info and quota_info.get("status") in {"warning", "hard_warning"}:
+            await websocket.send_json({
+                "status": "warning",
+                "message": "Timetable generation quota threshold reached",
+                "quota": quota_info,
+            })
+
         # Persist per-run time-window selection before solver startup.
         _upsert_generation_window(db, timetable, start_time, end_time, lunch_start, lunch_end)
         
@@ -301,17 +343,28 @@ async def generate_timetable_ws(
             generation_components = [c.strip() for c in components.split(',')]
             
         # Create generator instance
+        generation_started_at = utc_now()
+        mark_generation_started(
+            timetable,
+            mode="interactive",
+            started_at=generation_started_at,
+            components=generation_components,
+        )
+        db.commit()
+
         generator = TimetableGenerator(
             db=db,
             timetable_id=timetable_id,
             progress_callback=lambda data: asyncio.create_task(progress_callback(data)),
-            components=generation_components
+            components=generation_components,
+            profile=profile
         )
         
         # Run generation
         await websocket.send_json({
             'status': 'started',
-            'message': 'Timetable generation started'
+            'message': 'Timetable generation started',
+            'quota': quota_info,
         })
         
         success = generator.generate_timetable()
@@ -327,6 +380,19 @@ async def generate_timetable_ws(
                 'levels_processed': levels_processed
             })
             timetable.generation_metadata = meta
+            finalize_generation_run(
+                db,
+                timetable,
+                tenant_id=timetable.university_id,
+                success=True,
+                started_at=generation_started_at,
+                mode="interactive",
+                components=generation_components,
+                saved_slot_count=db.query(TimetableSlot).filter(TimetableSlot.timetable_id == timetable_id).count(),
+                solver_status_by_level=generator.solver_status_by_level,
+                fallback_levels=generator.fallback_levels,
+                diagnostics=generator.generation_diagnostics,
+            )
             db.commit()
             
             # Send notifications to coordinators
@@ -342,7 +408,8 @@ async def generate_timetable_ws(
             await websocket.send_json({
                 'status': 'success',
                 'message': 'Timetable generated successfully',
-                'timetable_id': timetable_id
+                'timetable_id': timetable_id,
+                'quota': quota_info,
             })
             
             AuditLogger.log_timetable_generation(
@@ -354,6 +421,21 @@ async def generate_timetable_ws(
                 details={"message": "All levels generated successfully"}
             )
         else:
+            finalize_generation_run(
+                db,
+                timetable,
+                tenant_id=timetable.university_id,
+                success=False,
+                started_at=generation_started_at,
+                mode="interactive",
+                components=generation_components,
+                saved_slot_count=db.query(TimetableSlot).filter(TimetableSlot.timetable_id == timetable_id).count(),
+                error_message="Failed to generate timetable due to constraints.",
+                solver_status_by_level=generator.solver_status_by_level,
+                fallback_levels=generator.fallback_levels,
+                diagnostics=generator.generation_diagnostics,
+            )
+            db.commit()
             await websocket.send_json({
                 'status': 'error',
                 'message': 'Failed to generate timetable. Please check constraints.'
@@ -370,6 +452,21 @@ async def generate_timetable_ws(
     except WebSocketDisconnect:
         manager.disconnect(websocket, channel)
     except HTTPException as e:
+        if db and 'timetable' in locals() and timetable:
+            try:
+                finalize_generation_run(
+                    db,
+                    timetable,
+                    tenant_id=timetable.university_id,
+                    success=False,
+                    started_at=locals().get("generation_started_at", utc_now()),
+                    mode="interactive",
+                    components=locals().get("generation_components"),
+                    error_message=str(e.detail),
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
         await websocket.send_json({
             'status': 'error',
             'message': str(e.detail)
@@ -384,6 +481,21 @@ async def generate_timetable_ws(
         )
     except Exception as e:
         error_msg = str(e) if isinstance(e, ValueError) else "An unexpected error occurred during timetable generation."
+        if db and 'timetable' in locals() and timetable:
+            try:
+                finalize_generation_run(
+                    db,
+                    timetable,
+                    tenant_id=timetable.university_id,
+                    success=False,
+                    started_at=locals().get("generation_started_at", utc_now()),
+                    mode="interactive",
+                    components=locals().get("generation_components"),
+                    error_message=str(e),
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
         await websocket.send_json({
             'status': 'error',
             'message': f'Error generating timetable: {error_msg}'
@@ -404,17 +516,22 @@ async def generate_timetable_ws(
 @router.post("/{timetable_id:int}/activate", response_model=Timetable)
 async def activate_timetable(
     timetable_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """Activate a timetable (deactivate all others). Coordinator only."""
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
     
     # Deactivate all other timetables
-    db.query(TimetableModel).update({TimetableModel.is_active: False})
+    filter_timetable_query_for_user(db.query(TimetableModel), current_user).update(
+        {TimetableModel.is_active: False}
+    )
     
     # Activate this one
     timetable.is_active = True
@@ -426,11 +543,14 @@ async def activate_timetable(
 @router.delete("/{timetable_id:int}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_timetable(
     timetable_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """Delete a timetable. Coordinator only."""
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
@@ -446,6 +566,8 @@ async def get_timetable_view(
     year: int = Query(..., ge=1, le=7, description="Year level: 1-7"),
     program: Optional[str] = Query(default="ALL", description="Program code or ALL"),
     timetable_id: Optional[int] = Query(None, description="Specific timetable to view. Defaults to active timetable."),
+    academic_week: Optional[int] = Query(None, description="Current academic week number for lab rotation filtering (1-indexed)."),
+    lab_subgroup_ids: Optional[str] = Query(None, description="Comma-separated list of selected lab subgroups."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -455,19 +577,16 @@ async def get_timetable_view(
     Used by the TimetableGrid UI component. Returns a flat list of slot objects
     alongside summary metadata. When no active timetable exists, returns empty slots.
     """
-    # Find the requested or active timetable
+    # Find the requested or active timetable inside the user's school/tenant
+    # scope. This endpoint powers the staff dashboard, so an unscoped .first()
+    # here would expose whichever active timetable happens to be returned first.
+    timetable_query = filter_timetable_query_for_user(db.query(TimetableModel), current_user)
     if timetable_id:
-        active_timetable = (
-            db.query(TimetableModel)
-            .filter(TimetableModel.id == timetable_id)
-            .first()
-        )
+        active_timetable = timetable_query.filter(TimetableModel.id == timetable_id).first()
     else:
-        active_timetable = (
-            db.query(TimetableModel)
-            .filter(TimetableModel.is_active == True)
-            .first()
-        )
+        active_timetable = timetable_query.filter(
+            TimetableModel.is_active == True,
+        ).order_by(TimetableModel.id.desc()).first()
 
     if not active_timetable:
         return {
@@ -558,6 +677,12 @@ async def get_timetable_view(
         "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
     ]
     days_map = {idx: str(day).upper() for idx, day in enumerate(normalized_days)}
+    activity_types_by_key = _activity_type_map(db, active_timetable.university_id)
+    selected_lab_subgroup_ids = [
+        int(value)
+        for value in lab_subgroup_ids.split(",")
+        if value.strip().isdigit()
+    ] if lab_subgroup_ids else []
 
     group_cache = {}
     stream_children_cache = {}
@@ -580,6 +705,8 @@ async def get_timetable_view(
         group_label = " + ".join(audience_groups[:3])
         if len(audience_groups) > 3:
             group_label += f" +{len(audience_groups) - 3} more"
+        activity_key = str(slot.session_type or "").strip().lower()
+        activity_meta = activity_types_by_key.get(activity_key, {})
 
         slot_list.append({
             "slot_id": slot.id,
@@ -590,6 +717,9 @@ async def get_timetable_view(
             "room": slot.room.name,
             "lecturer": lecturer_name,
             "session_type": slot.session_type,
+            "activity_type_key": activity_key or None,
+            "activity_display_name": activity_meta.get("display_name"),
+            "activity_color": activity_meta.get("color"),
             "group_label": group_label,
             "groups": audience_groups,
             "shared_group_ids": slot.shared_group_ids,
@@ -642,6 +772,82 @@ async def get_timetable_view(
         success=True
     )
 
+    # ── Lab Session Rotation Injection ────────────────────────────────────────
+    DAY_NAMES_LAB = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    lab_q = (
+        db.query(LabSession)
+        .join(Course, LabSession.course_id == Course.id)
+        .filter(
+            LabSession.university_id == active_timetable.university_id,
+            LabSession.timetable_id == active_timetable.id,
+            LabSession.status.in_([LabSessionStatus.PUBLISHED, LabSessionStatus.SCHEDULED]),
+            Course.level.in_([year, year * 100]),
+        )
+    )
+    if program and program.upper() != "ALL":
+        lab_q = lab_q.filter(Course.code.like(f"{program.upper()}%"))
+
+    for ls in lab_q.all():
+        ls_course = db.query(Course).filter(Course.id == ls.course_id).first()
+        ls_group = db.query(StudentGroup).filter(StudentGroup.id == ls.group_id).first()
+        ls_room = db.query(Room).filter(Room.id == ls.room_id).first() if ls.room_id else None
+
+        active_subgroup_ids = None
+        subgroup_label = ls_group.name if ls_group else "Lab Group"
+        if ls.rotation_configuration and academic_week is not None:
+            cycle_pos = str(((academic_week - 1) % max(ls.rotation_cycle_length, 1)) + 1)
+            active_subgroup_ids = [
+                int(group_id)
+                for group_id in ls.rotation_configuration.get(cycle_pos, [])
+                if str(group_id).isdigit()
+            ]
+            if selected_lab_subgroup_ids and not any(
+                subgroup_id in active_subgroup_ids for subgroup_id in selected_lab_subgroup_ids
+            ):
+                continue
+
+            sub_names = []
+            for sg_id in active_subgroup_ids:
+                sg = db.query(StudentGroup).filter(StudentGroup.id == int(sg_id)).first()
+                if sg:
+                    sub_names.append(sg.name)
+            subgroup_label = ", ".join(sub_names) if sub_names else "No subgroups this week"
+        elif selected_lab_subgroup_ids and ls.rotation_configuration:
+            all_rotation_ids = {
+                int(group_id)
+                for group_ids in ls.rotation_configuration.values()
+                for group_id in (group_ids or [])
+                if str(group_id).isdigit()
+            }
+            if not any(subgroup_id in all_rotation_ids for subgroup_id in selected_lab_subgroup_ids):
+                continue
+
+        slot_list.append({
+            "slot_id": f"lab_{ls.id}",
+            "day": DAY_NAMES_LAB[ls.day_of_week].upper() if 0 <= ls.day_of_week <= 6 else "",
+            "start_time": ls.start_time.strftime("%H:%M"),
+            "end_time": ls.end_time.strftime("%H:%M"),
+            "course_code": ls_course.code if ls_course else "LAB",
+            "room": ls_room.name if ls_room else "TBA",
+            "lecturer": None,
+            "session_type": ls.session_type or "lab",
+            "activity_type_key": "lab",
+            "activity_display_name": "Lab Session",
+            "activity_color": "#7C3AED",
+            "group_label": f"{ls_group.name if ls_group else 'Lab'} — {subgroup_label}",
+            "groups": [subgroup_label],
+            "shared_group_ids": None,
+            "combined_size": None,
+            "is_overridden": False,
+            "is_lab_session": True,
+            "lab_session_id": ls.id,
+            "rotation_cycle_length": ls.rotation_cycle_length,
+            "rotation_configuration": ls.rotation_configuration,
+            "active_subgroup_ids": active_subgroup_ids,
+            "timetable_id": active_timetable.id,
+        })
+    # ── End Lab Injection ──────────────────────────────────────────────────────
+
     return {
         "metadata": {
             "id": active_timetable.id,
@@ -671,7 +877,10 @@ async def get_timetable_conflicts(
     Returns conflict summary with details for each conflict.
     """
     # Check if timetable exists
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
@@ -692,7 +901,7 @@ async def get_active_timetable_analytics(
     Get analytics for the currently active timetable.
     """
     try:
-        analytics = AnalyticsService(db)
+        analytics = AnalyticsService(db, current_user)
         return analytics.get_active_timetable_analytics()
     except ValueError:
         raise HTTPException(status_code=404, detail="No active timetable found.")
@@ -714,7 +923,7 @@ async def get_timetable_analytics(
     - Time slot utilization
     """
     try:
-        analytics = AnalyticsService(db)
+        analytics = AnalyticsService(db, current_user)
         return analytics.get_timetable_analytics(timetable_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Timetable not found.")
@@ -725,7 +934,7 @@ async def assign_slot(
     slot_id: int,
     assignment: SlotAssignmentRequest,
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """
@@ -810,43 +1019,58 @@ async def create_manual_slot(
     timetable_id: int,
     slot_request: ManualSlotCreate,
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """
     Create a manual timetable slot. Coordinator only.
-    Useful for scheduling specific Lab subgroups or custom sessions.
+    Useful for scheduling specific subgroups or custom sessions.
     """
     # Verify timetable exists
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
+    ensure_user_can_manage_school(db, current_user, timetable.school_id)
 
     # Verify course exists
     course = db.query(Course).filter(Course.id == slot_request.course_id).first()
     if not course:
         raise HTTPException(status_code=422, detail="Invalid course_id")
+    if course.profile_status != COURSE_PROFILE_STATUS_COMPLETE:
+        raise HTTPException(
+            status_code=422,
+            detail="This course is still profile-seeded. Complete its academic details before scheduling it.",
+        )
 
     # Verify lecturer exists
     lecturer = db.query(Lecturer).filter(Lecturer.id == slot_request.lecturer_id).first()
     if not lecturer:
         raise HTTPException(status_code=422, detail="Invalid lecturer_id")
 
-    session_type = str(slot_request.session_type or "").strip().lower()
-
-    # Verify room exists when supplied; lectures/tutorials still require one.
-    room = None
-    if slot_request.room_id is not None:
-        room = db.query(Room).filter(Room.id == slot_request.room_id).first()
-        if not room:
-            raise HTTPException(status_code=422, detail="Invalid room_id")
-    elif session_type not in {"practical", "lab"}:
-        raise HTTPException(status_code=422, detail="room_id is required for this session type")
+    # Verify room exists. Manual slots must always target a concrete venue.
+    if slot_request.room_id is None:
+        raise HTTPException(status_code=422, detail="room_id is required for manual slots")
+    room = db.query(Room).filter(Room.id == slot_request.room_id).first()
+    if not room:
+        raise HTTPException(status_code=422, detail="Invalid room_id")
+    if room.school_id != timetable.school_id:
+        raise HTTPException(status_code=422, detail="Selected room is outside the timetable school scope")
 
     # Verify group exists
     group = db.query(StudentGroup).filter(StudentGroup.id == slot_request.group_id).first()
     if not group:
         raise HTTPException(status_code=422, detail="Invalid group_id")
+
+    course_department = db.query(Department).filter(Department.id == course.department_id).first()
+    group_department = db.query(Department).filter(Department.id == group.department_id).first()
+    lecturer_department = db.query(Department).filter(Department.id == lecturer.department_id).first()
+    if any(not department or department.school_id != timetable.school_id for department in (
+        course_department, group_department, lecturer_department,
+    )):
+        raise HTTPException(status_code=422, detail="Course, group, lecturer, and room must belong to the timetable's school")
 
     validator = ValidationService(db)
     _, validation_errors = validator.validate_timetable_slot(
@@ -944,7 +1168,10 @@ async def validate_timetable(
     Returns comprehensive validation report.
     """
     # Check if timetable exists
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
     
@@ -970,7 +1197,10 @@ async def get_timetable_versions(
     Returns version history with metadata.
     """
     # Check if timetable exists
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
     
@@ -988,7 +1218,7 @@ async def get_timetable_versions(
 async def create_timetable_version(
     timetable_id: int,
     description: Optional[str] = None,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """
@@ -996,7 +1226,10 @@ async def create_timetable_version(
     Coordinator only.
     """
     # Check if timetable exists
-    timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+    timetable = filter_timetable_query_for_user(
+        db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+        current_user,
+    ).first()
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
     
@@ -1055,7 +1288,7 @@ async def get_timetable_version(
 async def restore_timetable_version(
     timetable_id: int,
     version_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """
@@ -1068,7 +1301,10 @@ async def restore_timetable_version(
         result = version_service.restore_version(timetable_id, version_id, current_user.id)
         
         # Get timetable details for notification
-        timetable = db.query(TimetableModel).filter(TimetableModel.id == timetable_id).first()
+        timetable = filter_timetable_query_for_user(
+            db.query(TimetableModel).filter(TimetableModel.id == timetable_id),
+            current_user,
+        ).first()
         
         # Send notification to coordinators
         notification_service = NotificationService(db)
@@ -1109,7 +1345,7 @@ async def compare_timetable_versions(
 async def delete_timetable_version(
     timetable_id: int,
     version_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db)
 ):
     """
@@ -1160,7 +1396,7 @@ async def apply_slot_overrides(
     timetable_id: int,
     request_body: ApplyOverridesRequest,
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db),
 ):
     """
@@ -1275,7 +1511,7 @@ async def reset_slot_override(
     timetable_id: int,
     slot_id: int,
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_lab_coordinator),
     db: Session = Depends(get_db),
 ):
     """
@@ -1350,5 +1586,3 @@ async def get_slot_overrides(
         "override_count": len(overrides),
         "overrides": overrides,
     }
-
-

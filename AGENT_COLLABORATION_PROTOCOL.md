@@ -1,57 +1,154 @@
-# AI Agent Collaboration & Anti-Collision Protocol
+# TABLESYS — Agent Collaboration Protocol
 
-**Target Audience:** Antigravity, Copilot, Cursor (and any other autonomous agent working on this codebase).
-**Objective:** Guarantee that multiple agents can work concurrently on the TABLESYS repository without race conditions, merge conflicts, overwritten files, or logic collisions.
+Audience: Codex, Copilot, Antigravity
+Effective date: 2026-05-05
+Purpose: Prevent collisions while executing the SaaS expansion plan.
 
 ---
 
-## 1. The File Locking System (Mandatory)
-Before you (the AI Agent) edit *any* file, you must exclusively lock it.
+## 1) Single Source Of Truth
 
-1. **Check Locks First:** Read `AGENT_STATUS.md`. Look at the `## Files Currently Locked` section. If a file you need is locked by another agent, **STOP**. Do not proceed. Report the collision to the user.
-2. **Claim Your Lock:** Before making edits, add your lock to `AGENT_STATUS.md` in the following format:
-   `[Date] <Your-Name> -> <file/path/1.py>, <file/path/2.tsx>`
-3. **Release Your Lock:** Once your task is completely done, tested, and verified, you must delete your lock line from `AGENT_STATUS.md` so other agents can access those files.
+Always read these in order before starting work:
+1. TEAM_WORKPLAN.md
+2. AGENT_STATUS.md
+3. This protocol
 
-## 2. Strict Domain Boundaries
-Never touch code outside the immediate scope of your assigned task. If you spot a bug in another agent's domain, **do not fix it**. Instead, append a note to the `TEAM_WORKPLAN.md` or `AGENT_STATUS.md` Handoff section.
+If instructions conflict, use this precedence:
+1. User instruction in current session
+2. TEAM_WORKPLAN.md
+3. AGENT_STATUS.md
+4. This protocol
 
-### Quick Reference Map:
-* **Antigravity Focus:** Backend infrastructure, algorithms (`services/timetable_generator.py`), Docker, CI/CD, complex multi-step backend integrations, security analysis.
-* **Cursor Focus:** Complex frontend React components, UI/UX flows, multi-file frontend state architecture.
-* **Copilot Focus:** Repetitive boilerplate generation, API route CRUD generation (`routers/`), schema updates, backend test generation.
+---
 
-*Rule of Thumb:* If it is a frontend `.tsx` file, Antigravity shouldn't touch it unless it's an infrastructure/API linking task. If it's `timetable_generator.py`, Copilot and Cursor should not touch it.
+## 2) Mandatory Lock Workflow
 
-## 3. Communication & State Synchronization
-Agents cannot talk directly to each other. Your communication medium is the **Handoff Notes** in `AGENT_STATUS.md`.
+Before any edit:
+1. Check AGENT_STATUS.md -> Files Currently Locked.
+2. If target file is locked by another agent, stop and add a blocker note.
+3. If free, add your lock entry first.
 
-* **Start of Session:** Always read `AGENT_STATUS.md` first.
-* **End of Session:** Provide an indisputable output of your work in the `## Completed Work Log`.
-* **Handoff Template:** If your task unblocks a different agent, append this to the `## Handoff Notes` in `AGENT_STATUS.md`:
+Lock format:
+- `<workstream>: <agent> -> <file1>, <file2>, ...`
 
-```markdown
-- [DATE] <Your Name> -> <Next Agent>: <Phase/Task> COMPLETE
-- UNBLOCKS: <What they can do now>
-- NOTES: 
-   - <What exactly did you do>
-   - <What is strictly required of the next agent>
-```
+After finishing:
+1. Validate your changes.
+2. Add Completed Work Log entry.
+3. Add Handoff Note if another agent is unblocked.
+4. Remove your lock entry.
 
-## 4. The "No Global Database Wipes" Rule
-When making modifications to the schema or test suites:
-* **Never use `alembic downgrade base` or `drop_all`** on the main development database running in Docker, as other agents might be actively relying on that seeded data for frontend UI testing.
-* **Isolate Tests:** Use pytest fixtures with transactional rollbacks or a dedicated `tablesys_test` database for any backend testing routines.
+---
 
-## 5. Sequential Schema Migrations
-Database schemas are the biggest single point of failure for parallel agent workers. 
-* Only **ONE agent** is allowed to generate an Alembic migration at a time. 
-* If Copilot needs a new column for a router, and Antigravity needs a new column for a service, **do not generate migrations concurrently**. 
-* The user must explicitly command one agent to finalize the migration, commit it, and update `AGENT_STATUS.md` before the other agent generates theirs. 
+## 3) Domain Ownership
 
-## Summary Checklist For Every Prompt You Execute
-1. Read `TEAM_WORKPLAN.md` to see exactly what phase we are in.
-2. Read `AGENT_STATUS.md` to ensure your target files are not locked.
-3. Lock your files in `AGENT_STATUS.md`.
-4. Perform your modifications and test locally.
-5. Remove your lock, leave a Handoff Note in `AGENT_STATUS.md`, and yield back to the user.
+Codex:
+- Cross-cutting architecture and integration slices.
+- Complex multi-step changes that span subsystems.
+- Deep debugging and dependency/risk analysis.
+
+Copilot:
+- API routes, schemas, validation, boilerplate-heavy backend work.
+- Reporting endpoints, docs scaffolding, repetitive test generation.
+
+Antigravity:
+- Infrastructure, security hardening, observability, reliability.
+- Provisioning, orchestration, and backend performance-sensitive paths.
+
+Rule:
+- Do not edit outside your slice unless a handoff explicitly authorizes it.
+
+---
+
+## 4) Migration And Data Safety
+
+1. Only one migration owner at a time.
+2. No destructive shared-db operations (`drop_all`, full downgrades) in collaborative flow.
+3. Use isolated test DB or transactional tests for validation.
+4. Any change to deletion/export/compliance paths must include audit trail checks.
+
+---
+
+## 5) Handoff Contract
+
+Use this exact format in AGENT_STATUS.md -> Handoff Notes:
+
+- `[DATE] <From Agent> -> <To Agent>: <Task> COMPLETE`
+- `UNBLOCKS: <next executable work>`
+- `NOTES:`
+- `  - Files changed`
+- `  - Validation performed`
+- `  - Risks or constraints`
+
+Handoffs must be actionable. Avoid vague notes.
+
+---
+
+## 6) Definition Of Done (Per Slice)
+
+A slice is done only when all are true:
+1. Changes are validated with the narrowest relevant check.
+2. Completed Work Log entry exists.
+3. Handoff entry exists if needed.
+4. Lock entry is removed.
+
+---
+
+## 7) Blocker Handling
+
+If blocked by lock, missing decision, or vendor/legal dependency:
+1. Do not continue speculative edits.
+2. Add blocker note in AGENT_STATUS.md.
+3. State exact unblock requirement and owner.
+
+---
+
+## 8) Operating Goal
+
+All collaboration in this repo should move one of these outcomes forward:
+1. Tenant lifecycle automation
+2. Billing and metering
+3. Observability and SLA reporting
+4. Self-service documentation
+5. Security/compliance/commercial readiness
+
+---
+
+## 9) Team Communication Model
+
+Treat the agents like a dev team that reports through one shared board:
+- The Team Leader (Dennis) assigns work in AGENT_STATUS.md.
+- Each agent reads AGENT_STATUS.md first, then claims locks and executes.
+- All progress and blockers are recorded in AGENT_STATUS.md.
+
+This prevents side conversations and keeps all status in one place.
+
+---
+
+## 10) How To Assign Work (Task Cards)
+
+Create one task card per agent in AGENT_STATUS.md under a new section called "Active Task Cards".
+Use this exact template so each agent knows what to do:
+
+Task Card Template:
+- `[DATE] <Agent> | <Task Name>`
+- `GOAL: <one sentence outcome>`
+- `FILES: <exact file list or module scope>`
+- `DEPENDENCIES: <decisions, locks, or prerequisites>`
+- `VALIDATION: <command or check>`
+- `HANDOFF: <who is unblocked>`
+
+Rules:
+- One active task card per agent at a time.
+- If the task changes, update the card instead of creating a second one.
+- If blocked, move it to Decision Blockers and note the owner.
+
+---
+
+## 11) Daily Briefing Loop (3 Lines Per Agent)
+
+Each agent posts a short daily update in AGENT_STATUS.md under "Daily Briefing":
+- `DONE: <what completed>`
+- `NEXT: <what will be done next>`
+- `BLOCKED: <what is stuck and why>`
+
+This keeps leadership aware of current state without long logs.

@@ -1,0 +1,285 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.3, pluggy-1.6.0 -- /home/on3/.pyenv/versions/3.12.3/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-22-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '7.4.3', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'anyio': '4.13.0', 'langsmith': '0.7.24', 'asyncio': '0.23.8', 'cov': '4.1.0', 'hypothesis': '6.98.6', 'html': '4.1.1'}}
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase(PosixPath('/home/on3/DENNIS/TABLESYS/backend/.hypothesis/examples'))
+rootdir: /home/on3/DENNIS/TABLESYS/backend
+configfile: pytest.ini
+plugins: metadata-3.1.1, anyio-4.13.0, langsmith-0.7.24, asyncio-0.23.8, cov-4.1.0, hypothesis-6.98.6, html-4.1.1
+asyncio: mode=Mode.AUTO
+collecting ... collected 1 item
+
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_marks_pending_as_verified FAILED [100%]
+
+=================================== FAILURES ===================================
+___ TestProvisioningService.test_provision_tenant_marks_pending_as_verified ____
+
+db = <sqlalchemy.orm.session.Session object at 0x7aa7917a02f0>
+pending = <app.models.PendingRegistration object at 0x7aa791606540>
+
+    def provision_tenant(db: Session, pending: PendingRegistration) -> ProvisioningResult:
+        """
+        Execute the full 6-stage tenant provisioning lifecycle.
+    
+        Parameters
+        ----------
+        db : Session
+            The active database session. The caller should NOT commit before this
+            function returns — provisioning owns the transaction.
+        pending : PendingRegistration
+            A validated PendingRegistration row (token checked, not expired, not yet verified).
+    
+        Returns
+        -------
+        ProvisioningResult with a ready-to-return access token.
+    
+        Raises
+        ------
+        ProvisioningError on any stage failure after partial state has been written.
+        """
+        now = datetime.now(timezone.utc)
+        uni: Optional[University] = None
+        stages_completed = []
+    
+        try:
+            # ── Stage 1: tenant_record_created ───────────────────────────────────
+            plan_tier = getattr(pending, "plan_tier", None) or "free"
+            uni = University(
+                name=pending.org_name,
+                domain=pending.subdomain,
+                timezone="Africa/Lusaka",
+                is_active=True,
+                registered_at=now,
+                plan_tier=plan_tier,
+                max_users=0,  # Unlimited (enforced by quota layer instead)
+            )
+            db.add(uni)
+            db.flush()  # Obtain uni.id before dependent rows
+    
+            stages_completed.append("tenant_record_created")
+            logger.info(
+                "[Stage 1] tenant_record_created: university_id=%d domain=%s",
+                uni.id, uni.domain,
+            )
+    
+            # ── Stage 2: admin_account_created ───────────────────────────────────
+            admin_user = User(
+                university_id=uni.id,
+                username=pending.admin_username,
+                email=pending.admin_email,
+                full_name=pending.admin_full_name,
+                hashed_password=pending.hashed_password,
+                role=UserRole.COORDINATOR,
+                is_active=True,
+            )
+            db.add(admin_user)
+            db.flush()
+    
+            stages_completed.append("admin_account_created")
+            logger.info(
+                "[Stage 2] admin_account_created: user=%s university_id=%d",
+                admin_user.email, uni.id,
+            )
+    
+            # ── Stage 3: baseline_seed_applied ───────────────────────────────────
+>           seed_tenant_baseline(db, tenant_id=uni.id, plan_tier=plan_tier)
+
+app/services/provisioning.py:120: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/seeding_utils.py:205: in seed_tenant_baseline
+    create_tenant_quota_placeholders(db, tenant_id=tenant_id, plan_tier=plan_tier)
+app/services/usage.py:45: in create_quota_placeholders
+    return service.ensure_quota_placeholders(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.usage_service.UsageService object at 0x7aa7916335f0>
+tenant_id = 2, plan_tier = 'free', period = None, commit = False
+
+    def ensure_quota_placeholders(
+        self,
+        tenant_id: int,
+        plan_tier: str,
+        period: Optional[str] = None,
+        commit: bool = False,
+    ) -> int:
+        normalized_tier = PLAN_TIER_ALIASES.get(plan_tier, plan_tier)
+        period_start, period_end = resolve_period_bounds(period)
+        created_count = 0
+    
+        for metric_key in METRIC_KEYS:
+            quota = self.get_quota(normalized_tier, metric_key)
+            if not quota:
+>               raise ValueError(
+                    f"Missing plan quota for plan_tier='{normalized_tier}' metric_key='{metric_key}'"
+                )
+E               ValueError: Missing plan quota for plan_tier='starter' metric_key='seats_active'
+
+app/services/usage_service.py:60: ValueError
+
+The above exception was the direct cause of the following exception:
+
+self = <test_saas_workstreams.TestProvisioningService object at 0x7aa791761490>
+db_session = <sqlalchemy.orm.session.Session object at 0x7aa7917a02f0>
+
+    def test_provision_tenant_marks_pending_as_verified(self, db_session):
+        """Successful provisioning must set PendingRegistration.status = 'verified'."""
+        from app.services.provisioning import provision_tenant
+    
+        pending = self._make_pending(db_session, "prov-uni-2", "prov2@prov-uni-2.test")
+>       provision_tenant(db_session, pending)
+
+tests/test_saas_workstreams.py:327: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/provisioning.py:174: in provision_tenant
+    _handle_provisioning_failure(db, pending, stages_completed, exc)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <sqlalchemy.orm.session.Session object at 0x7aa7917a02f0>
+pending = <app.models.PendingRegistration object at 0x7aa791606540>
+stages_completed = ['tenant_record_created', 'admin_account_created']
+exc = ValueError("Missing plan quota for plan_tier='starter' metric_key='seats_active'")
+
+    def _handle_provisioning_failure(
+        db: Session,
+        pending: PendingRegistration,
+        stages_completed: list,
+        exc: Exception,
+    ) -> None:
+        """
+        Apply rollback policy:
+        - Roll back the in-flight transaction so partial tenant rows do not persist.
+        - Persist PendingRegistration as failed_provisioning for manual retry.
+        - Re-raise as ProvisioningError.
+        """
+        failed_at_stage = len(stages_completed)
+        logger.error(
+            "[!] Provisioning failed after stage %d (%s): %s",
+            failed_at_stage,
+            stages_completed[-1] if stages_completed else "none",
+            exc,
+            exc_info=True,
+        )
+    
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    
+        try:
+            # Persist the terminal failure state so a Superadmin can retry manually.
+            pending.status = "failed_provisioning"
+            db.add(pending)
+            db.commit()
+        except Exception:
+            db.rollback()
+    
+>       raise ProvisioningError(
+            f"Tenant provisioning failed at stage {failed_at_stage}. "
+            f"Completed: {stages_completed}. Cause: {exc}"
+        ) from exc
+E       app.services.provisioning.ProvisioningError: Tenant provisioning failed at stage 2. Completed: ['tenant_record_created', 'admin_account_created']. Cause: Missing plan quota for plan_tier='starter' metric_key='seats_active'
+
+app/services/provisioning.py:211: ProvisioningError
+---------------------------- Captured stderr setup -----------------------------
+2026-05-06 00:15:02 - passlib.handlers.bcrypt - DEBUG - detected 'bcrypt' backend, version '4.0.1'
+2026-05-06 00:15:02 - passlib.handlers.bcrypt - DEBUG - 'bcrypt' backend lacks $2$ support, enabling workaround
+------------------------------ Captured log setup ------------------------------
+DEBUG    passlib.handlers.bcrypt:bcrypt.py:625 detected 'bcrypt' backend, version '4.0.1'
+DEBUG    passlib.handlers.bcrypt:bcrypt.py:406 'bcrypt' backend lacks $2$ support, enabling workaround
+----------------------------- Captured stderr call -----------------------------
+2026-05-06 00:15:03 - app.provisioning - INFO - [Stage 1] tenant_record_created: university_id=2 domain=prov-uni-2
+2026-05-06 00:15:03 - app.provisioning - INFO - [Stage 2] admin_account_created: user=prov2@prov-uni-2.test university_id=2
+2026-05-06 00:15:03 - app.seeding - INFO - [*] Applying tenant baseline seed for tenant 2 (plan: free)
+2026-05-06 00:15:03 - app.seeding - INFO - [+] Default calendar created for tenant 2
+2026-05-06 00:15:03 - app.seeding - INFO - [+] Branding defaults applied for tenant 2
+2026-05-06 00:15:03 - app.provisioning - ERROR - [!] Provisioning failed after stage 2 (admin_account_created): Missing plan quota for plan_tier='starter' metric_key='seats_active'
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 120, in provision_tenant
+    seed_tenant_baseline(db, tenant_id=uni.id, plan_tier=plan_tier)
+  File "/home/on3/DENNIS/TABLESYS/backend/app/seeding_utils.py", line 205, in seed_tenant_baseline
+    create_tenant_quota_placeholders(db, tenant_id=tenant_id, plan_tier=plan_tier)
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/usage.py", line 45, in create_quota_placeholders
+    return service.ensure_quota_placeholders(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/usage_service.py", line 60, in ensure_quota_placeholders
+    raise ValueError(
+ValueError: Missing plan quota for plan_tier='starter' metric_key='seats_active'
+------------------------------ Captured log call -------------------------------
+INFO     app.provisioning:provisioning.py:95 [Stage 1] tenant_record_created: university_id=2 domain=prov-uni-2
+INFO     app.provisioning:provisioning.py:114 [Stage 2] admin_account_created: user=prov2@prov-uni-2.test university_id=2
+INFO     app.seeding:seeding_utils.py:202 [*] Applying tenant baseline seed for tenant 2 (plan: free)
+INFO     app.seeding:seeding_utils.py:125 [+] Default calendar created for tenant 2
+INFO     app.seeding:seeding_utils.py:149 [+] Branding defaults applied for tenant 2
+ERROR    app.provisioning:provisioning.py:190 [!] Provisioning failed after stage 2 (admin_account_created): Missing plan quota for plan_tier='starter' metric_key='seats_active'
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 120, in provision_tenant
+    seed_tenant_baseline(db, tenant_id=uni.id, plan_tier=plan_tier)
+  File "/home/on3/DENNIS/TABLESYS/backend/app/seeding_utils.py", line 205, in seed_tenant_baseline
+    create_tenant_quota_placeholders(db, tenant_id=tenant_id, plan_tier=plan_tier)
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/usage.py", line 45, in create_quota_placeholders
+    return service.ensure_quota_placeholders(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/usage_service.py", line 60, in ensure_quota_placeholders
+    raise ValueError(
+ValueError: Missing plan quota for plan_tier='starter' metric_key='seats_active'
+=============================== warnings summary ===============================
+app/database.py:48
+  /home/on3/DENNIS/TABLESYS/backend/app/database.py:48: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: 29 warnings
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11: DeprecationWarning: ast.NameConstant is deprecated and will be removed in Python 3.14; use ast.Constant instead
+    haveNameConstant = hasattr(ast,'NameConstant')
+
+app/main.py:310
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:310: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app/main.py:319
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:319: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_marks_pending_as_verified
+  /home/on3/DENNIS/TABLESYS/backend/app/services/usage_service.py:32: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_marks_pending_as_verified
+======================== 1 failed, 39 warnings in 2.74s ========================

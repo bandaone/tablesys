@@ -89,7 +89,7 @@ async def get_current_active_coordinator(
 ) -> User:
     enforce_user_roles(
         current_user.role,
-        [UserRole.COORDINATOR],
+        [UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN],
         "Not enough permissions. Coordinator access required.",
     )
     return current_user
@@ -99,8 +99,100 @@ async def get_current_active_hod(
 ) -> User:
     enforce_user_roles(
         current_user.role,
-        [UserRole.COORDINATOR, UserRole.HOD],
+        [UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN, UserRole.HOD],
         "Not enough permissions. HOD or Coordinator access required.",
+    )
+    return current_user
+
+
+async def get_current_active_lab_coordinator(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    enforce_user_roles(
+        current_user.role,
+        [
+            UserRole.COORDINATOR,
+            UserRole.SCHOOL_COORDINATOR,
+            UserRole.TENANT_ADMIN,
+            UserRole.HOD,
+            UserRole.LAB_COORDINATOR,
+        ],
+        "Lab coordinator access required.",
+    )
+    return current_user
+
+async def get_current_active_lab_coordinator_writer(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    enforce_user_roles(
+        current_user.role,
+        [
+            UserRole.COORDINATOR,
+            UserRole.TENANT_ADMIN,
+            UserRole.HOD,
+            UserRole.LAB_COORDINATOR,
+        ],
+        "Lab coordinator write access required.",
+    )
+    return current_user
+
+
+def is_tenant_admin(user: User) -> bool:
+    return user.role == UserRole.TENANT_ADMIN
+
+
+def is_school_operator(user: User) -> bool:
+    return user.role in {
+        UserRole.TENANT_ADMIN,
+        UserRole.SCHOOL_COORDINATOR,
+        UserRole.COORDINATOR,
+    }
+
+
+def resolve_effective_school_scope(user: User, explicit_school_id: Optional[int] = None) -> Optional[int]:
+    if explicit_school_id is not None:
+        if is_tenant_admin(user):
+            return explicit_school_id
+        if getattr(user, "school_id", None) == explicit_school_id:
+            return explicit_school_id
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to the requested school scope.",
+        )
+    if is_tenant_admin(user):
+        return None
+    return getattr(user, "school_id", None)
+
+
+async def get_current_active_tenant_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.TENANT_ADMIN],
+        "Tenant admin access required.",
+    )
+    return current_user
+
+
+async def get_current_active_school_operator(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.TENANT_ADMIN, UserRole.SCHOOL_COORDINATOR, UserRole.COORDINATOR],
+        "School operator access required.",
+    )
+    return current_user
+
+
+async def get_current_active_hod_or_school_operator(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    enforce_user_roles(
+        current_user.role,
+        [UserRole.TENANT_ADMIN, UserRole.SCHOOL_COORDINATOR, UserRole.COORDINATOR, UserRole.HOD],
+        "HOD or school operator access required.",
     )
     return current_user
 

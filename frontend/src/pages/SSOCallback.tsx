@@ -86,7 +86,7 @@ const SSOCallback: React.FC = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f172a 0%, #5c35cc 55%, #7c3aed 100%)',
+        background: 'linear-gradient(135deg, #0d47a1 0%, #1976d2 55%, #9c27b0 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -103,7 +103,7 @@ const SSOCallback: React.FC = () => {
           <Box
             sx={{
               width: 40, height: 40, borderRadius: '10px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, #1976d2, #9c27b0)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 6px 20px rgba(99,102,241,0.45)',
             }}
@@ -137,7 +137,7 @@ const SSOCallback: React.FC = () => {
               <CircularProgress
                 size={56}
                 thickness={3}
-                sx={{ color: '#818cf8', mb: 3 }}
+                sx={{ color: '#9c27b0', mb: 3 }}
               />
               <Typography variant="h6" fontWeight={700} sx={{ color: '#fff', mb: 1 }}>
                 Signing you in…
@@ -195,8 +195,8 @@ const SSOCallback: React.FC = () => {
                 sx={{
                   py: 1.25, borderRadius: '12px', fontWeight: 700,
                   textTransform: 'none',
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  '&:hover': { background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' },
+                  background: 'linear-gradient(135deg, #1976d2, #9c27b0)',
+                  '&:hover': { background: 'linear-gradient(135deg, #115293, #7b1fa2)' },
                 }}
               >
                 Back to Sign In

@@ -3,7 +3,8 @@ from datetime import date
 import pytest
 from httpx import AsyncClient
 
-from app.models import Course, Department, Room, StudentGroup
+from app.auth import get_password_hash
+from app.models import Course, Department, Room, StudentGroup, University, User, UserRole
 
 
 def _seed_exam_generation_data(db_session):
@@ -81,6 +82,15 @@ def _seed_exam_generation_data(db_session):
         "group_ids": [group_a.id, group_b.id],
         "room_names": [room.name for room in rooms],
     }
+
+
+async def _login(async_client: AsyncClient, username: str, password: str = "pass") -> dict:
+    response = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 @pytest.mark.asyncio
@@ -285,3 +295,257 @@ async def test_exam_publish_locks_period_and_marks_slots_published(
         json={"name": "Edited After Publish"},
     )
     assert locked_update_response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_exam_periods_are_scoped_to_the_current_university(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    db_session,
+):
+    seeded = _seed_exam_generation_data(db_session)
+
+    period_response = await async_client.post(
+        "/api/v1/exam-timetables/periods",
+        headers=auth_headers,
+        json={
+            "name": "Tenant 1 Protected Period",
+            "semester": "Semester 1",
+            "year": 2026,
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-05",
+        },
+    )
+    assert period_response.status_code == 201, period_response.text
+    period_id = period_response.json()["id"]
+
+    tenant_two = db_session.query(University).filter(University.id == 2).first()
+    if tenant_two is None:
+        tenant_two = University(
+            id=2,
+            name="Tenant Two University",
+            short_name="T2U",
+            domain="tenant2.test.local",
+            timezone="Africa/Harare",
+            is_active=True,
+            plan_tier="free",
+            max_users=50,
+        )
+        db_session.add(tenant_two)
+        db_session.flush()
+
+    tenant_two_user = db_session.query(User).filter(User.username == "exam_coord_u2").first()
+    if tenant_two_user is None:
+        tenant_two_user = User(
+            username="exam_coord_u2",
+            email="exam_coord_u2@tenant2.test.local",
+            full_name="Exam Coordinator U2",
+            role=UserRole.COORDINATOR,
+            hashed_password=get_password_hash("pass"),
+            is_active=True,
+            university_id=tenant_two.id,
+        )
+        db_session.add(tenant_two_user)
+        db_session.flush()
+
+    db_session.commit()
+
+    tenant_two_headers = await _login(async_client, "exam_coord_u2")
+
+    list_response = await async_client.get(
+        "/api/v1/exam-timetables/periods",
+        headers=tenant_two_headers,
+    )
+    assert list_response.status_code == 200, list_response.text
+    assert all(period["id"] != period_id for period in list_response.json())
+
+    detail_response = await async_client.get(
+        f"/api/v1/exam-timetables/periods/{period_id}",
+        headers=tenant_two_headers,
+    )
+    assert detail_response.status_code == 404, detail_response.text
+
+    delete_response = await async_client.delete(
+        f"/api/v1/exam-timetables/periods/{period_id}",
+        headers=tenant_two_headers,
+    )
+    assert delete_response.status_code == 404, delete_response.text
+
+
+@pytest.mark.asyncio
+async def test_publish_rejects_periods_with_unscheduled_papers(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    db_session,
+):
+    seeded = _seed_exam_generation_data(db_session)
+
+    period_response = await async_client.post(
+        "/api/v1/exam-timetables/periods",
+        headers=auth_headers,
+        json={
+            "name": "Semester 1 Mixed Feasibility Exams",
+            "semester": "Semester 1",
+            "year": 2026,
+            "start_date": "2026-08-01",
+            "end_date": "2026-08-03",
+        },
+    )
+    assert period_response.status_code == 201, period_response.text
+    period_id = period_response.json()["id"]
+
+    window_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/session-windows",
+        headers=auth_headers,
+        json={
+            "name": "Morning",
+            "start_time": "08:00:00",
+            "end_time": "12:00:00",
+            "display_order": 1,
+        },
+    )
+    assert window_response.status_code == 201, window_response.text
+
+    profile_response = await async_client.post(
+        "/api/v1/exam-timetables/seating-profiles",
+        headers=auth_headers,
+        json={"name": "Standard Seating", "capacity_factor": 100, "is_default": True},
+    )
+    assert profile_response.status_code == 201, profile_response.text
+    profile_id = profile_response.json()["id"]
+
+    schedulable_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/papers",
+        headers=auth_headers,
+        json={
+            "paper_code": "CSC4010-OK",
+            "paper_name": "Distributed Systems Main",
+            "course_id": seeded["course_id"],
+            "duration_minutes": 180,
+            "candidate_count": 110,
+            "group_ids": [seeded["group_ids"][0]],
+            "preferred_room_type": "lecture_hall",
+            "preferred_seating_profile_id": profile_id,
+            "max_rooms": 1,
+        },
+    )
+    assert schedulable_response.status_code == 201, schedulable_response.text
+
+    unschedulable_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/papers",
+        headers=auth_headers,
+        json={
+            "paper_code": "CSC4010-BLOCKED",
+            "paper_name": "Distributed Systems Overflow",
+            "course_id": seeded["course_id"],
+            "duration_minutes": 180,
+            "candidate_count": 500,
+            "group_ids": [seeded["group_ids"][1]],
+            "preferred_room_type": "lecture_hall",
+            "preferred_seating_profile_id": profile_id,
+            "max_rooms": 1,
+        },
+    )
+    assert unschedulable_response.status_code == 201, unschedulable_response.text
+
+    generate_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/generate",
+        headers=auth_headers,
+        json={"replace_existing": True},
+    )
+    assert generate_response.status_code == 200, generate_response.text
+    payload = generate_response.json()
+    assert payload["scheduled_count"] == 1
+    assert payload["unscheduled_count"] == 1
+
+    publish_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/publish",
+        headers=auth_headers,
+        json={"lock_after_publish": True},
+    )
+    assert publish_response.status_code == 422, publish_response.text
+    assert "Resolve all unscheduled papers" in publish_response.text
+
+
+@pytest.mark.asyncio
+async def test_published_period_cannot_be_deleted_or_mutated_via_status_fields(
+    async_client: AsyncClient,
+    auth_headers: dict,
+    db_session,
+):
+    seeded = _seed_exam_generation_data(db_session)
+
+    period_response = await async_client.post(
+        "/api/v1/exam-timetables/periods",
+        headers=auth_headers,
+        json={
+            "name": "Protected Published Exams",
+            "semester": "Semester 2",
+            "year": 2026,
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-07",
+        },
+    )
+    assert period_response.status_code == 201, period_response.text
+    period_id = period_response.json()["id"]
+
+    await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/session-windows",
+        headers=auth_headers,
+        json={
+            "name": "Morning",
+            "start_time": "08:00:00",
+            "end_time": "12:00:00",
+            "display_order": 1,
+        },
+    )
+
+    profile_response = await async_client.post(
+        "/api/v1/exam-timetables/seating-profiles",
+        headers=auth_headers,
+        json={"name": "Delete Guard Profile", "capacity_factor": 100},
+    )
+    profile_id = profile_response.json()["id"]
+
+    await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/papers",
+        headers=auth_headers,
+        json={
+            "paper_code": "CSC4010-FINAL",
+            "paper_name": "Distributed Systems Final",
+            "course_id": seeded["course_id"],
+            "duration_minutes": 120,
+            "candidate_count": 100,
+            "group_ids": [seeded["group_ids"][0]],
+            "preferred_room_type": "lecture_hall",
+            "preferred_seating_profile_id": profile_id,
+            "max_rooms": 1,
+        },
+    )
+
+    generate_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/generate",
+        headers=auth_headers,
+        json={"replace_existing": True},
+    )
+    assert generate_response.status_code == 200, generate_response.text
+
+    publish_response = await async_client.post(
+        f"/api/v1/exam-timetables/periods/{period_id}/publish",
+        headers=auth_headers,
+        json={"lock_after_publish": True},
+    )
+    assert publish_response.status_code == 200, publish_response.text
+
+    delete_response = await async_client.delete(
+        f"/api/v1/exam-timetables/periods/{period_id}",
+        headers=auth_headers,
+    )
+    assert delete_response.status_code == 409, delete_response.text
+
+    invalid_update_response = await async_client.put(
+        f"/api/v1/exam-timetables/periods/{period_id}",
+        headers=auth_headers,
+        json={"is_published": False},
+    )
+    assert invalid_update_response.status_code == 422, invalid_update_response.text

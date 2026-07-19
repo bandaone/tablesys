@@ -19,6 +19,9 @@ As of the current build, the system already includes:
 - heuristic generation with constrained-paper prioritization
 - diagnostic flags for tight placements and unscheduled papers
 - a coordinator review workspace for generating, reviewing, and publishing drafts
+- tenant-scoped exam period access and mutation rules
+- safer draft-to-publish lifecycle guardrails
+- deliberate paper-sync selection instead of auto-selecting an entire catalogue
 
 See [exam-timetable-implementation-checklist.md](/home/on3/DENNIS/TABLESYS/docs/exam-timetable-implementation-checklist.md) for the working checklist and current follow-up items.
 
@@ -62,6 +65,16 @@ The coordinator workflow should:
 - generate a conflict-free exam timetable
 - review exceptions and overrides
 - publish the final exam timetable
+
+## Current Operator Workflow
+
+The live workflow is intentionally split across roles:
+
+- coordinators create the exam period, session windows, seating profiles, draft timetable, and publish step
+- HODs and coordinators can review mapped course audiences and sync the approved papers for the cycle
+- publishing stays coordinator-controlled and is blocked until every paper has a scheduled slot
+
+This preserves central release control while still letting departmental owners shape the paper list safely.
 
 ## Core Rules
 
@@ -184,6 +197,7 @@ Suggested constraints to start with:
 - preferred: one paper per group per day
 - hard cap: no more than two papers per group per day unless explicitly overridden
 - minimum gap: configurable by institution, for example 24 hours or one full session block
+- if same-day fallback is disabled, the generator should reject any placement that gives a group another paper on that date
 
 ## Scheduling Workflow
 
@@ -207,6 +221,12 @@ It should use the current academic structure to determine:
 - whether a paper is shared across groups
 - the number of candidates per paper
 - the duration of each paper
+
+Operational rules:
+
+- a fresh exam period should start with no automatic paper selection
+- operators choose which mapped papers enter the cycle, then sync them deliberately
+- if an operator clears all current selections, the UI should warn before removing already-synced papers
 
 ### Step 3: Calculate effective room capacity
 
@@ -256,6 +276,12 @@ The coordinator should be able to inspect:
 - groups with overloaded exam days
 - rooms that are underused or overused
 
+Before publish, the coordinator should also see:
+
+- whether any papers remain unscheduled
+- whether the draft contains flagged placements that still need review
+- whether the draft is still editable or already locked
+
 ### Step 7: Publish and lock
 
 Once the coordinator publishes the exam timetable:
@@ -264,6 +290,13 @@ Once the coordinator publishes the exam timetable:
 - overlapping bookings are blocked
 - the timetable is frozen until an explicit edit or republish action
 - audit history should record the publish event
+
+Workflow guardrails:
+
+- the period must already have a generated draft
+- every paper in the period must have a scheduled slot before publish is allowed
+- published or locked periods cannot be deleted through the normal workflow
+- publish and lock state must only be changed through the dedicated publish action
 
 ## UI Plan for Coordinators
 
@@ -350,6 +383,17 @@ The feature is successful when:
 - same-group same-day collisions are rare and controlled
 - room bookings become exclusive during the exam period
 - the final timetable can be published, audited, and reviewed safely
+
+## Guardrails Added In This Iteration
+
+These are now part of the intended workflow:
+
+- exam periods are resolved inside the current university scope before read, update, generate, publish, or delete actions proceed
+- generic exam-period edits can no longer directly set publish or lock state
+- published or locked periods are protected from deletion
+- publish is blocked while any paper remains unscheduled
+- same-day fallback now affects scheduling outcomes instead of being a display-only setting
+- custom session-window overrides stay hidden in the main UI until the override workflow is fully implemented
 
 ## Next Step
 

@@ -9,6 +9,7 @@ import { CircularProgress, Box, Typography, ThemeProvider as MuiThemeProvider } 
 
 // Core layout/critical path imports
 import LoginPage from './pages/LoginPage';
+import LegacyAccess from './pages/LegacyAccess';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardLayout from './components/DashboardLayout';
 import StudentPortal from './pages/StudentPortal';
@@ -28,6 +29,7 @@ import LecturerPortal from './pages/LecturerPortal';
 const RoomsPage = lazy(() => import('./pages/RoomsPage'));
 const GroupsPage = lazy(() => import('./pages/GroupsPage'));
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'));
+const SchoolsPage = lazy(() => import('./pages/SchoolsPage'));
 const TimetableViewPage = lazy(() => import('./pages/TimetableViewPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const PrintSchedulePage = lazy(() => import('./pages/PrintSchedulePage'));
@@ -36,8 +38,10 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
 const SystemMonitorPage = lazy(() => import('./pages/SystemMonitorPage'));
-const LabGroupsPage = lazy(() => import('./pages/LabGroupsPage'));
+const LabSchedulingPage = lazy(() => import('./pages/LabSchedulingPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const BillingUsagePage = lazy(() => import('./pages/BillingUsagePage'));
+const InstitutionSetupPage = lazy(() => import('./pages/InstitutionSetupPage'));
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -55,9 +59,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
        return <Navigate to="/dashboard" replace />;
     }
 
+    const superadminAllowedSharedRoutes = ['/monitor', '/audit', '/help'];
+    const isSuperadminSharedRoute = superadminAllowedSharedRoutes.some((path) =>
+      location.pathname.startsWith(path)
+    );
+
     // Superadmins shouldn't access normal university views (since they have no university_id)
-    // with possible exceptions like their own profile or help (but here we strict-sandbox them for safety).
-    if (!location.pathname.startsWith('/superadmin') && safeRole === 'SUPERADMIN') {
+    // except shared owner/support routes like monitor, audit, and help.
+    if (!location.pathname.startsWith('/superadmin') && safeRole === 'SUPERADMIN' && !isSuperadminSharedRoute) {
        return <Navigate to="/superadmin" replace />;
     }
 
@@ -107,6 +116,17 @@ const DynamicThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+const RoleBasedRedirect: React.FC = () => {
+  const { isTenantAdmin, isLabCoordinator } = useAuth();
+  if (isTenantAdmin) {
+     return <Navigate to="/admin" replace />;
+  }
+  if (isLabCoordinator) {
+     return <Navigate to="/lab-scheduling" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
+};
+
 const App: React.FC = () => {
   return (
     <BrandingProvider>
@@ -116,6 +136,7 @@ const App: React.FC = () => {
             <BrowserRouter>
               <Suspense fallback={<LoadingFallback />}>
                 <Routes>
+                  <Route path="/legacy-access" element={<LegacyAccess />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/sso/callback" element={<SSOCallback />} />
@@ -143,7 +164,7 @@ const App: React.FC = () => {
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Navigate to="/dashboard" replace />} />
+                    <Route index element={<RoleBasedRedirect />} />
                     <Route path="dashboard" element={<DashboardPage />} />
                     <Route path="analytics" element={<AnalyticsPage />} />
                     <Route path="courses" element={<CoursesPage />} />
@@ -155,6 +176,8 @@ const App: React.FC = () => {
                     <Route path="rooms" element={<RoomsPage />} />
                     <Route path="groups" element={<GroupsPage />} />
                     <Route path="departments" element={<DepartmentsPage />} />
+                    <Route path="schools" element={<SchoolsPage />} />
+                    <Route path="setup" element={<InstitutionSetupPage />} />
                     <Route path="users" element={<UsersPage />} />
                     <Route path="print" element={<PrintSchedulePage />} />
                     <Route path="admin" element={<AdminDashboard />} />
@@ -162,7 +185,8 @@ const App: React.FC = () => {
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="audit" element={<AuditLogsPage />} />
                     <Route path="help" element={<HelpPage />} />
-                    <Route path="lab-groups" element={<LabGroupsPage />} />
+                    <Route path="lab-scheduling" element={<LabSchedulingPage />} />
+                    <Route path="billing" element={<BillingUsagePage />} />
                   </Route>
                 </Routes>
               </Suspense>

@@ -32,6 +32,8 @@ class AuditLogResponse(BaseModel):
     entity_name: Optional[str]
     changes: Optional[Dict[str, Any]]
     ip_address: Optional[str]
+    user_agent: Optional[str]
+    tenant_name: Optional[str]
     timestamp: str
     status: str
     error_message: Optional[str]
@@ -96,9 +98,10 @@ class AuditLogCreate(BaseModel):
 
 def require_admin_or_coordinator(current_user: User = Depends(get_current_user)):
     """
-    Dependency to ensure only Admins or Coordinators can access audit logs
+    Dependency to ensure only Admins, Coordinators, or Superadmins can access audit logs
     """
-    if current_user.role not in ["Admin", "Coordinator"]:
+    allowed_roles = {"Admin", "Coordinator", "superadmin"}
+    if current_user.role not in allowed_roles and str(current_user.role) not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators and coordinators can access audit logs"

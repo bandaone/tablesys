@@ -56,7 +56,7 @@ def seed_test_users(test_engine):
     """
     Seed test database with required users for authentication.
     
-    Creates coordinator and HOD users with password 'coordinator123'
+    Creates coordinator, HOD, and lab coordinator users with password 'pass'
     to match test fixture expectations.
     """
     from app.auth import get_password_hash
@@ -71,6 +71,8 @@ def seed_test_users(test_engine):
     db = TestingSessionLocal()
     
     try:
+        from app.seeding_utils import create_quota_placeholders
+        create_quota_placeholders(db, commit=True)
         # Create University (Tenant 1) required by foreign keys
         from datetime import datetime, timezone
         uni = db.query(University).filter(University.id == 1).first()
@@ -105,14 +107,14 @@ def seed_test_users(test_engine):
                 db.refresh(dept)
             dept_map[d["code"]] = dept.id
         
-        # Create coordinator user
+        # Create tenant admin user
         user = db.query(User).filter(User.username == "coordinator").first()
         if not user:
             user = User(
                 username="coordinator",
                 email="coordinator@test.local",
-                full_name="Timetable Coordinator",
-                role=UserRole.COORDINATOR,
+                full_name="Tenant Admin",
+                role=UserRole.TENANT_ADMIN,
                 hashed_password=get_password_hash("pass"),
                 is_active=True,
                 university_id=1,
@@ -128,6 +130,22 @@ def seed_test_users(test_engine):
                 email="hod_civil@test.local",
                 full_name="HOD Civil Engineering",
                 role=UserRole.HOD,
+                department_id=dept_map["CEE"],
+                hashed_password=get_password_hash("pass"),
+                is_active=True,
+                university_id=1,
+            )
+            db.add(user)
+            db.commit()
+
+        # Create Lab Coordinator user for Civil Engineering
+        user = db.query(User).filter(User.username == "lab_civil").first()
+        if not user:
+            user = User(
+                username="lab_civil",
+                email="lab_civil@test.local",
+                full_name="Lab Coordinator Civil Engineering",
+                role=UserRole.LAB_COORDINATOR,
                 department_id=dept_map["CEE"],
                 hashed_password=get_password_hash("pass"),
                 is_active=True,
@@ -265,6 +283,26 @@ async def hod_token(async_client: AsyncClient) -> str:
 async def hod_headers(hod_token: str) -> dict:
     """Get authentication headers for HOD user"""
     return {"Authorization": f"Bearer {hod_token}"}
+
+
+@pytest.fixture
+async def lab_token(async_client: AsyncClient) -> str:
+    """
+    Get authentication token for a lab coordinator user.
+    """
+    response = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "lab_civil", "password": "pass"}
+    )
+    if response.status_code != 200:
+        pytest.skip("Lab coordinator user not available in test database")
+    return response.json()["access_token"]
+
+
+@pytest.fixture
+async def lab_headers(lab_token: str) -> dict:
+    """Get authentication headers for lab coordinator user"""
+    return {"Authorization": f"Bearer {lab_token}"}
 
 
 # ============================================================================
@@ -434,17 +472,5 @@ def reset_rate_limiter():
 
 
 # ============================================================================
-# EVENT LOOP FIXTURE (For Async Tests)
+# END OF FIXTURES
 # ============================================================================
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """
-    Create event loop for async tests.
-    
-    This ensures all async tests share the same event loop.
-    """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-

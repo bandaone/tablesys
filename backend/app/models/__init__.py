@@ -1,13 +1,17 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Time, JSON, Index, DateTime, Date, func
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Time, JSON, Index, DateTime, Date, func, BigInteger, UniqueConstraint
 from sqlalchemy.orm import relationship
 import enum
 from ..database import Base
 
 class UserRole(str, enum.Enum):
     SUPERADMIN = "superadmin"          # Platform owner — sees all universities
+    TENANT_ADMIN = "tenant_admin"
+    SCHOOL_COORDINATOR = "school_coordinator"
     COORDINATOR = "coordinator"
     HOD = "hod"
     LAB_COORDINATOR = "lab_coordinator"
+    LECTURER = "lecturer"
+    STUDENT = "student"
 
 class RoomType(str, enum.Enum):
     LECTURE_HALL   = "lecture_hall"
@@ -70,6 +74,7 @@ class University(Base):
     # ── Plan / Licensing ─────────────────────────────────────────────────
     plan_tier = Column(String, default="free")                     # free | pro | enterprise
     max_users = Column(Integer, default=50)
+    scheduling_policy = Column(JSON, nullable=True)
 
 class AcademicCalendar(Base):
     __tablename__ = "academic_calendars"
@@ -82,7 +87,38 @@ class AcademicCalendar(Base):
     end_time = Column(Time, nullable=False)     # e.g. 18:00
     slot_duration_minutes = Column(Integer, default=60)
     is_default = Column(Boolean, default=False)
-    
+
+
+class School(Base):
+    __tablename__ = "schools"
+
+    id = Column(Integer, primary_key=True, index=True)
+    university_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    code = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    academic_calendar_id = Column(Integer, ForeignKey("academic_calendars.id"), nullable=True, index=True)
+    scheduling_policy = Column(JSON, nullable=True)
+
+    academic_calendar = relationship("AcademicCalendar")
+
+    __table_args__ = (
+        UniqueConstraint("university_id", "name", name="uq_school_univ_name"),
+        UniqueConstraint("university_id", "code", name="uq_school_univ_code"),
+    )
+
+
+from sqlalchemy import Table
+
+student_group_assignments = Table(
+    "student_group_assignments",
+    Base.metadata,
+    Column("student_id", Integer, ForeignKey("users.id"), primary_key=True),
+    Column("group_id", Integer, ForeignKey("student_groups.id"), primary_key=True),
+    Column("assigned_at", DateTime(timezone=True), server_default=func.now())
+)
+
 class User(Base):
     __tablename__ = "users"
     
@@ -93,10 +129,16 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, index=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
     
     department = relationship("Department", back_populates="hods")
+    school = relationship("School")
+    subgroups = relationship("StudentGroup", secondary=student_group_assignments, backref="user_members")
 
 class Department(Base):
     __tablename__ = "departments"
@@ -105,9 +147,11 @@ class Department(Base):
     university_id = Column(Integer, ForeignKey("universities.id"), nullable=True, index=True)
     name = Column(String, unique=True, nullable=False)
     code = Column(String, unique=True, nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, index=True)
     
     hods = relationship("User", back_populates="department")
     courses = relationship("Course", back_populates="department")
+    school = relationship("School")
 
 class Course(Base):
     __tablename__ = "courses"
@@ -117,10 +161,11 @@ class Course(Base):
     name = Column(String, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
     level = Column(Integer, nullable=False, index=True)  # 2, 3, 4, 5
-    credits = Column(Integer, nullable=False)
-    lecture_hours = Column(Integer, nullable=False)
-    tutorial_hours = Column(Integer, default=0)
-    practical_hours = Column(Integer, default=0)
+    credits = Column(Integer, nullable=True)
+    lecture_hours = Column(Integer, nullable=True)
+    tutorial_hours = Column(Integer, nullable=True)
+    practical_hours = Column(Integer, nullable=True)
+    profile_status = Column(String, nullable=False, default="profile_complete")
     
     # New Fields
     preferred_room_type = Column(Enum(RoomType), default=RoomType.ANY)
@@ -134,6 +179,7 @@ class Course(Base):
     # EEE dept + [6] = EEE-owned but GEN Year2 groups attend (e.g. EEE 2019)
     # any dept + [2,5] = cross-dept shared (e.g. CEE course with MEC)
     shared_with_department_ids = Column(JSON, nullable=True)
+    activity_requirements = Column(JSON, nullable=True)
 
     department = relationship("Department", back_populates="courses")
     lecturer_assignments = relationship("LecturerAssignment", back_populates="course")
@@ -157,6 +203,8 @@ class Lecturer(Base):
     
     # New Fields
     teaching_preferences = Column(JSON, nullable=True) # { "preferred_days": [], "avoid_early_morning": false }
+    last_login_at = Column(DateTime(timezone=True), nullable=True)  # Tracks active portal usage
+    welcome_email_sent = Column(Boolean, default=False)
     
     department = relationship("Department")
     assignments = relationship("LecturerAssignment", back_populates="lecturer")
@@ -222,9 +270,42 @@ class Room(Base):
     # Structured availability blocks: [{"day": "Monday", "start_time": "08:00", "end_time": "17:00"}]
     availability_blocks = Column(JSON, default=list)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    tags = Column(JSON, nullable=True)
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, index=True)
+    # Provenance is retained so venue ownership is auditable and never inferred
+    # from a room name or building label.
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # ── Relationships ────────────────────────────────────────────────────
     department = relationship("Department")
+    school = relationship("School")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class LabRoomAllocation(Base):
+    """A department's non-exclusive, preferred pool of lab venues.
+
+    Allocating a room makes it available in that department's lab scheduler;
+    it does not reserve the room for every hour of the week.  Actual time
+    clashes are still prevented by the lab scheduler.
+    """
+    __tablename__ = "lab_room_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    university_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    room = relationship("Room")
+    department = relationship("Department")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        UniqueConstraint("department_id", "room_id", name="uq_lab_room_allocation_department_room"),
+        Index("ix_lab_room_allocation_university_department", "university_id", "department_id"),
+    )
 
 class StudentGroup(Base):
     __tablename__ = "student_groups"
@@ -331,10 +412,12 @@ class Timetable(Base):
     year = Column(Integer, nullable=False)
     academic_half = Column(String, default="first_half") # "first_half" or "second_half"
     academic_calendar_id = Column(Integer, ForeignKey("academic_calendars.id"), nullable=True)
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=False, index=True)
     is_active = Column(Boolean, default=False)
     generation_metadata = Column(JSON, nullable=True)  # Stores level-by-level generation info
 
     academic_calendar = relationship("AcademicCalendar")
+    school = relationship("School")
     slots = relationship("TimetableSlot", back_populates="timetable", cascade="all, delete-orphan")
     versions = relationship("TimetableVersion", back_populates="timetable", cascade="all, delete-orphan")
 
@@ -391,8 +474,13 @@ class Student(Base):
     year_level = Column(Integer, nullable=False)  # 1, 2, 3, 4, 5
     group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=True)  # Optional: specific group assignment
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    # Students use this only as an anonymous timetable-viewing profile.  It is
+    # still needed to keep a selected group inside its university tenant.
+    # Keep this in sync with migration b679af0f9f03.
+    university_id = Column(Integer, ForeignKey("universities.id"), nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)  # Tracks active portal usage
     
     # Relationships
     group = relationship("StudentGroup", back_populates="students")
@@ -436,6 +524,26 @@ class AuditLog(Base):
         Index('ix_audit_logs_entity_type', 'entity_type'),
         Index('ix_audit_logs_timestamp', 'timestamp'),
     )
+
+
+class PlatformAlert(Base):
+    __tablename__ = "platform_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    severity = Column(String, nullable=False, index=True)  # critical | warning | info
+    category = Column(String, nullable=False, index=True)  # infra | tenant | security
+    title = Column(String, nullable=False)
+    detail = Column(String, nullable=True)
+    tenant_name = Column(String, nullable=True)
+    tenant_id = Column(Integer, ForeignKey("universities.id"), nullable=True, index=True)
+    triggered_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    acknowledged_by = Column(String, nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    alert_key = Column(String, nullable=False, unique=True, index=True)
+    auto_resolve = Column(Boolean, nullable=False, default=True)
+
+    university = relationship("University")
 
 
 
@@ -501,6 +609,96 @@ class RoomBooking(Base):
     room = relationship("Room")
     lecturer = relationship("Lecturer")
     course = relationship("Course")
+
+
+class UsageEvent(Base):
+    __tablename__ = "usage_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    metric_key = Column(String, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    source = Column(String, nullable=False, default="api")
+    metadata_json = Column("metadata", JSON, nullable=True)
+
+    __table_args__ = (
+        Index("ix_usage_events_tenant_metric", "tenant_id", "metric_key"),
+        Index("ix_usage_events_occurred_at", "occurred_at"),
+    )
+
+
+class ViewerActivity(Base):
+    __tablename__ = "viewer_activity"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    audience = Column(String, nullable=False, index=True)  # student_public | lecturer_portal
+    viewer_id = Column(String, nullable=True, index=True)
+    lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=True, index=True)
+    group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=True, index=True)
+    route_key = Column(String, nullable=False, index=True)
+    method = Column(String, nullable=False, default="GET")
+    status_code = Column(Integer, nullable=False, default=200)
+    response_time_ms = Column(Integer, nullable=False, default=0)
+    occurred_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_viewer_activity_tenant_audience_time", "tenant_id", "audience", "occurred_at"),
+        Index("ix_viewer_activity_tenant_route_time", "tenant_id", "route_key", "occurred_at"),
+    )
+
+
+class UsageMonthlySummary(Base):
+    __tablename__ = "usage_monthly_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    period_start = Column(DateTime(timezone=True), nullable=False, index=True)
+    period_end = Column(DateTime(timezone=True), nullable=False)
+    metric_key = Column(String, nullable=False, index=True)
+    total_quantity = Column(BigInteger, nullable=False, default=0)
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "period_start", "metric_key", name="uq_usage_summary_period"),
+        Index("ix_usage_summary_tenant_period", "tenant_id", "period_start"),
+    )
+
+
+class ActivityType(Base):
+    __tablename__ = "activity_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    university_id = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    key = Column(String, nullable=False)
+    display_name = Column(String, nullable=False)
+    color = Column(String, nullable=True, default="#3B82F6")
+    default_duration_periods = Column(Integer, nullable=True, default=1)
+    default_frequency_per_week = Column(Integer, nullable=True, default=1)
+    requires_subgroups = Column(Boolean, nullable=True, default=False)
+    resource_tags_required = Column(JSON, nullable=True)
+    counts_toward_contact_hours = Column(Boolean, nullable=True, default=True)
+    is_active = Column(Boolean, nullable=True, default=True)
+
+    __table_args__ = (
+        UniqueConstraint("university_id", "key", name="uq_activity_type_univ_key"),
+    )
+
+
+class PlanQuota(Base):
+    __tablename__ = "plan_quotas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_tier = Column(String, nullable=False, index=True)
+    metric_key = Column(String, nullable=False, index=True)
+    limit_quantity = Column(BigInteger, nullable=False)
+    enforcement = Column(String, nullable=False, default="warn")
+
+    __table_args__ = (
+        UniqueConstraint("plan_tier", "metric_key", name="uq_plan_quota_tier_metric"),
+        Index("ix_plan_quota_tier_metric", "plan_tier", "metric_key"),
+    )
 
 
 class ExamPeriod(Base):
@@ -621,6 +819,11 @@ class ExamSlot(Base):
     exam_paper_id = Column(Integer, ForeignKey("exam_papers.id"), nullable=False, index=True)
     session_window_id = Column(Integer, ForeignKey("exam_session_windows.id"), nullable=False, index=True)
     seating_profile_id = Column(Integer, ForeignKey("exam_seating_profiles.id"), nullable=True, index=True)
+    # The primary lecturer assigned to the course being examined. Even when the
+    # exam is split across multiple rooms, this person is the overall responsible
+    # Chief Invigilator for the paper. Resolved automatically during generation
+    # from the LecturerAssignment table (expertise_level='primary').
+    chief_invigilator_id = Column(Integer, ForeignKey("lecturers.id"), nullable=True, index=True)
     exam_date = Column(Date, nullable=False, index=True)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
@@ -634,6 +837,7 @@ class ExamSlot(Base):
     paper = relationship("ExamPaper", back_populates="slots")
     session_window = relationship("ExamSessionWindow", back_populates="slots")
     seating_profile = relationship("ExamSeatingProfile", back_populates="slot_defaults")
+    chief_invigilator = relationship("Lecturer", foreign_keys=[chief_invigilator_id])
     room_allocations = relationship(
         "ExamSlotRoom",
         back_populates="exam_slot",
@@ -664,4 +868,80 @@ class ExamSlotRoom(Base):
 
     __table_args__ = (
         Index("ix_exam_slot_room_slot_room", "exam_slot_id", "room_id"),
+    )
+
+
+class LabSessionStatus(str, enum.Enum):
+    DRAFT       = "draft"
+    PUBLISHED   = "published"
+    SCHEDULED   = "scheduled"
+    CANCELLED   = "cancelled"
+    RESCHEDULED = "rescheduled"
+
+
+class LabSession(Base):
+    """
+    A recurring lab/practical/tutorial slot created by a Lab Coordinator.
+
+    Design rules
+    ─────────────
+    • One row = one weekly recurring slot for ONE lab subgroup.
+    • The slot is tied to a specific room (lab venue), day and time-window.
+    • Conflict detection is done at write time against TimetableSlot rows
+      that share the same room, day, and an overlapping time window.
+    • `rotation_order` supports the venue-rotation feature: when several
+      subgroups share a single lab room they are scheduled in alternating
+      weeks ordered by this field (0-indexed).
+    • `frequency_weeks` = 1 means every week; 2 means fortnightly, etc.
+    • `timetable_id` links the session back to the active lecture timetable
+      so conflict checks can be scoped correctly.
+    """
+    __tablename__ = "lab_sessions"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    university_id  = Column(Integer, ForeignKey("universities.id"), nullable=False, index=True)
+    timetable_id   = Column(Integer, ForeignKey("timetables.id"),   nullable=True,  index=True)
+    course_id      = Column(Integer, ForeignKey("courses.id"),      nullable=False, index=True)
+    group_id       = Column(Integer, ForeignKey("student_groups.id"), nullable=False, index=True)
+    room_id        = Column(Integer, ForeignKey("rooms.id"),         nullable=True,  index=True)
+
+    # Schedule coordinates
+    day_of_week    = Column(Integer, nullable=False)          # 0 = Monday … 6 = Sunday
+    start_time     = Column(Time,    nullable=False)
+    end_time       = Column(Time,    nullable=False)
+
+    # Session metadata
+    session_type   = Column(String,  nullable=False, default="lab")   # lab | tutorial | drawing
+    status         = Column(String,  nullable=False, default=LabSessionStatus.SCHEDULED)
+    notes          = Column(String,  nullable=True)
+
+    # Lab-specific extras
+    duration_minutes  = Column(Integer, nullable=False, default=120)
+    frequency_weeks   = Column(Integer, nullable=False, default=1)    # Legacy fallback, typically 1
+    
+    # Master Slot & Rotation config
+    rotation_cycle_length = Column(Integer, nullable=False, default=1)   # How many weeks to complete a cycle
+    rotation_configuration = Column(JSON, nullable=True)                 # {"1": [subgrp_id], "2": [subgrp_id]}
+    # Conflict tracking (populated at creation by the smart scheduler)
+    has_conflict      = Column(Boolean, nullable=False, default=False)
+    conflict_detail   = Column(JSON,    nullable=True)                # [{type, slot_id, description}]
+
+    # Audit
+    created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    university  = relationship("University")
+    timetable   = relationship("Timetable")
+    course      = relationship("Course")
+    group       = relationship("StudentGroup")
+    room        = relationship("Room")
+    created_by  = relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        Index("ix_lab_session_university_day",  "university_id", "day_of_week"),
+        Index("ix_lab_session_group_course",    "group_id",      "course_id"),
+        Index("ix_lab_session_room_day",        "room_id",       "day_of_week"),
+        Index("ix_lab_session_timetable",       "timetable_id"),
     )

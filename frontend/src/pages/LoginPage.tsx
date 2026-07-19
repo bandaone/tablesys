@@ -3,9 +3,9 @@ import {
   Box,
   Button,
   Container,
-  Paper,
-  TextField,
   Typography,
+  TextField,
+  Paper,
   Alert,
   Chip,
   Grid,
@@ -72,10 +72,10 @@ const LoginPage: React.FC = () => {
 
   // Default Platform Colors (used if no ?school param is present)
   const defaultColors = {
-    primaryDark: '#0f172a',
-    primaryLight: '#334155',
-    secondary: '#6366f1',
-    accent: '#8b5cf6',
+    primaryDark: '#0a2e1a',
+    primaryLight: '#006837',
+    secondary: '#FDB913',
+    accent: '#c58f00',
   };
 
   // The active colours dynamically switch to the school if loaded
@@ -178,7 +178,7 @@ const LoginPage: React.FC = () => {
       sx={{
         minHeight: '100vh',
         backgroundColor: activeColors.primaryDark,
-        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, #5c35cc 55%, #7c3aed 100%)`,
+        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, ${activeColors.primaryLight} 52%, ${activeColors.secondary} 130%)`,
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
@@ -186,16 +186,25 @@ const LoginPage: React.FC = () => {
         py: 4,
         px: 2,
         overflow: 'hidden',
+        isolation: 'isolate',
         '&::before': {
           content: '""',
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(10px)',
+          inset: 0,
+          background: `radial-gradient(circle at 90% 12%, rgba(255,255,255,0.14) 0 105px, rgba(255,255,255,0.075) 106px 235px, transparent 236px), radial-gradient(circle at 7% 93%, rgba(255,255,255,0.11) 0 82px, rgba(255,255,255,0.055) 83px 195px, transparent 196px), radial-gradient(circle at 72% 86%, rgba(255,255,255,0.055) 0 58px, transparent 59px)`,
           zIndex: 0
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          width: 520,
+          height: 520,
+          right: -250,
+          top: -270,
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.16)',
+          boxShadow: '0 0 0 62px rgba(255,255,255,0.035), 0 0 0 145px rgba(255,255,255,0.025)',
+          zIndex: 0,
         },
         ...animations.fadeIn,
         ...animations.shake,
@@ -254,7 +263,8 @@ const LoginPage: React.FC = () => {
                     fontWeight: 800,
                     mb: 1,
                     letterSpacing: 2,
-                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                    color: '#ffffff',
+                    textShadow: '0 3px 14px rgba(0,0,0,0.38)',
                     fontFamily: '"Montserrat", sans-serif'
                   }}
                 >
@@ -262,7 +272,7 @@ const LoginPage: React.FC = () => {
                 </Typography>
                 
                 {branding.name && branding.short_name && (
-                   <Typography variant="h6" sx={{ mb: 4, opacity: 0.9, fontWeight: 300 }}>
+                   <Typography variant="h6" sx={{ mb: 4, color: '#ffffff', opacity: 0.94, fontWeight: 300, textShadow: '0 2px 10px rgba(0,0,0,0.28)' }}>
                      {branding.name}
                    </Typography>
                 )}
@@ -270,7 +280,7 @@ const LoginPage: React.FC = () => {
                 <Divider sx={{ width: '60%', mb: 4, bgcolor: 'rgba(255,255,255,0.3)' }} />
 
                 <Box sx={{ textAlign: 'center', width: '100%' }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, letterSpacing: 2 }}>
+                  <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 700, mb: 2, letterSpacing: 2, textShadow: '0 2px 10px rgba(0,0,0,0.28)' }}>
                     {branding.tagline || 'MULTI-UNIVERSITY TIMETABLE PLATFORM'}
                   </Typography>
                 </Box>

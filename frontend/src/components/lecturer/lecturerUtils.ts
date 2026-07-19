@@ -6,6 +6,8 @@
  * correctly (mixing component and non-component exports breaks HMR).
  */
 
+import { activityChipSx, resolveActivityPresentation } from '../../utils/activityPresentation';
+
 export const DAY_ORDER = [
   'Monday',
   'Tuesday',
@@ -16,7 +18,7 @@ export const DAY_ORDER = [
   'Sunday',
 ] as const;
 
-export type LecturerPortalTab = 'home' | 'today' | 'week' | 'search' | 'courses';
+export type LecturerPortalTab = 'home' | 'today' | 'week' | 'search' | 'courses' | 'exams';
 
 export const formatDayLabel = (day: string | number | undefined): string => {
   if (day === undefined || day === null) return '';
@@ -37,30 +39,14 @@ export const getMinutesFromTime = (value: string): number => {
   return hours * 60 + minutes;
 };
 
-export const normalizeSessionType = (value?: string): 'lecture' | 'tutorial' | 'lab' => {
-  const normalized = (value || '').toLowerCase();
-  if (normalized.includes('lab')) return 'lab';
-  if (normalized.includes('tutorial')) return 'tutorial';
-  return 'lecture';
-};
+export const normalizeSessionType = (value?: string): string =>
+  resolveActivityPresentation(value).key;
 
-export const getSessionTypeChipColor = (
-  value?: string,
-): 'primary' | 'secondary' | 'success' | 'warning' => {
-  switch (normalizeSessionType(value)) {
-    case 'lab':
-      return 'success';
-    case 'tutorial':
-      return 'warning';
-    default:
-      return 'primary';
-  }
-};
+export const getSessionTypeChipSx = (value?: string) =>
+  activityChipSx(value);
 
-export const formatSessionTypeLabel = (value?: string): string => {
-  const n = normalizeSessionType(value);
-  return n.charAt(0).toUpperCase() + n.slice(1);
-};
+export const formatSessionTypeLabel = (value?: string): string =>
+  resolveActivityPresentation(value).displayName;
 
 export const formatDuration = (minutes: number): string => {
   if (minutes <= 0) return 'Now';

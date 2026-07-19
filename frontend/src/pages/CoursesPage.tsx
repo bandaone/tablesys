@@ -47,6 +47,7 @@ import {
 import { coursesAPI, departmentsAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { CourseGroupAssigner } from '../components/CourseGroupAssigner';
+import { useInstitutionSetup, activityTypeColors } from '../hooks/useInstitutionSetup';
 
 interface CourseRow {
   id: number;
@@ -54,11 +55,17 @@ interface CourseRow {
   name: string;
   department_id: number;
   level: number;
-  credits: number;
-  lecture_hours: number;
-  tutorial_hours: number;
-  practical_hours: number;
+  credits?: number | null;
+  lecture_hours?: number | null;
+  tutorial_hours?: number | null;
+  practical_hours?: number | null;
+  profile_status?: string | null;
   shared_with_department_ids?: number[];
+  activity_requirements?: Array<{
+    activity_type_key: string;
+    hours_per_session: number;
+    frequency_per_week: number;
+  }>;
 }
 
 interface DepartmentRow {
@@ -82,7 +89,18 @@ const CoursesPage: React.FC = () => {
   const [groupAssignDialogOpen, setGroupAssignDialogOpen] = useState(false);
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
   const [dialogError, setDialogError] = useState('');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    code: string;
+    name: string;
+    department_id: string | number;
+    level: number;
+    credits: string | number;
+    lecture_hours: string | number;
+    tutorial_hours: string | number;
+    practical_hours: string | number;
+    shared_with_department_ids: number[];
+    activity_requirements: Array<{ activity_type_key: string; hours_per_session: number; frequency_per_week: number }> | null;
+  }>({
     code: '',
     name: '',
     department_id: '',
@@ -92,12 +110,14 @@ const CoursesPage: React.FC = () => {
     tutorial_hours: 0,
     practical_hours: 0,
     shared_with_department_ids: [] as number[],
+    activity_requirements: null,
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
   const deptFilter = searchParams.get('dept');
 
   const { user, isCoordinator, isHOD } = useAuth();
+  const { activityTypes, activityTypesByKey } = useInstitutionSetup();
 
   useEffect(() => {
     fetchCourses();
@@ -206,14 +226,41 @@ const CoursesPage: React.FC = () => {
     return isHOD && user?.department_id === course.department_id;
   };
 
+  const isProfileSeededCourse = (course: CourseRow) => course.profile_status === 'profile_seeded';
+
+  const toFormValue = (value?: number | null) => (value === null || value === undefined ? '' : value);
+
+  const parseOptionalNumber = (value: string | number) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const parsed = typeof value === 'number' ? value : parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  // Older imports used 3 while newer imports use 300.  The management view
+  // must treat those as the same academic year while the data migration brings
+  // every stored record to the canonical 100-based form.
+  const normaliseAcademicYear = (level: number) => (level >= 100 ? Math.round(level / 100) : level);
+  const formatLevelLabel = (level: number) => normaliseAcademicYear(level);
+
+  const buildCoursePayload = () => ({
+    ...formData,
+    department_id: Number(formData.department_id),
+    level: Number(formData.level),
+    credits: parseOptionalNumber(formData.credits),
+    lecture_hours: parseOptionalNumber(formData.lecture_hours),
+    tutorial_hours: parseOptionalNumber(formData.tutorial_hours),
+    practical_hours: parseOptionalNumber(formData.practical_hours),
+  });
+
   // Filter and Group courses by level
   const filteredCourses = deptFilter
     ? courses.filter(c => c.department_id === parseInt(deptFilter))
     : courses;
 
   const coursesByLevel = filteredCourses.reduce((acc, course) => {
-    if (!acc[course.level]) acc[course.level] = [];
-    acc[course.level].push(course);
+    const academicYear = normaliseAcademicYear(course.level);
+    if (!acc[academicYear]) acc[academicYear] = [];
+    acc[academicYear].push(course);
     return acc;
   }, {} as Record<number, typeof courses>);
 
@@ -239,10 +286,11 @@ const CoursesPage: React.FC = () => {
   const handleSaveCourse = async () => {
     setDialogError('');
     try {
+      const payload = buildCoursePayload();
       if (editingCourse) {
-        await coursesAPI.update(editingCourse.id, formData);
+        await coursesAPI.update(editingCourse.id, payload);
       } else {
-        await coursesAPI.create(formData);
+        await coursesAPI.create(payload);
       }
       setOpenDialog(false);
       setEditingCourse(null);
@@ -251,12 +299,13 @@ const CoursesPage: React.FC = () => {
         code: '',
         name: '',
         department_id: '',
-        level: 1,
+        level: 100,
         credits: 3,
         lecture_hours: 2,
         tutorial_hours: 0,
         practical_hours: 0,
         shared_with_department_ids: [],
+        activity_requirements: null,
       });
       fetchCourses();
     } catch (e: unknown) {
@@ -312,6 +361,18 @@ const CoursesPage: React.FC = () => {
               startIcon={<AddIcon />}
               onClick={() => {
                 setEditingCourse(null);
+                setFormData({
+                  code: '',
+                  name: '',
+                  department_id: user?.department_id ? String(user.department_id) : '',
+                  level: 100,
+                  credits: 3,
+                  lecture_hours: 2,
+                  tutorial_hours: 0,
+                  practical_hours: 0,
+                  shared_with_department_ids: [],
+                  activity_requirements: null,
+                });
                 setOpenDialog(true);
               }}
               sx={{ textTransform: 'none' }}
@@ -347,7 +408,7 @@ const CoursesPage: React.FC = () => {
             <Card elevation={2}>
               <CardContent>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Year {level}
+                  Year {formatLevelLabel(parseInt(level, 10))}
                 </Typography>
                 <Typography variant="h5" fontWeight="600">
                   {count} courses
@@ -378,7 +439,7 @@ const CoursesPage: React.FC = () => {
             <Accordion key={level} defaultExpanded={level >= 3} sx={{ mb: 2 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: 'grey.50' }}>
                 <Typography variant="h6" fontWeight="600">
-                  Year {level} Courses
+                  Year {formatLevelLabel(level)} Courses
                   <Chip
                     label={`${levelCourses.length} courses`}
                     size="small"
@@ -418,16 +479,47 @@ const CoursesPage: React.FC = () => {
                               variant="outlined"
                             />
                           </TableCell>
-                          <TableCell>{course.credits}</TableCell>
                           <TableCell>
-                            <Typography variant="body2" color="text.secondary">
-                              L: {course.lecture_hours} | T: {course.tutorial_hours} | P: {course.practical_hours}
-                            </Typography>
+                            {course.credits ?? (
+                              <Chip size="small" color="warning" variant="outlined" label="Pending" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {/* Contact hours: prefer activity_requirements chips, fall back to legacy L/T/P */}
+                            {course.activity_requirements && course.activity_requirements.length > 0 ? (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {course.activity_requirements.map((req) => {
+                                  const at = activityTypesByKey[req.activity_type_key];
+                                  const color = at?.color ?? '#3B82F6';
+                                  const label = at?.display_name ?? req.activity_type_key;
+                                  return (
+                                    <Chip
+                                      key={req.activity_type_key}
+                                      label={`${label} ${req.frequency_per_week}×/wk`}
+                                      size="small"
+                                      sx={{
+                                        bgcolor: `${color}1a`,
+                                        color: color,
+                                        border: `1px solid ${color}55`,
+                                        fontWeight: 500,
+                                        fontSize: '0.7rem',
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                {isProfileSeededCourse(course)
+                                  ? 'Profile seeded: complete hours later'
+                                  : `L: ${course.lecture_hours ?? 0} | T: ${course.tutorial_hours ?? 0} | P: ${course.practical_hours ?? 0}`}
+                              </Typography>
+                            )}
                           </TableCell>
                           {(isCoordinator || isHOD) && (
                             <TableCell>
                               {canManageCourseMapping(course) && (
-                                <Tooltip title="Edit">
+                                <Tooltip title="Edit course details only (keeps this course and its enrolment mapping)">
                                   <IconButton
                                     size="small"
                                     color="primary"
@@ -437,12 +529,13 @@ const CoursesPage: React.FC = () => {
                                         code: course.code,
                                         name: course.name,
                                         department_id: String(course.department_id),
-                                        level: course.level,
-                                        credits: course.credits,
-                                        lecture_hours: course.lecture_hours,
-                                        tutorial_hours: course.tutorial_hours,
-                                        practical_hours: course.practical_hours,
+                                        level: course.level >= 100 ? course.level : course.level * 100,
+                                        credits: toFormValue(course.credits),
+                                        lecture_hours: toFormValue(course.lecture_hours),
+                                        tutorial_hours: toFormValue(course.tutorial_hours),
+                                        practical_hours: toFormValue(course.practical_hours),
                                         shared_with_department_ids: course.shared_with_department_ids || [],
+                                        activity_requirements: course.activity_requirements ?? null,
                                       });
                                       setDialogError('');
                                       setOpenDialog(true);
@@ -454,7 +547,7 @@ const CoursesPage: React.FC = () => {
                               )}
 
                               {canManageCourseMapping(course) && (
-                                <Tooltip title="Manage Groups For This Course">
+                                <Tooltip title="Manage enrolled cohorts and shared lecture delivery">
                                   <IconButton
                                     size="small"
                                     color="info"
@@ -495,8 +588,18 @@ const CoursesPage: React.FC = () => {
 
       {/* Add/Edit Course Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{editingCourse ? 'Edit Course' : 'Add New Course'}</DialogTitle>
+        <DialogTitle>{editingCourse ? `Edit Course Details — ${editingCourse.code}` : 'Add New Course'}</DialogTitle>
         <DialogContent>
+          {editingCourse && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              You are editing the existing course record. Its course ID and group/enrolment mapping are retained unless you explicitly open “Manage Groups”.
+            </Alert>
+          )}
+          {editingCourse && isProfileSeededCourse(editingCourse) && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              This course was seeded from a school profile upload. Fill in credits and contact hours here when the school coordinator or HOD is ready to complete it.
+            </Alert>
+          )}
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 1 }}>
             <TextField
               label="Course Code"
@@ -532,10 +635,10 @@ const CoursesPage: React.FC = () => {
               <Select
                 value={formData.level}
                 label="Level"
-                onChange={(e) => { setFormData({ ...formData, level: parseInt(e.target.value as string) || 1 }); }}
+                onChange={(e) => { setFormData({ ...formData, level: parseInt(e.target.value as string, 10) || 100 }); }}
               >
-                {[1, 2, 3, 4, 5, 6, 7].map(val => (
-                  <MenuItem key={val} value={val}>Year {val}</MenuItem>
+                {[100, 200, 300, 400, 500, 600, 700].map(val => (
+                  <MenuItem key={val} value={val}>Year {val / 100}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -569,31 +672,177 @@ const CoursesPage: React.FC = () => {
               label="Credits"
               type="number"
               value={formData.credits}
-              onChange={(e) => { setFormData({ ...formData, credits: parseInt(e.target.value) || 0 }); }}
+              onChange={(e) => { setFormData({ ...formData, credits: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 }); }}
               fullWidth
             />
-            <TextField
-              label="Lecture Hours"
-              type="number"
-              value={formData.lecture_hours}
-              onChange={(e) => { setFormData({ ...formData, lecture_hours: parseInt(e.target.value) || 0 }); }}
-              fullWidth
-            />
-            <TextField
-              label="Tutorial Hours"
-              type="number"
-              value={formData.tutorial_hours}
-              onChange={(e) => { setFormData({ ...formData, tutorial_hours: parseInt(e.target.value) || 0 }); }}
-              fullWidth
-            />
-            <TextField
-              label="Practical Hours"
-              type="number"
-              value={formData.practical_hours}
-              onChange={(e) => { setFormData({ ...formData, practical_hours: parseInt(e.target.value) || 0 }); }}
-              fullWidth
-              sx={{ gridColumn: 'span 2' }}
-            />
+
+            {/* ── Activity requirements (dynamic) or legacy hours ── */}
+            {activityTypes.length > 0 ? (
+              <Box sx={{ gridColumn: 'span 2' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={600} color="text.primary">
+                    Session Requirements
+                  </Typography>
+                  {formData.activity_requirements === null && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          activity_requirements: activityTypes.map((at) => ({
+                            activity_type_key: at.key,
+                            hours_per_session: at.default_duration_periods,
+                            frequency_per_week: at.default_frequency_per_week,
+                          })),
+                        })
+                      }
+                    >
+                      Switch to activity-based scheduling
+                    </Button>
+                  )}
+                  {formData.activity_requirements !== null && (
+                    <Button
+                      size="small"
+                      sx={{ textTransform: 'none', fontSize: '0.75rem', color: 'text.secondary' }}
+                      onClick={() => setFormData({ ...formData, activity_requirements: null })}
+                    >
+                      Revert to legacy hours
+                    </Button>
+                  )}
+                </Box>
+
+                {formData.activity_requirements !== null ? (
+                  // Dynamic per-activity rows
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {activityTypes.map((at) => {
+                      const existing = formData.activity_requirements!.find(
+                        (r) => r.activity_type_key === at.key,
+                      );
+                      const c = activityTypeColors(at.color);
+                      return (
+                        <Box
+                          key={at.key}
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 130px 130px',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: `1px solid ${c.border}`,
+                            bgcolor: c.bg,
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                bgcolor: at.color || '#3B82F6',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Typography variant="body2" fontWeight={500} color={c.text}>
+                              {at.display_name}
+                            </Typography>
+                          </Box>
+                          <TextField
+                            label="hrs/session"
+                            type="number"
+                            size="small"
+                            value={existing?.hours_per_session ?? at.default_duration_periods}
+                            inputProps={{ min: 1, max: 8 }}
+                            onChange={(e) => {
+                              const updated = (formData.activity_requirements ?? []).filter(
+                                (r) => r.activity_type_key !== at.key,
+                              );
+                              updated.push({
+                                activity_type_key: at.key,
+                                hours_per_session: parseInt(e.target.value) || 1,
+                                frequency_per_week: existing?.frequency_per_week ?? at.default_frequency_per_week,
+                              });
+                              setFormData({ ...formData, activity_requirements: updated });
+                            }}
+                          />
+                          <TextField
+                            label="times/week"
+                            type="number"
+                            size="small"
+                            value={existing?.frequency_per_week ?? at.default_frequency_per_week}
+                            inputProps={{ min: 1, max: 10 }}
+                            onChange={(e) => {
+                              const updated = (formData.activity_requirements ?? []).filter(
+                                (r) => r.activity_type_key !== at.key,
+                              );
+                              updated.push({
+                                activity_type_key: at.key,
+                                hours_per_session: existing?.hours_per_session ?? at.default_duration_periods,
+                                frequency_per_week: parseInt(e.target.value) || 1,
+                              });
+                              setFormData({ ...formData, activity_requirements: updated });
+                            }}
+                          />
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                ) : (
+                  // Legacy hours fallback (shown inside the dynamic block when user hasn't switched)
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5 }}>
+                    <TextField
+                      label="Lecture Hours"
+                      type="number"
+                      value={formData.lecture_hours}
+                      onChange={(e) => setFormData({ ...formData, lecture_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 })}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Tutorial Hours"
+                      type="number"
+                      value={formData.tutorial_hours}
+                      onChange={(e) => setFormData({ ...formData, tutorial_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 })}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Practical Hours"
+                      type="number"
+                      value={formData.practical_hours}
+                      onChange={(e) => setFormData({ ...formData, practical_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 })}
+                      fullWidth
+                    />
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              // No custom types — render pure legacy fields
+              <>
+                <TextField
+                  label="Lecture Hours"
+                  type="number"
+                  value={formData.lecture_hours}
+                  onChange={(e) => { setFormData({ ...formData, lecture_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 }); }}
+                  fullWidth
+                />
+                <TextField
+                  label="Tutorial Hours"
+                  type="number"
+                  value={formData.tutorial_hours}
+                  onChange={(e) => { setFormData({ ...formData, tutorial_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 }); }}
+                  fullWidth
+                />
+                <TextField
+                  label="Practical Hours"
+                  type="number"
+                  value={formData.practical_hours}
+                  onChange={(e) => { setFormData({ ...formData, practical_hours: e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0 }); }}
+                  fullWidth
+                  sx={{ gridColumn: 'span 2' }}
+                />
+              </>
+            )}
           </Box>
           {dialogError && (
             <Alert severity="error" sx={{ mx: 3, mb: 1 }}>{dialogError}</Alert>

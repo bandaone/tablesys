@@ -9,8 +9,8 @@ from ..database import get_db
 from ..schemas import (
     Course, CourseCreate, CourseUpdate, CourseEnrollmentMapping, CourseEnrollmentUpdate
 )
-from ..models import Course as CourseModel, User, UserRole, Department
-from ..auth import get_current_user, get_current_active_coordinator, get_current_active_hod
+from ..models import Course as CourseModel, User, UserRole, Department, ActivityType
+from ..auth import get_current_user, get_current_active_hod
 from ..config import settings
 from ..utils.sanitization import sanitize_input
 from ..utils.audit_logger import AuditLogger
@@ -19,13 +19,20 @@ from ..services.course_mapping_service import CourseMappingService
 from ..utils.bulk_import_helpers import (
     resolve_department_id, ffill_department_columns, normalize_column_names, safe_int
 )
+from ..utils.course_profile import (
+    COURSE_PROFILE_STATUS_COMPLETE,
+    derive_course_profile_status,
+    has_complete_course_profile,
+    normalize_course_level,
+)
 from ..utils.department_utils import find_general_department, is_general_department
+from ..utils.school_scope import ensure_user_can_manage_department, filter_course_query_for_user
 
 router = APIRouter(prefix="/api/v1/courses", tags=["courses"])
 
 
 def _can_manage_course_enrollment(current_user: User, course: CourseModel) -> bool:
-    if current_user.role == UserRole.COORDINATOR:
+    if current_user.role in {UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN}:
         return True
     if current_user.role == UserRole.HOD and current_user.department_id == course.department_id:
         return True
@@ -43,8 +50,10 @@ def validate_course_fields(code: str, name: str, level: int, credits: int, lectu
         return {"detail": "Course name cannot be empty", "field": "name"}
     if len(name) > 200:
         return {"detail": "Course name must be 200 characters or less", "field": "name"}
-    if level not in [1, 2, 3, 4, 5, 6, 7]:
-        return {"detail": "Level must be 1, 2, 3, 4, 5, 6, or 7", "field": "level"}
+    try:
+        normalize_course_level(level)
+    except ValueError as exc:
+        return {"detail": str(exc), "field": "level"}
     if credits < 1 or credits > 12:
         return {"detail": "Credits must be between 1 and 12", "field": "credits"}
     if lecture_hours < 0 or lecture_hours > 10:
@@ -59,6 +68,89 @@ def validate_course_fields(code: str, name: str, level: int, credits: int, lectu
     if total_hours > 15:
         return {"detail": "Total hours (lecture + tutorial + practical) cannot exceed 15", "field": "lecture_hours"}
     return None
+
+
+def validate_course_identity_fields(code: str, name: str, level: int) -> Optional[dict]:
+    if not code or len(code.strip()) == 0:
+        return {"detail": "Course code cannot be empty", "field": "code"}
+    if len(code) > 20:
+        return {"detail": "Course code must be 20 characters or less", "field": "code"}
+    if not name or len(name.strip()) == 0:
+        return {"detail": "Course name cannot be empty", "field": "name"}
+    if len(name) > 200:
+        return {"detail": "Course name must be 200 characters or less", "field": "name"}
+    try:
+        normalize_course_level(level)
+    except ValueError as exc:
+        return {"detail": str(exc), "field": "level"}
+    return None
+
+
+def _validate_course_payload(course_payload: Dict) -> Optional[dict]:
+    activity_requirements = course_payload.get("activity_requirements") or []
+    if activity_requirements:
+        return None
+    if not has_complete_course_profile(
+        course_payload.get("credits"),
+        course_payload.get("lecture_hours"),
+        course_payload.get("tutorial_hours"),
+        course_payload.get("practical_hours"),
+    ):
+        return validate_course_identity_fields(
+            course_payload["code"],
+            course_payload["name"],
+            course_payload["level"],
+        )
+    return validate_course_fields(
+        course_payload["code"],
+        course_payload["name"],
+        course_payload["level"],
+        course_payload["credits"],
+        course_payload["lecture_hours"],
+        course_payload["tutorial_hours"],
+        course_payload["practical_hours"],
+    )
+
+
+def _validate_activity_requirement_keys(
+    db: Session,
+    university_id: Optional[int],
+    activity_requirements: Optional[List[Dict]],
+) -> None:
+    if not activity_requirements or university_id is None:
+        return
+    keys = sorted(
+        {
+            str(item.get("activity_type_key", "")).strip().lower()
+            for item in activity_requirements
+            if str(item.get("activity_type_key", "")).strip()
+        }
+    )
+    if not keys:
+        return
+    known = {
+        row[0]
+        for row in db.query(ActivityType.key).filter(
+            ActivityType.university_id == university_id,
+            ActivityType.is_active == True,
+            ActivityType.key.in_(keys),
+        ).all()
+    }
+    unknown = [key for key in keys if key not in known]
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown activity_type_key(s) for this institution: {', '.join(unknown)}",
+        )
+
+
+def _set_course_profile_status(course_payload: Dict) -> None:
+    course_payload["profile_status"] = derive_course_profile_status(
+        course_payload.get("credits"),
+        course_payload.get("lecture_hours"),
+        course_payload.get("tutorial_hours"),
+        course_payload.get("practical_hours"),
+    )
 
 @router.get("/", response_model=List[Course])
 async def get_courses(
@@ -84,7 +176,6 @@ async def get_courses(
         query = query.join(Department).filter(
             Department.university_id == current_user.university_id
         )
-
     if current_user.role == UserRole.HOD and current_user.department_id is not None:
         dept_id = current_user.department_id
 
@@ -114,17 +205,21 @@ async def get_courses(
                         CourseModel.department_id == gen_dept_id,
                         or_(
                             CourseModel.shared_with_department_ids.is_(None),
-                            dept_in_shared
-                        )
+                            dept_in_shared,
+                        ),
                     ),
                     # (c) Any other dept's course explicitly shared with this dept
                     and_(
                         CourseModel.department_id != dept_id,
                         CourseModel.department_id != gen_dept_id,
-                        dept_in_shared
-                    )
+                        dept_in_shared,
+                    ),
                 )
             )
+    elif getattr(current_user, "department_id", None) is not None:
+        query = query.filter(CourseModel.department_id == current_user.department_id)
+    elif current_user.role in {UserRole.SCHOOL_COORDINATOR, UserRole.COORDINATOR} and getattr(current_user, "school_id", None) is not None:
+        query = query.filter(Department.school_id == current_user.school_id)
 
     # Optional level filter — normalise 400 → 4 etc.
     if level is not None:
@@ -141,7 +236,9 @@ async def get_course(
     db: Session = Depends(get_db)
 ):
     """Get a specific course."""
-    course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    course = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.id == course_id
+    ).first()
     
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -149,6 +246,9 @@ async def get_course(
     # HODs can view courses in their department or general courses (dept_id=0)
     if current_user.role == UserRole.HOD:
         if course.department_id != 0 and course.department_id != current_user.department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.COORDINATOR and getattr(current_user, "department_id", None) is not None:
+        if course.department_id != current_user.department_id:
             raise HTTPException(status_code=403, detail="Access denied")
     
     return course
@@ -161,7 +261,9 @@ async def get_course_enrollment_map(
     db: Session = Depends(get_db)
 ):
     """Return the main-group enrolment truth for a course plus lecture delivery mode."""
-    course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    course = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.id == course_id
+    ).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -225,7 +327,9 @@ async def update_course_enrollment_map(
     Owner-department HODs and coordinators can manage this mapping. Shared target
     departments consume the mapping but do not control it from the course page.
     """
-    course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    course = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.id == course_id
+    ).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -276,28 +380,35 @@ async def create_course(
 ):
     """Create a new course. Coordinator or HOD."""
     # Validate field values
-    validation_error = validate_course_fields(
-        course.code, course.name, course.level, course.credits,
-        course.lecture_hours, course.tutorial_hours, course.practical_hours
-    )
+    course_data = course.model_dump()
+    course_data["level"] = normalize_course_level(course_data["level"])
+    validation_error = _validate_course_payload(course_data)
     if validation_error:
         raise HTTPException(status_code=422, detail=validation_error["detail"])
+    _validate_activity_requirement_keys(
+        db,
+        current_user.university_id,
+        course_data.get("activity_requirements"),
+    )
     
     # Verify department exists if specified
     if course.department_id != 0:
-        dept = db.query(Department).filter(Department.id == course.department_id).first()
+        dept = ensure_user_can_manage_department(db, current_user, course.department_id)
         if not dept:
             raise HTTPException(status_code=422, detail=[{"loc": ["body", "department_id"], "msg": "Invalid department_id", "type": "value_error"}])
     
     # Check if course code already exists
-    existing = db.query(CourseModel).filter(CourseModel.code == course.code).first()
+    existing = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.department_id == course.department_id,
+        CourseModel.code == course.code,
+    ).first()
     if existing:
-        raise HTTPException(status_code=409, detail=f"Course with code '{course.code}' already exists")
+        raise HTTPException(status_code=409, detail=f"Course with code '{course.code}' already exists in this department")
     
     # Sanitize inputs
-    course_data = course.model_dump()
     course_data['code'] = sanitize_input(course.code, max_length=20)
     course_data['name'] = sanitize_input(course.name, max_length=200)
+    _set_course_profile_status(course_data)
     
     db_course = CourseModel(**course_data)
     db.add(db_course)
@@ -333,11 +444,13 @@ async def update_course(
 ):
     """Update a course. Coordinator or HOD (within their department)."""
     # Only coordinators and HODs may edit courses
-    allowed_roles = [UserRole.COORDINATOR, UserRole.HOD]
+    allowed_roles = [UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN, UserRole.HOD]
     if current_user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Only coordinators and HODs can edit courses")
 
-    db_course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    db_course = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.id == course_id
+    ).first()
     
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -358,33 +471,49 @@ async def update_course(
         "practical_hours": db_course.practical_hours,
     }
     current_data.update(update_data)
+    if "level" in current_data and current_data["level"] is not None:
+        current_data["level"] = normalize_course_level(current_data["level"])
     
     # Validate updated field values
-    validation_error = validate_course_fields(
-        current_data["code"], current_data["name"], current_data["level"],
-        current_data["credits"], current_data["lecture_hours"],
-        current_data["tutorial_hours"], current_data["practical_hours"]
-    )
+    validation_error = _validate_course_payload(current_data)
     if validation_error:
         raise HTTPException(status_code=422, detail=validation_error["detail"])
+    _validate_activity_requirement_keys(
+        db,
+        current_user.university_id,
+        current_data.get("activity_requirements"),
+    )
     
     # Verify department exists if being updated
     if "department_id" in update_data and update_data["department_id"] != 0:
-        dept = db.query(Department).filter(Department.id == update_data["department_id"]).first()
+        dept = ensure_user_can_manage_department(db, current_user, update_data["department_id"])
         if not dept:
             raise HTTPException(status_code=422, detail="Invalid department_id")
     
     # Check for duplicate code if code is being updated
-    if "code" in update_data and update_data["code"] != db_course.code:
-        existing = db.query(CourseModel).filter(CourseModel.code == update_data["code"]).first()
+    target_department_id = update_data.get("department_id", db_course.department_id)
+    code_changed = "code" in update_data and update_data["code"] != db_course.code
+    department_changed = "department_id" in update_data and update_data["department_id"] != db_course.department_id
+    if code_changed or department_changed:
+        candidate_code = update_data.get("code", db_course.code)
+        existing = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+            CourseModel.department_id == target_department_id,
+            CourseModel.code == candidate_code,
+            CourseModel.id != db_course.id,
+        ).first()
         if existing:
-            raise HTTPException(status_code=409, detail=f"Course with code '{update_data['code']}' already exists")
+            raise HTTPException(status_code=409, detail=f"Course with code '{candidate_code}' already exists in this department")
     
     # Sanitize string inputs
     if "code" in update_data:
         update_data["code"] = sanitize_input(update_data["code"], max_length=20)
     if "name" in update_data:
         update_data["name"] = sanitize_input(update_data["name"], max_length=200)
+    if "level" in update_data and update_data["level"] is not None:
+        update_data["level"] = normalize_course_level(update_data["level"])
+
+    _set_course_profile_status(current_data)
+    update_data["profile_status"] = current_data["profile_status"]
     
     for field, value in update_data.items():
         setattr(db_course, field, value)
@@ -412,7 +541,9 @@ async def delete_course(
     db: Session = Depends(get_db)
 ):
     """Delete a course. Coordinator or HOD."""
-    db_course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    db_course = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+        CourseModel.id == course_id
+    ).first()
     
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -458,29 +589,26 @@ async def delete_all_courses(
     try:
         from ..models import LecturerAssignment, GroupAssignment, TimetableSlot
         
+        scoped_query = filter_course_query_for_user(db.query(CourseModel), current_user)
         if current_user.role == UserRole.HOD:
-            count = db.query(CourseModel).filter(CourseModel.department_id == current_user.department_id).count()
-            
-            courses = db.query(CourseModel).filter(CourseModel.department_id == current_user.department_id).all()
+            count = scoped_query.filter(CourseModel.department_id == current_user.department_id).count()
+            courses = scoped_query.filter(CourseModel.department_id == current_user.department_id).all()
             course_ids = [c.id for c in courses]
             
             if course_ids:
                 db.query(TimetableSlot).filter(TimetableSlot.course_id.in_(course_ids)).delete()
                 db.query(GroupAssignment).filter(GroupAssignment.course_id.in_(course_ids)).delete()
                 db.query(LecturerAssignment).filter(LecturerAssignment.course_id.in_(course_ids)).delete()
-                db.query(CourseModel).filter(CourseModel.department_id == current_user.department_id).delete()
+                scoped_query.filter(CourseModel.department_id == current_user.department_id).delete(synchronize_session=False)
         else:
-            count = db.query(CourseModel).count()
-            
-            # Delete related records first to avoid foreign key constraint violations
-            
-            # Delete all assignments and slots that reference courses
-            db.query(TimetableSlot).delete()
-            db.query(GroupAssignment).delete()
-            db.query(LecturerAssignment).delete()
-            
-            # Now delete all courses
-            db.query(CourseModel).delete()
+            courses = scoped_query.all()
+            count = len(courses)
+            course_ids = [c.id for c in courses]
+            if course_ids:
+                db.query(TimetableSlot).filter(TimetableSlot.course_id.in_(course_ids)).delete(synchronize_session=False)
+                db.query(GroupAssignment).filter(GroupAssignment.course_id.in_(course_ids)).delete(synchronize_session=False)
+                db.query(LecturerAssignment).filter(LecturerAssignment.course_id.in_(course_ids)).delete(synchronize_session=False)
+                db.query(CourseModel).filter(CourseModel.id.in_(course_ids)).delete(synchronize_session=False)
             
         db.commit()
         
@@ -580,7 +708,12 @@ async def bulk_upload_courses(
             df['practical_hours'] = 0
 
         # ── Pre-fetch departments (single DB query) ────────────────────────
-        departments = db.query(Department).all()
+        departments = db.query(Department)
+        if current_user.university_id:
+            departments = departments.filter(Department.university_id == current_user.university_id)
+        if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+            departments = departments.filter(Department.school_id == current_user.school_id)
+        departments = departments.all()
         dept_id_map   = {d.id: d.id for d in departments}
         dept_id_map[0] = 0
         dept_code_map = {d.code.upper(): d.id for d in departments if d.code}
@@ -614,6 +747,8 @@ async def bulk_upload_courses(
                         errors.append(f"Row {idx + 2}: Access denied — not your department")
                         skipped_count += 1
                         continue
+                else:
+                    ensure_user_can_manage_department(db, current_user, resolved_dept_id)
 
                 # ── Course code ────────────────────────────────────────────
                 code_val = str(row.get('code', '')).strip()
@@ -622,7 +757,10 @@ async def bulk_upload_courses(
                     skipped_count += 1
                     continue
 
-                existing = db.query(CourseModel).filter(CourseModel.code == code_val.upper()).first()
+                existing = filter_course_query_for_user(db.query(CourseModel), current_user).filter(
+                    CourseModel.department_id == resolved_dept_id,
+                    CourseModel.code == code_val.upper(),
+                ).first()
                 if existing:
                     skipped_count += 1
                     continue
@@ -649,13 +787,14 @@ async def bulk_upload_courses(
                     code=sanitize_input(code_val, max_length=20).upper(),
                     name=sanitize_input(str(row.get('name', '')), max_length=200),
                     department_id=resolved_dept_id,
-                    level=safe_int(row.get('level'), 1),
+                    level=normalize_course_level(safe_int(row.get('level'), 1)),
                     credits=safe_int(row.get('credits'), 3),
                     lecture_hours=safe_int(row.get('lecture_hours'), 2),
                     tutorial_hours=safe_int(row.get('tutorial_hours'), 0),
                     practical_hours=safe_int(row.get('practical_hours'), 0),
                     shared_with_department_ids=shared_ids,
                     course_type=_ctype,
+                    profile_status=COURSE_PROFILE_STATUS_COMPLETE,
                 )
                 db.add(course)
                 created_count += 1

@@ -323,7 +323,7 @@ const RoomsPage: React.FC = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
-                sx={{ background: 'linear-gradient(135deg,#006837,#004826)', '&:hover': { boxShadow: 4 } }}
+                sx={{ background: 'linear-gradient(135deg,#1976d2,#115293)', '&:hover': { boxShadow: 4 } }}
               >
                 Add Venue
               </Button>

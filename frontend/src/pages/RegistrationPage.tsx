@@ -149,10 +149,10 @@ const RegistrationPage: React.FC = () => {
 
   /* Default Platform Colors for Registration */
   const activeColors = {
-    primaryDark: '#0f172a',
-    primaryLight: '#334155',
-    secondary: '#6366f1',
-    accent: '#8b5cf6',
+    primaryDark: '#0d47a1',
+    primaryLight: '#1976d2',
+    secondary: '#9c27b0',
+    accent: '#7b1fa2',
   };
 
   return (
@@ -160,7 +160,7 @@ const RegistrationPage: React.FC = () => {
       sx={{
         minHeight: '100vh',
         backgroundColor: activeColors.primaryDark,
-        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, #5c35cc 55%, #7c3aed 100%)`,
+        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, ${activeColors.primaryLight} 55%, ${activeColors.secondary} 100%)`,
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
@@ -202,9 +202,9 @@ const RegistrationPage: React.FC = () => {
             <Box
               sx={{
                 width: 42, height: 42, borderRadius: '12px',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                background: 'linear-gradient(135deg, #1976d2, #9c27b0)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(99,102,241,0.45)',
+                boxShadow: '0 8px 24px rgba(0,104,55,0.35)',
               }}
             >
               <TableChartIcon sx={{ color: 'white', fontSize: 22 }} />
@@ -280,10 +280,10 @@ const RegistrationPage: React.FC = () => {
                   sx={{
                     mb: 4,
                     '& .MuiStepLabel-label': { color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', mt: 0.5 },
-                    '& .MuiStepLabel-label.Mui-active': { color: '#a5b4fc', fontWeight: 700 },
+                    '& .MuiStepLabel-label.Mui-active': { color: '#9c27b0', fontWeight: 700 },
                     '& .MuiStepLabel-label.Mui-completed': { color: '#4ade80' },
                     '& .MuiStepIcon-root': { color: 'rgba(255,255,255,0.15)' },
-                    '& .MuiStepIcon-root.Mui-active': { color: '#6366f1' },
+                    '& .MuiStepIcon-root.Mui-active': { color: '#1976d2' },
                     '& .MuiStepIcon-root.Mui-completed': { color: '#4ade80' },
                     '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.12)' },
                   }}
@@ -529,11 +529,11 @@ const RegistrationPage: React.FC = () => {
                         fontWeight: 700,
                         fontSize: '0.95rem',
                         textTransform: 'none',
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
+                        background: 'linear-gradient(135deg, #1976d2, #9c27b0)',
+                        boxShadow: '0 8px 24px rgba(0,104,55,0.35)',
                         '&:hover': {
-                          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                          boxShadow: '0 12px 32px rgba(99,102,241,0.55)',
+                          background: 'linear-gradient(135deg, #115293, #7b1fa2)',
+                          boxShadow: '0 12px 32px rgba(0,104,55,0.45)',
                           transform: 'translateY(-1px)',
                         },
                         transition: 'all 0.2s',
@@ -552,11 +552,11 @@ const RegistrationPage: React.FC = () => {
                         fontWeight: 700,
                         fontSize: '0.95rem',
                         textTransform: 'none',
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
+                        background: 'linear-gradient(135deg, #1976d2, #9c27b0)',
+                        boxShadow: '0 8px 24px rgba(0,104,55,0.35)',
                         '&:hover': {
-                          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                          boxShadow: '0 12px 32px rgba(99,102,241,0.55)',
+                          background: 'linear-gradient(135deg, #115293, #7b1fa2)',
+                          boxShadow: '0 12px 32px rgba(0,104,55,0.45)',
                           transform: 'translateY(-1px)',
                         },
                         transition: 'all 0.2s',

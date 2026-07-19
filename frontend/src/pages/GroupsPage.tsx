@@ -34,7 +34,7 @@ import { GroupCourseManager } from '../components/GroupCourseManager';
 import TableSkeleton from '../components/skeletons/TableSkeleton';
 import { formatGroupLabel } from '../utils/displayFormatters';
 
-type GroupType = 'general' | 'department' | 'stream';
+type GroupType = 'general' | 'department' | 'stream' | 'lab_group' | 'tutorial_group' | 'drawing_group';
 
 interface Group {
   id: number;
@@ -116,7 +116,10 @@ const GroupsPage: React.FC = () => {
   const fetchGroups = async () => {
     try {
       const data = await groupsAPI.getAll();
-      setGroups(data);
+      // Lab, tutorial and drawing groups are scheduling delivery detail. They
+      // are managed on Lab Scheduling, not nested into the academic cohort /
+      // stream tree where they make the mapping view unreadable.
+      setGroups(data.filter((group: Group) => !['lab_group', 'tutorial_group', 'drawing_group'].includes(group.group_type || 'department')));
     } catch (err) {
       setError('Failed to load groups');
     }
@@ -206,6 +209,13 @@ const GroupsPage: React.FC = () => {
 
   const handleSubdivideSubmit = async () => {
     if (!subdivideTarget) return;
+    
+    const totalSubgroupSize = subgroupSizes.reduce((sum, size) => sum + size, 0);
+    if (totalSubgroupSize > subdivideTarget.size) {
+        setError(`Total stream sizes (${totalSubgroupSize}) cannot exceed the parent cohort size (${subdivideTarget.size}). Please adjust the numbers.`);
+        return;
+    }
+
     setLoading(true);
     try {
       const promises = [];
@@ -286,7 +296,7 @@ const GroupsPage: React.FC = () => {
 
   const getTypeChip = (type: GroupType | undefined) => {
     switch (type) {
-      case 'stream':        return <Chip label="Stream" size="small" sx={{ bgcolor: '#7c3aed', color: '#fff', fontWeight: 600, fontSize: '0.68rem' }} />;
+      case 'stream':        return <Chip label="Stream" size="small" sx={{ bgcolor: '#1976d2', color: '#fff', fontWeight: 600, fontSize: '0.68rem' }} />;
       case 'general':       return <Chip label="General" size="small" sx={{ bgcolor: '#0284c7', color: '#fff', fontWeight: 600, fontSize: '0.68rem' }} />;
       default:              return <Chip label="Department" size="small" variant="outlined" sx={{ fontSize: '0.68rem' }} />;
     }
@@ -410,8 +420,8 @@ const GroupsPage: React.FC = () => {
         <TableRow
           hover
           sx={{
-            bgcolor: isStream ? 'rgba(124,58,237,0.03)' : depth > 0 ? 'rgba(2,132,199,0.03)' : 'inherit',
-            borderLeft: isStream ? '3px solid #7c3aed' : 'none',
+            bgcolor: isStream ? 'rgba(0,104,55,0.03)' : depth > 0 ? 'rgba(253,185,19,0.03)' : 'inherit',
+            borderLeft: isStream ? '3px solid #1976d2' : 'none',
           }}
         >
           <TableCell>
@@ -513,7 +523,7 @@ const GroupsPage: React.FC = () => {
                 startIcon={<AddIcon />}
                 onClick={() => { handleOpenDialog(); }}
                 sx={{
-                  background: 'linear-gradient(135deg, #006837 0%, #004826 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #115293 100%)',
                   transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',

@@ -13,7 +13,7 @@ Boundary contract (PARALLEL_WORKPLAN.md):
 Authentication strategy:
   - Every /api/v1/sis/* webhook expects an  X-SIS-API-Key  header.
   - Management endpoints (generate / revoke / list keys) require a valid
-    COORDINATOR or SUPERADMIN Bearer token so the SuperAdmin UI can call them.
+    school operator, tenant admin, or SUPERADMIN Bearer token.
 
 SIS import endpoints (all idempotent UPSERT semantics):
   POST /api/v1/sis/webhooks/students      – bulk-upsert students
@@ -39,8 +39,8 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Boolean, Text
 from sqlalchemy.orm import Session
 
-from ...auth import get_current_user
-from ...database import Base, get_db, engine
+from ...auth import get_current_user, is_school_operator, is_tenant_admin
+from ...database import Base, get_db
 from ...models import (
     Course,
     Department,
@@ -87,8 +87,9 @@ class SisApiKey(Base):
     )
 
 
-# Create the table on startup without touching shared models
-SisApiKey.__table__.create(bind=engine, checkfirst=True)
+def ensure_sis_api_key_table(bind) -> None:
+    """Create the SIS API key table during app startup, not at module import time."""
+    SisApiKey.__table__.create(bind=bind, checkfirst=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Router
@@ -271,11 +272,10 @@ def _resolve_api_key(
 
 def _require_coordinator_or_superadmin(current_user: User) -> User:
     role = current_user.role
-    allowed = {UserRole.COORDINATOR, UserRole.SUPERADMIN}
-    if role not in allowed:
+    if not (role == UserRole.SUPERADMIN or is_tenant_admin(current_user) or is_school_operator(current_user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only coordinators and superadmins may manage SIS API keys.",
+            detail="Only school operators, tenant admins, and superadmins may manage SIS API keys.",
         )
     return current_user
 
@@ -380,7 +380,7 @@ def revoke_api_key(
 ):
     """
     Revoke an API key so it can no longer authenticate webhook calls.
-    Superadmins may revoke any key; coordinators may only revoke their own.
+    Superadmins may revoke any key; tenant users may only revoke their own university keys.
     """
     _require_coordinator_or_superadmin(current_user)
 
@@ -389,7 +389,7 @@ def revoke_api_key(
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found.")
 
-    # Coordinators may only revoke keys belonging to their own university
+    # Tenant-scoped operators may only revoke keys belonging to their own university
     if (
         current_user.role != UserRole.SUPERADMIN
         and api_key.university_id != current_user.university_id

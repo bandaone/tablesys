@@ -1,0 +1,710 @@
+OpenTelemetry components not loaded in database.py
+/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/_pytest/config/__init__.py:331: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+Plugin: helpconfig, Hook: pytest_cmdline_parse
+ConftestImportFailure: PermissionError: [Errno 13] Permission denied: '/home/on3/DENNIS/TABLESYS/backend/logs/app.log' (from /home/on3/DENNIS/TABLESYS/backend/tests/conftest.py)
+For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+  config = pluginmanager.hook.pytest_cmdline_parse(
+ImportError while loading conftest '/home/on3/DENNIS/TABLESYS/backend/tests/conftest.py'.
+tests/conftest.py:19: in <module>
+    from app.main import app
+app/main.py:334: in <module>
+    setup_logging()
+app/main.py:286: in setup_logging
+    app_handler = logging.handlers.RotatingFileHandler(
+../../../.pyenv/versions/3.12.3/lib/python3.12/logging/handlers.py:155: in __init__
+    BaseRotatingHandler.__init__(self, filename, mode, encoding=encoding,
+../../../.pyenv/versions/3.12.3/lib/python3.12/logging/handlers.py:58: in __init__
+    logging.FileHandler.__init__(self, filename, mode=mode,
+../../../.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py:1231: in __init__
+    StreamHandler.__init__(self, self._open())
+../../../.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py:1263: in _open
+    return open_func(self.baseFilename, self.mode,
+E   PermissionError: [Errno 13] Permission denied: '/home/on3/DENNIS/TABLESYS/backend/logs/app.log'
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (1, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 500, in request
+    self.endheaders()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1331, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1091, in _send_output
+    self.send(msg)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1035, in send
+    self.connect()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 678, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 235, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (2, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 293, in _export_with_retries
+    _logger.warning(
+Message: 'Transient error %s encountered while exporting metrics batch, retrying in %.2fs.'
+Arguments: (ConnectionError(MaxRetryError('HTTPConnectionPool(host=\'localhost\', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host=\'localhost\', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))')), 0.9218747564487303)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (3, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 500, in request
+    self.endheaders()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1331, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1091, in _send_output
+    self.send(msg)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1035, in send
+    self.connect()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 678, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 235, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (4, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 293, in _export_with_retries
+    _logger.warning(
+Message: 'Transient error %s encountered while exporting metrics batch, retrying in %.2fs.'
+Arguments: (ConnectionError(MaxRetryError('HTTPConnectionPool(host=\'localhost\', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host=\'localhost\', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))')), 2.0503429395436124)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (5, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 500, in request
+    self.endheaders()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1331, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1091, in _send_output
+    self.send(msg)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1035, in send
+    self.connect()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 678, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 235, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (6, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 293, in _export_with_retries
+    _logger.warning(
+Message: 'Transient error %s encountered while exporting metrics batch, retrying in %.2fs.'
+Arguments: (ConnectionError(MaxRetryError('HTTPConnectionPool(host=\'localhost\', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host=\'localhost\', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))')), 4.540479619509817)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (7, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 500, in request
+    self.endheaders()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1331, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1091, in _send_output
+    self.send(msg)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/http/client.py", line 1035, in send
+    self.connect()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/util/retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 227, in _export
+    resp = self._session.post(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 678, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=4318): Max retries exceeded with url: /v1/metrics (Caused by NewConnectionError("HTTPConnection(host='localhost', port=4318): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 263, in _export_with_retries
+    resp = self._export(serialized_data, deadline_sec - time())
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 235, in _export
+    resp = self._session.post(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 640, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 592, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/sessions.py", line 706, in send
+    r = adapter.send(request, **kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/requests/adapters.py", line 645, in send
+    resp = conn.urlopen(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 766, in urlopen
+    conn = self._get_conn(timeout=pool_timeout)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 292, in _get_conn
+    return conn or self._new_conn()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/urllib3/connectionpool.py", line 241, in _new_conn
+    log.debug(
+Message: 'Starting new HTTP connection (%d): %s:%s'
+Arguments: (8, 'localhost', 4318)
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+ValueError: I/O operation on closed file.
+Call stack:
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 558, in _ticker
+    self.collect(timeout_millis=self._export_interval_millis)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 364, in collect
+    self._receive_metrics(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py", line 575, in _receive_metrics
+    self._exporter.export(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 319, in export
+    return self._export_with_retries(export_request, deadline_sec)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py", line 287, in _export_with_retries
+    _logger.error(
+Message: 'Failed to export metrics batch due to timeout, max retries or shutdown.'
+Arguments: ()

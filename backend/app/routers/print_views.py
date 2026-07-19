@@ -1,11 +1,8 @@
 """
 Print Views Router
 
-Provides print-optimized views for different schedule types:
-- Lecturer schedules
-- Student group schedules  
-- Room schedules
-- Weekly overview
+Provides print-optimized views for different schedule types.
+All endpoints verify tenant ownership before returning data.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -33,6 +30,40 @@ def _slot_group_label(db: Session, slot: TimetableSlot) -> str:
     return " + ".join(labels) if labels else "N/A"
 
 
+def _assert_timetable_owned(timetable: Timetable, user: User) -> None:
+    """Raise 403 if the timetable belongs to a different university."""
+    if (
+        user.university_id is not None
+        and timetable.university_id is not None
+        and timetable.university_id != user.university_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this timetable.",
+        )
+
+
+def _get_active_timetable(db: Session, user: User, timetable_id: Optional[int]) -> Timetable:
+    """Fetch the requested or active timetable, always scoped to the user's university."""
+    if timetable_id:
+        timetable = db.query(Timetable).filter(
+            Timetable.id == timetable_id,
+        ).first()
+        if not timetable:
+            raise HTTPException(status_code=404, detail="Timetable not found")
+        _assert_timetable_owned(timetable, user)
+        return timetable
+
+    # Fall back to active timetable for this university
+    timetable = db.query(Timetable).filter(
+        Timetable.is_active == True,
+        Timetable.university_id == user.university_id,
+    ).first()
+    if not timetable:
+        raise HTTPException(status_code=404, detail="No active timetable found")
+    return timetable
+
+
 @router.get("/lecturer/{lecturer_id}")
 async def get_lecturer_schedule(
     lecturer_id: int,
@@ -42,23 +73,23 @@ async def get_lecturer_schedule(
 ):
     """
     Get print-friendly schedule for a specific lecturer.
-    If timetable_id not provided, uses active timetable.
+    Ownership is verified: lecturer must belong to the requesting user's university.
     """
-    # Get lecturer
     lecturer = db.query(Lecturer).filter(Lecturer.id == lecturer_id).first()
     if not lecturer:
         raise HTTPException(status_code=404, detail="Lecturer not found")
-    
-    # Get timetable
-    if timetable_id:
-        timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
-    else:
-        timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
-    
-    if not timetable:
-        raise HTTPException(status_code=404, detail="No active timetable found")
-    
-    # Get all slots for this lecturer
+
+    # Verify the lecturer belongs to this tenant
+    if current_user.university_id is not None:
+        dept = db.query(Department).filter(Department.id == lecturer.department_id).first()
+        if dept and dept.university_id != current_user.university_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this lecturer's schedule.",
+            )
+
+    timetable = _get_active_timetable(db, current_user, timetable_id)
+
     slots = (
         db.query(TimetableSlot)
         .filter(
@@ -67,14 +98,15 @@ async def get_lecturer_schedule(
         )
         .all()
     )
-    
-    # Organize slots by day and time
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     schedule_data = []
     for slot in slots:
         course = db.query(Course).filter(Course.id == slot.course_id).first()
         room = db.query(Room).filter(Room.id == slot.room_id).first() if slot.room_id else None
+        day_label = day_names[slot.day_of_week] if isinstance(slot.day_of_week, int) else str(slot.day_of_week)
         schedule_data.append({
-            "day": slot.day,
+            "day": day_label,
             "start_time": slot.start_time.strftime("%H:%M"),
             "end_time": slot.end_time.strftime("%H:%M"),
             "course_code": course.code if course else "N/A",
@@ -83,17 +115,19 @@ async def get_lecturer_schedule(
             "group": _slot_group_label(db, slot),
             "level": course.level if course else None,
         })
-    
-    # Sort by day and time
+
     day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    schedule_data.sort(key=lambda x: (day_order.index(x["day"]), x["start_time"]))
-    
+    schedule_data.sort(key=lambda x: (
+        day_order.index(x["day"]) if x["day"] in day_order else 99,
+        x["start_time"]
+    ))
+
     return {
         "lecturer": {
             "id": lecturer.id,
             "staff_number": lecturer.staff_number,
             "full_name": lecturer.full_name,
-            "email": lecturer.email,
+            # email intentionally omitted from print view responses
             "department": lecturer.department.name if lecturer.department else "N/A",
         },
         "timetable": {
@@ -120,23 +154,20 @@ async def get_group_schedule(
 ):
     """
     Get print-friendly schedule for a specific student group.
-    If timetable_id not provided, uses active timetable.
+    Ownership is verified: group must belong to the requesting user's university.
     """
-    # Get group
     group = db.query(StudentGroup).filter(StudentGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Student group not found")
-    
-    # Get timetable
-    if timetable_id:
-        timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
-    else:
-        timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
-    
-    if not timetable:
-        raise HTTPException(status_code=404, detail="No active timetable found")
-    
-    # Get all slots for this group
+
+    if current_user.university_id is not None and group.university_id != current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this group's schedule.",
+        )
+
+    timetable = _get_active_timetable(db, current_user, timetable_id)
+
     slots = (
         db.query(TimetableSlot)
         .filter(
@@ -145,16 +176,16 @@ async def get_group_schedule(
         )
         .all()
     )
-    
-    # Organize slots
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     schedule_data = []
     for slot in slots:
         course = db.query(Course).filter(Course.id == slot.course_id).first()
         room = db.query(Room).filter(Room.id == slot.room_id).first() if slot.room_id else None
         lecturer = db.query(Lecturer).filter(Lecturer.id == slot.lecturer_id).first() if slot.lecturer_id else None
-        
+        day_label = day_names[slot.day_of_week] if isinstance(slot.day_of_week, int) else str(slot.day_of_week)
         schedule_data.append({
-            "day": slot.day,
+            "day": day_label,
             "start_time": slot.start_time.strftime("%H:%M"),
             "end_time": slot.end_time.strftime("%H:%M"),
             "course_code": course.code if course else "N/A",
@@ -163,15 +194,17 @@ async def get_group_schedule(
             "lecturer": lecturer.full_name if lecturer else "TBA",
             "credits": course.credits if course else 0,
         })
-    
-    # Sort by day and time
+
     day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    schedule_data.sort(key=lambda x: (day_order.index(x["day"]), x["start_time"]))
-    
+    schedule_data.sort(key=lambda x: (
+        day_order.index(x["day"]) if x["day"] in day_order else 99,
+        x["start_time"]
+    ))
+
     return {
         "group": {
             "id": group.id,
-            "group_name": group.group_name,
+            "name": group.name,
             "level": group.level,
             "size": group.size,
             "department": group.department.name if group.department else "N/A",
@@ -200,23 +233,20 @@ async def get_room_schedule(
 ):
     """
     Get print-friendly schedule for a specific room.
-    Shows all classes scheduled in that room.
+    Ownership verified: room must belong to the requesting user's university.
     """
-    # Get room
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    
-    # Get timetable
-    if timetable_id:
-        timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
-    else:
-        timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
-    
-    if not timetable:
-        raise HTTPException(status_code=404, detail="No active timetable found")
-    
-    # Get all slots for this room
+
+    if current_user.university_id is not None and room.university_id != current_user.university_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this room's schedule.",
+        )
+
+    timetable = _get_active_timetable(db, current_user, timetable_id)
+
     slots = (
         db.query(TimetableSlot)
         .filter(
@@ -225,14 +255,15 @@ async def get_room_schedule(
         )
         .all()
     )
-    
-    # Organize slots
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     schedule_data = []
     for slot in slots:
         course = db.query(Course).filter(Course.id == slot.course_id).first()
         lecturer = db.query(Lecturer).filter(Lecturer.id == slot.lecturer_id).first() if slot.lecturer_id else None
+        day_label = day_names[slot.day_of_week] if isinstance(slot.day_of_week, int) else str(slot.day_of_week)
         schedule_data.append({
-            "day": slot.day,
+            "day": day_label,
             "start_time": slot.start_time.strftime("%H:%M"),
             "end_time": slot.end_time.strftime("%H:%M"),
             "course_code": course.code if course else "N/A",
@@ -241,11 +272,13 @@ async def get_room_schedule(
             "group": _slot_group_label(db, slot),
             "level": course.level if course else None,
         })
-    
-    # Sort by day and time
+
     day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    schedule_data.sort(key=lambda x: (day_order.index(x["day"]), x["start_time"]))
-    
+    schedule_data.sort(key=lambda x: (
+        day_order.index(x["day"]) if x["day"] in day_order else 99,
+        x["start_time"]
+    ))
+
     return {
         "room": {
             "id": room.id,
@@ -261,7 +294,7 @@ async def get_room_schedule(
             "year": timetable.year,
         },
         "schedule": schedule_data,
-        "utilization_percentage": (len(slots) / 50) * 100 if slots else 0,  # 50 = approx slots per week
+        "utilization_percentage": (len(slots) / 50) * 100 if slots else 0,
     }
 
 
@@ -273,57 +306,45 @@ async def get_weekly_overview(
     db: Session = Depends(get_db)
 ):
     """
-    Get weekly overview for print.
-    Can filter by level (2, 3, 4, 5).
+    Get weekly overview for print. Scoped to the requesting user's university.
+    Can filter by level (1-7).
     """
-    # Get timetable
-    if timetable_id:
-        timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
-    else:
-        timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
-    
-    if not timetable:
-        raise HTTPException(status_code=404, detail="No active timetable found")
-    
-    # Build query
+    timetable = _get_active_timetable(db, current_user, timetable_id)
+
     query = db.query(TimetableSlot).filter(TimetableSlot.timetable_id == timetable.id)
-    
-    # Filter by level if provided
+
     if level:
         query = query.join(Course).filter(Course.level == level)
-    
+
     slots = query.all()
-    
-    # Organize by day
-    days_data = {
-        "Monday": [],
-        "Tuesday": [],
-        "Wednesday": [],
-        "Thursday": [],
-        "Friday": [],
-    }
-    
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    days_data: Dict = {d: [] for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]}
+
     for slot in slots:
         course = db.query(Course).filter(Course.id == slot.course_id).first()
         room = db.query(Room).filter(Room.id == slot.room_id).first() if slot.room_id else None
         lecturer = db.query(Lecturer).filter(Lecturer.id == slot.lecturer_id).first() if slot.lecturer_id else None
         group = db.query(StudentGroup).filter(StudentGroup.id == slot.group_id).first() if slot.group_id else None
-        
-        days_data[slot.day].append({
+        day_label = day_names[slot.day_of_week] if isinstance(slot.day_of_week, int) else str(slot.day_of_week)
+
+        if day_label not in days_data:
+            continue
+
+        days_data[day_label].append({
             "start_time": slot.start_time.strftime("%H:%M"),
             "end_time": slot.end_time.strftime("%H:%M"),
             "course_code": course.code if course else "N/A",
             "course_name": course.name if course else "N/A",
             "room": room.name if room else "TBA",
             "lecturer": lecturer.full_name if lecturer else "TBA",
-            "group": group.group_name if group else "N/A",
+            "group": group.name if group else "N/A",
             "level": course.level if course else None,
         })
-    
-    # Sort each day by start time
+
     for day in days_data:
         days_data[day].sort(key=lambda x: x["start_time"])
-    
+
     return {
         "timetable": {
             "id": timetable.id,

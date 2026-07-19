@@ -4,6 +4,9 @@ export interface TimetableSlot {
   start_time: string;
   end_time: string;
   session_type?: string;
+  activity_type_key?: string;
+  activity_display_name?: string;
+  activity_color?: string;
   course_code: string;
   course_name: string;
   lecturer_name: string;

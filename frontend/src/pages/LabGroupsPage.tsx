@@ -79,7 +79,11 @@ const typeChipStyles: Record<string, { label: string; color?: 'success' | 'warni
     drawing_group: { label: 'Drawing', color: 'info' },
 };
 
-const LabGroupsPage: React.FC = () => {
+interface LabGroupsPageProps {
+    isEmbedded?: boolean;
+}
+
+const LabGroupsPage: React.FC<LabGroupsPageProps> = ({ isEmbedded }) => {
     const [mainGroups, setMainGroups] = useState<Group[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [streamMap, setStreamMap] = useState<Record<number, Group[]>>({});
@@ -94,11 +98,13 @@ const LabGroupsPage: React.FC = () => {
         targetId: number;
         targetName: string;
         targetKind: 'parent' | 'stream';
+        targetSize: number;
     }>({
         open: false,
         targetId: 0,
         targetName: '',
         targetKind: 'parent',
+        targetSize: 0,
     });
     const [genForm, setGenForm] = useState({
         naming_mode: 'alpha' as 'alpha' | 'numeric' | 'custom',
@@ -110,6 +116,22 @@ const LabGroupsPage: React.FC = () => {
     });
     const [generating, setGenerating] = useState(false);
     const [genError, setGenError] = useState('');
+
+    const handleCountChange = (newCount: number) => {
+        setGenForm(prev => ({
+            ...prev,
+            count: newCount,
+            size_per_group: Math.ceil(genDialog.targetSize / newCount)
+        }));
+    };
+
+    const handleSizeChange = (newSize: number) => {
+        setGenForm(prev => ({
+            ...prev,
+            size_per_group: newSize,
+            count: Math.ceil(genDialog.targetSize / newSize)
+        }));
+    };
 
     const deptName = (id: number) => departments.find(d => d.id === id)?.name ?? `Dept ${id}`;
     const levelLabel = (l: number) => {
@@ -170,23 +192,24 @@ const LabGroupsPage: React.FC = () => {
         void fetchAll();
     }, [fetchAll]);
 
-    const openGenDialog = (targetId: number, targetName: string, targetKind: 'parent' | 'stream') => {
+    const openGenDialog = (targetId: number, targetName: string, targetKind: 'parent' | 'stream', targetSize: number) => {
+        const initialCount = 2;
         setGenForm({
             naming_mode: 'alpha',
             prefix: targetKind === 'stream' ? 'S' : 'L',
-            count: 4,
-            size_per_group: 10,
+            count: initialCount,
+            size_per_group: Math.ceil(targetSize / initialCount),
             group_type: 'lab_group',
             custom_names: '',
         });
         setGenError('');
-        setGenDialog({ open: true, targetId, targetName, targetKind });
+        setGenDialog({ open: true, targetId, targetName, targetKind, targetSize });
     };
 
     const handleGenerate = async () => {
         setGenError('');
-        if (genForm.size_per_group < 4 || genForm.size_per_group > 13) {
-            setGenError('Teaching subgroup size must be between 4 and 13 students.');
+        if (genForm.size_per_group * genForm.count > genDialog.targetSize + genForm.count) {
+            setGenError(`Total subgroup capacity (${genForm.size_per_group * genForm.count}) significantly exceeds the parent cohort size (${genDialog.targetSize}).`);
             return;
         }
 
@@ -303,7 +326,7 @@ const LabGroupsPage: React.FC = () => {
                                 variant="contained"
                                 color="success"
                                 startIcon={<AddIcon />}
-                                onClick={() => openGenDialog(node.id, node.name, node.kind)}
+                                onClick={() => openGenDialog(node.id, node.name, node.kind, node.size)}
                             >
                                 Add Labs / Tutorials
                             </Button>
@@ -377,21 +400,18 @@ const LabGroupsPage: React.FC = () => {
         );
     };
 
+    const Wrapper: any = isEmbedded ? Box : Container;
+    const wrapperProps = isEmbedded ? {} : { maxWidth: false as const, sx: { mt: 3, mb: 4 } };
+
     return (
-        <Container maxWidth={false} sx={{ mt: 3, mb: 4 }}>
-            <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #0f172a 0%, #1a3a4f 100%)', color: 'white' }}>
-                <CardContent sx={{ py: 2.25, px: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <ScienceIcon sx={{ fontSize: 38, color: '#34d399' }} />
-                        <Box>
-                            <Typography variant="h5" fontWeight="bold" color="white">Lab & Tutorial Groups</Typography>
-                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                                Create lab, tutorial, and drawing groups from parent cohorts or their elective streams in one clean tree view.
-                            </Typography>
-                        </Box>
-                    </Box>
-                </CardContent>
-            </Card>
+        <Wrapper {...wrapperProps}>
+            {!isEmbedded && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                    <Typography variant="h4" fontWeight="600" color="primary.main">
+                        Lab & Tutorial Groups
+                    </Typography>
+                </Box>
+            )}
 
             {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
@@ -559,11 +579,11 @@ const LabGroupsPage: React.FC = () => {
                     </Typography>
                     <Slider
                         value={genForm.count}
-                        min={2}
-                        max={20}
+                        min={1}
+                        max={genDialog.targetSize > 0 ? Math.min(20, genDialog.targetSize) : 20}
                         step={1}
                         marks={[{ value: 2, label: '2' }, { value: 10, label: '10' }, { value: 20, label: '20' }]}
-                        onChange={(_, value) => setGenForm((prev) => ({ ...prev, count: value as number }))}
+                        onChange={(_, value) => handleCountChange(value as number)}
                         sx={{ mb: 3 }}
                     />
 
@@ -572,11 +592,15 @@ const LabGroupsPage: React.FC = () => {
                     </Typography>
                     <Slider
                         value={genForm.size_per_group}
-                        min={4}
-                        max={13}
+                        min={1}
+                        max={genDialog.targetSize > 0 ? genDialog.targetSize : 50}
                         step={1}
-                        marks={[{ value: 4, label: '4' }, { value: 8, label: '8' }, { value: 13, label: '13' }]}
-                        onChange={(_, value) => setGenForm((prev) => ({ ...prev, size_per_group: value as number }))}
+                        marks={[
+                            { value: 4, label: '4' },
+                            { value: genDialog.targetSize ? Math.floor(genDialog.targetSize / 2) : 25, label: 'Half' },
+                            { value: genDialog.targetSize || 50, label: 'Full' }
+                        ]}
+                        onChange={(_, value) => handleSizeChange(value as number)}
                         sx={{ mb: 2 }}
                     />
 
@@ -607,7 +631,7 @@ const LabGroupsPage: React.FC = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Container>
+        </Wrapper>
     );
 };
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 import pandas as pd
 import io
@@ -7,11 +8,14 @@ import re
 from ..database import get_db
 from ..schemas import Lecturer, LecturerCreate, LecturerUpdate
 from ..models import UserRole, Lecturer as LecturerModel, User, Department, LecturerAssignment, Course
-from ..auth import get_current_user, get_current_active_coordinator
+from ..auth import get_current_user, get_current_active_school_operator
 from ..utils.sanitization import sanitize_input
 from ..utils.audit_logger import AuditLogger
 from ..services.notification_service import NotificationService
+from ..utils.email_service import EmailService
+from ..config import settings
 from ..utils.bulk_import_helpers import resolve_department_id, ffill_department_columns, safe_int
+from ..utils.school_scope import ensure_user_can_manage_department, filter_lecturer_query_for_user
 
 router = APIRouter(prefix="/api/v1/lecturers", tags=["lecturers"])
 
@@ -21,6 +25,11 @@ def _append_issue(issue_summary: dict, key: str, message: str, limit: int = 8) -
     bucket["count"] += 1
     if len(bucket["examples"]) < limit:
         bucket["examples"].append(message)
+
+
+def normalize_staff_number(value: str) -> str:
+    """Staff numbers are a platform-wide, case-insensitive identity."""
+    return sanitize_input(str(value or "").strip(), max_length=50).upper()
 
 # Validation helpers
 def validate_lecturer_fields(staff_number: str, full_name: str, email: str, 
@@ -61,13 +70,7 @@ async def get_lecturers(
     query = db.query(LecturerModel).options(
         joinedload(LecturerModel.assignments).joinedload(LecturerAssignment.course)
     )
-    # Enforce Tenant Isolation for Lecturers
-    if current_user.university_id:
-        from ..models import UserRole, Department
-        query = query.join(Department).filter(Department.university_id == current_user.university_id)
-    
-    if current_user.role == UserRole.HOD and current_user.department_id:
-        query = query.filter(LecturerModel.department_id == current_user.department_id)
+    query = filter_lecturer_query_for_user(query, current_user)
     
     lecturers = query.offset(skip).limit(limit).all()
     return lecturers
@@ -76,13 +79,14 @@ async def get_lecturers(
 async def create_lecturer(
     request: Request,
     lecturer: LecturerCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Create a new lecturer. Coordinator only."""
     # Validate field values
+    normalized_staff_number = normalize_staff_number(lecturer.staff_number)
     validation_error = validate_lecturer_fields(
-        lecturer.staff_number, lecturer.full_name, lecturer.email,
+        normalized_staff_number, lecturer.full_name, lecturer.email,
         lecturer.max_hours_per_week
     )
     if validation_error:
@@ -90,25 +94,25 @@ async def create_lecturer(
     
     # Verify department exists
     if lecturer.department_id:
-        dept = db.query(Department).filter(Department.id == lecturer.department_id).first()
-        if not dept:
+        dept = ensure_user_can_manage_department(db, current_user, lecturer.department_id)
+        if dept is None:
             raise HTTPException(status_code=422, detail="Invalid department_id")
     
     # Check for duplicates
     existing = db.query(LecturerModel).filter(
-        (LecturerModel.staff_number == lecturer.staff_number) |
+        (func.lower(LecturerModel.staff_number) == normalized_staff_number.lower()) |
         (LecturerModel.email == lecturer.email)
     ).first()
     
     if existing:
-        if existing.staff_number == lecturer.staff_number:
-            raise HTTPException(status_code=409, detail=f"Lecturer with staff number '{lecturer.staff_number}' already exists")
+        if existing.staff_number.lower() == normalized_staff_number.lower():
+            raise HTTPException(status_code=409, detail=f"Staff number '{normalized_staff_number}' is already assigned in TABLESYS")
         else:
             raise HTTPException(status_code=409, detail=f"Lecturer with email '{lecturer.email}' already exists")
     
     # Sanitize inputs
     lecturer_data = lecturer.model_dump()
-    lecturer_data['staff_number'] = sanitize_input(lecturer.staff_number, max_length=50)
+    lecturer_data['staff_number'] = normalized_staff_number
     lecturer_data['full_name'] = sanitize_input(lecturer.full_name, max_length=200)
     if lecturer.email:
         lecturer_data['email'] = sanitize_input(lecturer.email, max_length=200)
@@ -127,11 +131,13 @@ async def create_lecturer(
                 Course.id.in_(course_ids),
                 Department.university_id == current_user.university_id
             )
+            if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+                courses_query = courses_query.filter(Department.school_id == current_user.school_id)
         else:
             courses_query = db.query(Course).filter(Course.id.in_(course_ids))
-        
+
         valid_courses = {c.id for c in courses_query.all()}
-        
+
         for cid in set(course_ids):
             if cid in valid_courses:
                 db.add(LecturerAssignment(
@@ -142,7 +148,7 @@ async def create_lecturer(
 
     db.commit()
     db.refresh(db_lecturer)
-    
+
     AuditLogger.log_data_modification(
         request=request,
         user_id=current_user.id,
@@ -157,7 +163,26 @@ async def create_lecturer(
         message=f"{current_user.username} has added lecturer {db_lecturer.full_name} ({db_lecturer.staff_number}).",
         type="info"
     )
-    
+
+    # Send welcome email if email is provided; track it to avoid duplicates
+    if db_lecturer.email:
+        assigned_courses = []
+        if db_lecturer.id:
+            from ..models import Course, LecturerAssignment
+            assigned_courses_query = db.query(Course.code, Course.name).join(LecturerAssignment, LecturerAssignment.course_id == Course.id).filter(LecturerAssignment.lecturer_id == db_lecturer.id).all()
+            assigned_courses = [f"{c[0]} - {c[1]}" for c in assigned_courses_query]
+
+        sent = EmailService.send_lecturer_welcome_email(
+            recipient=db_lecturer.email,
+            user_name=db_lecturer.full_name,
+            staff_number=db_lecturer.staff_number,
+            login_url=f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3002')}/lecturer",
+            assigned_courses=assigned_courses
+        )
+        if sent:
+            db_lecturer.welcome_email_sent = True
+            db.commit()
+
     return db_lecturer
 
 @router.put("/{lecturer_id}", response_model=Lecturer)
@@ -165,16 +190,20 @@ async def update_lecturer(
     request: Request,
     lecturer_id: int,
     lecturer_update: LecturerUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Update a lecturer. Coordinator only."""
-    db_lecturer = db.query(LecturerModel).filter(LecturerModel.id == lecturer_id).first()
-    
+    db_lecturer = filter_lecturer_query_for_user(
+        db.query(LecturerModel), current_user
+    ).filter(LecturerModel.id == lecturer_id).first()
+
     if not db_lecturer:
         raise HTTPException(status_code=404, detail="Lecturer not found")
     
     update_data = lecturer_update.model_dump(exclude_unset=True)
+    if "staff_number" in update_data:
+        update_data["staff_number"] = normalize_staff_number(update_data["staff_number"])
     
     # Build full lecturer data for validation (merge existing with updates)
     current_data = {
@@ -195,25 +224,28 @@ async def update_lecturer(
     
     # Verify department exists if being updated
     if "department_id" in update_data and update_data["department_id"]:
-        dept = db.query(Department).filter(Department.id == update_data["department_id"]).first()
-        if not dept:
+        dept = ensure_user_can_manage_department(db, current_user, update_data["department_id"])
+        if dept is None:
             raise HTTPException(status_code=422, detail="Invalid department_id")
     
     # Check for duplicate staff_number if being updated
-    if "staff_number" in update_data and update_data["staff_number"] != db_lecturer.staff_number:
-        existing = db.query(LecturerModel).filter(LecturerModel.staff_number == update_data["staff_number"]).first()
+    if "staff_number" in update_data and update_data["staff_number"].lower() != db_lecturer.staff_number.lower():
+        existing = db.query(LecturerModel).filter(
+            func.lower(LecturerModel.staff_number) == update_data["staff_number"].lower(),
+            LecturerModel.id != db_lecturer.id,
+        ).first()
         if existing:
-            raise HTTPException(status_code=409, detail=f"Lecturer with staff number '{update_data['staff_number']}' already exists")
+            raise HTTPException(status_code=409, detail=f"Staff number '{update_data['staff_number']}' is already assigned in TABLESYS")
     
     # Check for duplicate email if being updated
     if "email" in update_data and update_data["email"] != db_lecturer.email:
-        existing = db.query(LecturerModel).filter(LecturerModel.email == update_data["email"]).first()
+        existing = filter_lecturer_query_for_user(db.query(LecturerModel), current_user).filter(
+            LecturerModel.email == update_data["email"]
+        ).first()
         if existing:
             raise HTTPException(status_code=409, detail=f"Lecturer with email '{update_data['email']}' already exists")
     
     # Sanitize string inputs
-    if "staff_number" in update_data:
-        update_data["staff_number"] = sanitize_input(update_data["staff_number"], max_length=50)
     if "full_name" in update_data:
         update_data["full_name"] = sanitize_input(update_data["full_name"], max_length=200)
     if "email" in update_data:
@@ -233,6 +265,8 @@ async def update_lecturer(
                 Course.id.in_(course_ids),
                 Department.university_id == current_user.university_id
             )
+            if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+                courses_query = courses_query.filter(Department.school_id == current_user.school_id)
         else:
             courses_query = db.query(Course).filter(Course.id.in_(course_ids))
         
@@ -244,10 +278,10 @@ async def update_lecturer(
                     course_id=cid,
                     session_type="lecture"
                 ))
-    
+
     db.commit()
     db.refresh(db_lecturer)
-    
+
     AuditLogger.log_data_modification(
         request=request,
         user_id=current_user.id,
@@ -257,22 +291,43 @@ async def update_lecturer(
         resource_id=db_lecturer.id,
         details={"staff_number": db_lecturer.staff_number, "updates": list(update_data.keys())}
     )
-    
+
+    # If an email was just added and the welcome email has never been sent, send it now
+    if db_lecturer.email and not db_lecturer.welcome_email_sent:
+        assigned_courses = []
+        if db_lecturer.id:
+            from ..models import Course, LecturerAssignment
+            assigned_courses_query = db.query(Course.code, Course.name).join(LecturerAssignment, LecturerAssignment.course_id == Course.id).filter(LecturerAssignment.lecturer_id == db_lecturer.id).all()
+            assigned_courses = [f"{c[0]} - {c[1]}" for c in assigned_courses_query]
+
+        sent = EmailService.send_lecturer_welcome_email(
+            recipient=db_lecturer.email,
+            user_name=db_lecturer.full_name,
+            staff_number=db_lecturer.staff_number,
+            login_url=f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3002')}/lecturer",
+            assigned_courses=assigned_courses
+        )
+        if sent:
+            db_lecturer.welcome_email_sent = True
+            db.commit()
+
     return db_lecturer
 
 @router.delete("/{lecturer_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lecturer(
     request: Request,
     lecturer_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Delete a lecturer. Coordinator only."""
-    db_lecturer = db.query(LecturerModel).filter(LecturerModel.id == lecturer_id).first()
-    
+    db_lecturer = filter_lecturer_query_for_user(
+        db.query(LecturerModel), current_user
+    ).filter(LecturerModel.id == lecturer_id).first()
+
     if not db_lecturer:
         raise HTTPException(status_code=404, detail="Lecturer not found")
-    
+
     db.delete(db_lecturer)
     db.commit()
     
@@ -298,13 +353,11 @@ async def delete_lecturer(
 @router.delete("/", status_code=status.HTTP_200_OK)
 async def delete_all_lecturers(
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Delete all lecturers. Coordinator only. Use before bulk re-upload."""
-    query = db.query(LecturerModel)
-    if current_user.university_id:
-        query = query.join(Department).filter(Department.university_id == current_user.university_id)
+    query = filter_lecturer_query_for_user(db.query(LecturerModel), current_user)
         
     lecturers_to_delete = query.all()
     if not lecturers_to_delete:
@@ -350,7 +403,7 @@ async def delete_all_lecturers(
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_lecturers(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """
@@ -466,6 +519,8 @@ async def bulk_upload_lecturers(
         dept_query = db.query(Department)
         if current_user.university_id:
             dept_query = dept_query.filter(Department.university_id == current_user.university_id)
+        if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+            dept_query = dept_query.filter(Department.school_id == current_user.school_id)
         departments = dept_query.all()
         dept_id_map    = {d.id: d.id for d in departments}
         dept_code_map  = {d.code.upper(): d.id for d in departments if d.code}
@@ -476,6 +531,8 @@ async def bulk_upload_lecturers(
         if current_user.university_id:
             courses_query = courses_query.join(Department, Course.department_id == Department.id)\
                                          .filter(Department.university_id == current_user.university_id)
+            if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+                courses_query = courses_query.filter(Department.school_id == current_user.school_id)
         all_courses = courses_query.all()
         # Shape courses natively by removing spaces, dashes, dots, and forcing upper
         course_code_map = {re.sub(r'[^A-Z0-9]', '', c.code.upper()): c.id for c in all_courses if c.code}
@@ -499,6 +556,7 @@ async def bulk_upload_lecturers(
                 # If it came out as "12345.0" from numeric Excel cells, clean it
                 if re.match(r'^\d+\.0$', staff_number):
                     staff_number = staff_number[:-2]
+                staff_number = normalize_staff_number(staff_number)
 
                 full_name = str(row.get("full_name", "")).strip()
                 if not full_name:
@@ -520,7 +578,7 @@ async def bulk_upload_lecturers(
                 
                 # Check for existing
                 existing = db.query(LecturerModel).filter(
-                    LecturerModel.staff_number == staff_number
+                    func.lower(LecturerModel.staff_number) == staff_number.lower()
                 ).first()
 
                 # If creating new, department is strictly required by Postgres schema
@@ -595,6 +653,49 @@ async def bulk_upload_lecturers(
                 skipped_count += 1
 
         db.commit()
+
+        # ── Send welcome emails post-commit ──────────────────────────────
+        # Re-query so we have full DB state with IDs set
+        missing_email_staff = []
+        for idx, row in df.iterrows():
+            raw_staff = row.get("staff_number", "")
+            if not raw_staff or str(raw_staff).strip().lower() in ("nan", ""):
+                continue
+            sn = str(raw_staff).strip()
+            if re.match(r"^\d+\.0$", sn):
+                sn = sn[:-2]
+            lecturer_obj = db.query(LecturerModel).filter(
+                func.lower(LecturerModel.staff_number) == sn.lower()
+            ).first()
+            if not lecturer_obj:
+                continue
+            if not lecturer_obj.email:
+                missing_email_staff.append(sn)
+            elif not lecturer_obj.welcome_email_sent:
+                assigned_courses = []
+                if lecturer_obj.id:
+                    from ..models import Course, LecturerAssignment
+                    assigned_courses_query = db.query(Course.code, Course.name).join(LecturerAssignment, LecturerAssignment.course_id == Course.id).filter(LecturerAssignment.lecturer_id == lecturer_obj.id).all()
+                    assigned_courses = [f"{c[0]} - {c[1]}" for c in assigned_courses_query]
+
+                sent = EmailService.send_lecturer_welcome_email(
+                    recipient=lecturer_obj.email,
+                    user_name=lecturer_obj.full_name,
+                    staff_number=lecturer_obj.staff_number,
+                    login_url=f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3002')}/lecturer",
+                    assigned_courses=assigned_courses
+                )
+                if sent:
+                    lecturer_obj.welcome_email_sent = True
+        db.commit()
+
+        if missing_email_staff:
+            _append_issue(
+                issue_summary,
+                "missing_email",
+                f"{len(missing_email_staff)} lecturer(s) have no email — portal access link not sent: {', '.join(missing_email_staff[:8])}"
+            )
+
         return {
             "status":   "success",
             "created":  created_count,
@@ -615,7 +716,7 @@ async def bulk_upload_lecturers(
 @router.post("/bulk-assign-courses", response_model=dict)
 async def bulk_assign_courses(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """
@@ -683,20 +784,16 @@ async def bulk_assign_courses(
         df = df.loc[:, ~df.columns.duplicated()]
 
         # Build look-up caches
-        lecturers_query = db.query(LecturerModel)
-        if current_user.university_id:
-            from ..models import UserRole, Department
-            lecturers_query = lecturers_query.join(Department, LecturerModel.department_id == Department.id)\
-                                             .filter(Department.university_id == current_user.university_id)
-        all_lecturers = lecturers_query.all()
+        all_lecturers = filter_lecturer_query_for_user(db.query(LecturerModel), current_user).all()
         lecturer_by_staff  = {l.staff_number.strip(): l for l in all_lecturers if l.staff_number}
         lecturer_by_name   = {l.full_name.strip().lower(): l for l in all_lecturers if l.full_name}
 
         courses_query = db.query(Course)
         if current_user.university_id:
-            from ..models import UserRole, Department
             courses_query = courses_query.join(Department, Course.department_id == Department.id)\
                                          .filter(Department.university_id == current_user.university_id)
+            if getattr(current_user, "school_id", None) is not None and current_user.role != UserRole.TENANT_ADMIN:
+                courses_query = courses_query.filter(Department.school_id == current_user.school_id)
         all_courses = courses_query.all()
         course_by_code = {
             re.sub(r'[^A-Z0-9]', '', c.code.upper()): c

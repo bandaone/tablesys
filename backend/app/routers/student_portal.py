@@ -2,9 +2,11 @@
 Student Portal Router - Student Authentication and Timetable Access
 Provides endpoints for student login and personal timetable viewing
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
@@ -16,6 +18,7 @@ from ..models import Student, StudentGroup, Department, Timetable, TimetableSlot
 from ..config import settings
 from ..access_policy import enforce_active_student
 from ..utils.display_formatting import format_department_name, format_group_label, format_person_name, format_room_name
+from ..utils.sanitization import sanitize_input
 
 
 router = APIRouter(prefix="/api/v1/student", tags=["student-portal"])
@@ -96,6 +99,19 @@ def create_student_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 
+def _resolve_requested_university_id(request: Request) -> Optional[int]:
+    raw = request.headers.get("X-University-ID")
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid university context header.",
+        )
+
+
 async def get_current_student(
     token: str = Depends(oauth2_scheme_student),
     db: Session = Depends(get_db)
@@ -131,6 +147,7 @@ async def get_current_student(
 @router.post("/register", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def register_student(
     student_data: StudentCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -139,41 +156,91 @@ async def register_student(
     Note: In production, this should be restricted to administrators
     or integrated with university registration system
     """
+    tenant_id = _resolve_requested_university_id(request)
+    if tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="University context is required. Include X-University-ID header.",
+        )
+
+    student_number = sanitize_input(student_data.student_number, max_length=50)
+    full_name = sanitize_input(student_data.full_name, max_length=200)
+    email = sanitize_input(student_data.email, max_length=200).lower()
+    program = sanitize_input(student_data.program, max_length=200)
+
+    if not 1 <= student_data.year_level <= 7:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="year_level must be between 1 and 7.",
+        )
+
+    if student_data.group_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Group selection is required for student registration",
+        )
+
+    # Validate full ownership chain: group -> department -> university
+    group = db.query(StudentGroup).filter(StudentGroup.id == student_data.group_id).first()
+    if not group:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student group not found")
+
+    if group.university_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Student group does not belong to this institution",
+        )
+
+    if student_data.department_id and student_data.department_id != group.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student group does not match the provided department",
+        )
+
     # Check if student already exists
     existing = db.query(Student).filter(
-        (Student.student_number == student_data.student_number) |
-        (Student.email == student_data.email)
+        (Student.student_number == student_number) |
+        (Student.email == email)
     ).first()
     
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Student number or email already registered"
         )
     
     # Create new student
     hashed_password = get_password_hash(student_data.password)
     new_student = Student(
-        student_number=student_data.student_number,
-        full_name=student_data.full_name,
-        email=student_data.email,
+        student_number=student_number,
+        full_name=full_name,
+        email=email,
         hashed_password=hashed_password,
-        program=student_data.program,
+        program=program,
         year_level=student_data.year_level,
         group_id=student_data.group_id,
-        department_id=student_data.department_id,
+        department_id=group.department_id,
+        university_id=group.university_id,
         created_at=datetime.utcnow().isoformat()
     )
     
     db.add(new_student)
-    db.commit()
-    db.refresh(new_student)
+    try:
+        db.commit()
+        db.refresh(new_student)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Student number or email already registered"
+        )
     
     return new_student
 
 
 @router.post("/login", response_model=StudentLoginResponse)
 async def login_student(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -183,8 +250,10 @@ async def login_student(
     Accepts student_number as username and password
     Returns JWT access token
     """
+    tenant_id = _resolve_requested_university_id(request)
+    student_number = sanitize_input(form_data.username, max_length=50)
     student = db.query(Student).filter(
-        Student.student_number == form_data.username
+        Student.student_number == student_number
     ).first()
     
     if not student or not verify_password(form_data.password, student.hashed_password):
@@ -196,7 +265,26 @@ async def login_student(
     
     if not student.is_active:
         enforce_active_student(student.is_active)
+
+    if tenant_id is not None:
+        dept = None
+        group = None
+        if student.department_id:
+            dept = db.query(Department).filter(Department.id == student.department_id).first()
+        if student.group_id:
+            group = db.query(StudentGroup).filter(StudentGroup.id == student.group_id).first()
+        resolved_uni_id = group.university_id if group else (dept.university_id if dept else None)
+        if resolved_uni_id is not None and resolved_uni_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Student does not belong to this institution",
+            )
     
+    # Record last login timestamp for dashboard active-user tracking
+    from datetime import datetime, timezone
+    student.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+
     # Create access token
     access_token = create_student_access_token(
         data={"sub": student.student_number}
@@ -244,11 +332,19 @@ async def get_student_timetable(
             detail="Student group not found"
         )
     
-    # Find the most recent generated timetable for this department
+    # Find the active timetable for this student's university
+    student_uni_id = getattr(current_student, 'university_id', None)
+    if student_uni_id is None and group:
+        student_uni_id = group.university_id
+        
+    department = db.query(Department).filter(Department.id == group.department_id).first() if group else None
+    school_id = department.school_id if department else None
+
     timetable = db.query(Timetable).filter(
-        Timetable.department_id == current_student.department_id,
-        Timetable.is_generated == True
-    ).order_by(Timetable.updated_at.desc()).first()
+        Timetable.university_id == student_uni_id,
+        Timetable.is_active == True,
+        or_(Timetable.school_id == school_id, Timetable.school_id == None) if school_id else True
+    ).order_by(Timetable.school_id.isnot(None).desc(), Timetable.id.desc()).first()
     
     if not timetable:
         raise HTTPException(
@@ -298,7 +394,7 @@ async def get_student_timetable(
             'id': timetable.id,
             'name': timetable.name,
             'semester': timetable.semester,
-            'academic_year': timetable.academic_year,
+            'academic_year': timetable.year,
             'department': format_department_name(department.name) if department else 'N/A'
         },
         'slots': formatted_slots,
@@ -323,12 +419,20 @@ async def get_student_courses(
     ).all()
     
     course_list = []
+    
+    group = db.query(StudentGroup).filter(StudentGroup.id == current_student.group_id).first() if current_student.group_id else None
+    student_uni_id = getattr(current_student, 'university_id', group.university_id if group else None)
+    department = db.query(Department).filter(Department.id == group.department_id).first() if group else None
+    school_id = department.school_id if department else None
+
     for course in courses:
         # Get lecturer if assigned
         slot = db.query(TimetableSlot).join(Timetable).filter(
             TimetableSlot.course_id == course.id,
-            Timetable.department_id == current_student.department_id,
-            Timetable.is_generated == True
+            TimetableSlot.group_id == current_student.group_id,
+            Timetable.university_id == student_uni_id,
+            Timetable.is_active == True,
+            or_(Timetable.school_id == school_id, Timetable.school_id == None) if school_id else True
         ).first()
         
         lecturer = None
@@ -344,7 +448,7 @@ async def get_student_courses(
             'id': course.id,
             'code': course.code,
             'name': course.name,
-            'credit_hours': course.credit_hours,
+            'credit_hours': course.credits,
             'course_type': course.course_type,
             'lecturer': lecturer
         })

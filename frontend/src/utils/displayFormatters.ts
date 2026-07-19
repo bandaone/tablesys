@@ -6,10 +6,10 @@ const normalizeWhitespace = (value: string | null | undefined): string =>
 const smartTitleToken = (token: string): string => {
   const cleaned = token.trim();
   if (!cleaned) return '';
-  if (/^[A-Z0-9]{2,10}$/.test(cleaned)) return cleaned;
-  if (/^[A-Z]{2,10}[0-9]{1,4}$/.test(cleaned)) return cleaned;
   const lower = cleaned.toLowerCase();
   if (LOWER_WORDS.has(lower)) return lower;
+  if (/^[A-Z0-9]{2,4}$/.test(cleaned)) return cleaned;
+  if (/^[A-Z]{2,6}[0-9]{1,4}$/.test(cleaned)) return cleaned;
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
 

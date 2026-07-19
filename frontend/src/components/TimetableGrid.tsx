@@ -66,6 +66,7 @@ interface TimetableGridProps {
     onSlotClick?: (slot: TimetableSlot) => void;
     selectedSlot?: TimetableSlot | null;
     showCurrentTime?: boolean;
+    activityTypesMap?: Record<string, { color: string; display_name: string }>;
     /** Called when an override is successfully persisted or reset */
     onOverrideChange?: () => void;
 }
@@ -210,6 +211,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({
     onSlotClick,
     selectedSlot,
     showCurrentTime = false,
+    activityTypesMap,
     onOverrideChange,
 }) => {
     const isAssignMode = mode === 'assign';
@@ -514,6 +516,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({
                                                             }
                                                             selected={isSameSlot(slot, selectedSlot ?? undefined)}
                                                             dragEnabled={isAssignMode}
+                                                            activityTypesMap={activityTypesMap}
                                                             onResetOverride={
                                                                 isAssignMode ? handleResetOverride : undefined
                                                             }

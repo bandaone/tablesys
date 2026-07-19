@@ -29,6 +29,7 @@ from ..models import (
     RoomBooking,
     Timetable
 )
+from .transit import DEFAULT_TRANSIT_MINUTES, insufficient_transit_time, times_overlap
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +82,13 @@ class Conflict:
         start = self.time_range[0].strftime("%H:%M")
         end = self.time_range[1].strftime("%H:%M")
         
+        if self.conflict_type.endswith("_transit"):
+            resource_type = self.conflict_type.removesuffix("_transit").capitalize()
+            return (
+                f"{resource_type} '{self.resource_name}' has less than {DEFAULT_TRANSIT_MINUTES} minutes "
+                f"to move between different rooms on {day_name} ({start}-{end})"
+            )
+
         resource_type = self.conflict_type.capitalize()
         
         return (
@@ -118,94 +126,93 @@ class ConflictDetector:
         conflicts.extend(self._detect_group_conflicts(slots))
         
         return conflicts
+
+    @staticmethod
+    def _slot_group_ids(slot: TimetableSlot) -> Set[int]:
+        """Return every group explicitly covered by a shared timetable slot."""
+        return {slot.group_id, *(slot.shared_group_ids or [])}
+
+    def _group_lineage_ids(self, group_id: int) -> Set[int]:
+        """Include parents so a stream cannot be sent to another class mid-cohort."""
+        ids: Set[int] = set()
+        current_id = group_id
+        for _ in range(10):
+            if current_id is None or current_id in ids:
+                break
+            ids.add(current_id)
+            group = self.db.get(StudentGroup, current_id)
+            current_id = group.parent_group_id if group else None
+        return ids
+
+    def _slots_share_audience(self, first: TimetableSlot, second: TimetableSlot) -> bool:
+        first_lineage: Set[int] = set()
+        second_lineage: Set[int] = set()
+        for group_id in self._slot_group_ids(first):
+            first_lineage.update(self._group_lineage_ids(group_id))
+        for group_id in self._slot_group_ids(second):
+            second_lineage.update(self._group_lineage_ids(group_id))
+        return bool(first_lineage.intersection(second_lineage))
     
     def _detect_lecturer_conflicts(self, slots: List[TimetableSlot]) -> List[Conflict]:
-        """Detect lecturer double-booking conflicts."""
-        # Group slots by (lecturer_id, day, time) to find overlaps
-        lecturer_schedule: Dict[Tuple[int, int, time, time], List[TimetableSlot]] = defaultdict(list)
-        
-        for slot in slots:
-            if slot.lecturer_id is None:
-                continue
-            
-            key = (slot.lecturer_id, slot.day_of_week, slot.start_time, slot.end_time)
-            lecturer_schedule[key].append(slot)
-        
-        # Find conflicts (multiple slots with same lecturer at same time)
+        """Detect overlapping or impossible cross-room lecturer movements."""
         conflicts = []
-        for (lecturer_id, day, start, end), conflicting_slots in lecturer_schedule.items():
-            if len(conflicting_slots) > 1:
-                # Get lecturer name
-                lecturer = self.db.query(Lecturer).get(lecturer_id)
-                lecturer_name = lecturer.full_name if lecturer else f"Lecturer #{lecturer_id}"
-                
-                conflict = Conflict(
-                    conflict_type="lecturer",
-                    slot_ids=[s.id for s in conflicting_slots],
-                    resource_id=lecturer_id,
-                    resource_name=lecturer_name,
-                    day=day,
-                    time_range=(start, end),
-                )
-                conflicts.append(conflict)
+        by_lecturer: Dict[Tuple[int, int], List[TimetableSlot]] = defaultdict(list)
+        for slot in slots:
+            if slot.lecturer_id is not None:
+                by_lecturer[(slot.lecturer_id, slot.day_of_week)].append(slot)
+        for (lecturer_id, day), schedule in by_lecturer.items():
+            lecturer = self.db.get(Lecturer, lecturer_id)
+            lecturer_name = lecturer.full_name if lecturer else f"Lecturer #{lecturer_id}"
+            for index, first in enumerate(schedule):
+                for second in schedule[index + 1:]:
+                    if times_overlap(first.start_time, first.end_time, second.start_time, second.end_time):
+                        conflict_type, time_range = "lecturer", (max(first.start_time, second.start_time), min(first.end_time, second.end_time))
+                    elif insufficient_transit_time(first.start_time, first.end_time, first.room_id, second.start_time, second.end_time, second.room_id):
+                        conflict_type, time_range = "lecturer_transit", (min(first.start_time, second.start_time), max(first.end_time, second.end_time))
+                    else:
+                        continue
+                    conflicts.append(Conflict(conflict_type, [first.id, second.id], lecturer_id, lecturer_name, day, time_range))
         
         return conflicts
     
     def _detect_room_conflicts(self, slots: List[TimetableSlot]) -> List[Conflict]:
-        """Detect room double-booking conflicts."""
-        room_schedule: Dict[Tuple[int, int, time, time], List[TimetableSlot]] = defaultdict(list)
-        
-        for slot in slots:
-            if slot.room_id is None:
-                continue
-            
-            key = (slot.room_id, slot.day_of_week, slot.start_time, slot.end_time)
-            room_schedule[key].append(slot)
-        
+        """Detect room double-booking. Back-to-back use of one room is allowed."""
         conflicts = []
-        for (room_id, day, start, end), conflicting_slots in room_schedule.items():
-            if len(conflicting_slots) > 1:
-                room = self.db.query(Room).get(room_id)
-                room_name = room.name if room else f"Room #{room_id}"
-                
-                conflict = Conflict(
-                    conflict_type="room",
-                    slot_ids=[s.id for s in conflicting_slots],
-                    resource_id=room_id,
-                    resource_name=room_name,
-                    day=day,
-                    time_range=(start, end),
-                )
-                conflicts.append(conflict)
+        by_room: Dict[Tuple[int, int], List[TimetableSlot]] = defaultdict(list)
+        for slot in slots:
+            if slot.room_id is not None:
+                by_room[(slot.room_id, slot.day_of_week)].append(slot)
+        for (room_id, day), schedule in by_room.items():
+            room = self.db.get(Room, room_id)
+            room_name = room.name if room else f"Room #{room_id}"
+            for index, first in enumerate(schedule):
+                for second in schedule[index + 1:]:
+                    if times_overlap(first.start_time, first.end_time, second.start_time, second.end_time):
+                        conflicts.append(Conflict("room", [first.id, second.id], room_id, room_name, day,
+                                                  (max(first.start_time, second.start_time), min(first.end_time, second.end_time))))
         
         return conflicts
     
     def _detect_group_conflicts(self, slots: List[TimetableSlot]) -> List[Conflict]:
-        """Detect student group double-booking conflicts."""
-        group_schedule: Dict[Tuple[int, int, time, time], List[TimetableSlot]] = defaultdict(list)
-        
-        for slot in slots:
-            if slot.group_id is None:
-                continue
-            
-            key = (slot.group_id, slot.day_of_week, slot.start_time, slot.end_time)
-            group_schedule[key].append(slot)
-        
+        """Detect student clashes and too-short movements between different rooms."""
         conflicts = []
-        for (group_id, day, start, end), conflicting_slots in group_schedule.items():
-            if len(conflicting_slots) > 1:
-                group = self.db.query(StudentGroup).get(group_id)
-                group_name = group.name if group else f"Group #{group_id}"
-                
-                conflict = Conflict(
-                    conflict_type="group",
-                    slot_ids=[s.id for s in conflicting_slots],
-                    resource_id=group_id,
-                    resource_name=group_name,
-                    day=day,
-                    time_range=(start, end),
-                )
-                conflicts.append(conflict)
+        by_day: Dict[int, List[TimetableSlot]] = defaultdict(list)
+        for slot in slots:
+            by_day[slot.day_of_week].append(slot)
+        for day, schedule in by_day.items():
+            for index, first in enumerate(schedule):
+                for second in schedule[index + 1:]:
+                    if not self._slots_share_audience(first, second):
+                        continue
+                    primary_group = self.db.get(StudentGroup, first.group_id)
+                    group_name = primary_group.name if primary_group else f"Group #{first.group_id}"
+                    if times_overlap(first.start_time, first.end_time, second.start_time, second.end_time):
+                        conflict_type, time_range = "group", (max(first.start_time, second.start_time), min(first.end_time, second.end_time))
+                    elif insufficient_transit_time(first.start_time, first.end_time, first.room_id, second.start_time, second.end_time, second.room_id):
+                        conflict_type, time_range = "group_transit", (min(first.start_time, second.start_time), max(first.end_time, second.end_time))
+                    else:
+                        continue
+                    conflicts.append(Conflict(conflict_type, [first.id, second.id], first.group_id, group_name, day, time_range))
         
         return conflicts
     
@@ -224,6 +231,8 @@ class ConflictDetector:
                 "lecturer": 0,
                 "room": 0,
                 "group": 0,
+                "lecturer_transit": 0,
+                "group_transit": 0,
             },
             "by_severity": {
                 "high": 0,  # 3+ overlapping slots

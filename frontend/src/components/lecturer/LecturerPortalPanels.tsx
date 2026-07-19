@@ -9,6 +9,7 @@ import {
   SchoolRounded as SchoolIcon,
   TimerRounded as TimerIcon,
   AssignmentRounded as AssignmentIcon,
+  AutoStoriesRounded as AutoStoriesIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -56,8 +57,7 @@ import {
   formatDayLabel,
   formatTimeRange,
   formatDuration,
-  normalizeSessionType,
-  getSessionTypeChipColor,
+  getSessionTypeChipSx,
   formatSessionTypeLabel,
   getMinutesFromTime,
   getDaySortIndex,
@@ -81,7 +81,7 @@ const formatLocation = (room: string | undefined, building: string | undefined):
   return `${r} · ${b}`;
 };
 
-const COURSE_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444'];
+const COURSE_PALETTE = ['#1976d2', '#9c27b0', '#f59e0b', '#7b1fa2', '#06b6d4', '#ef4444'];
 
 // ── LecturerCourseAnnouncements ─────────────────────────────────────────────
 
@@ -435,8 +435,8 @@ export const LecturerSessionCard: React.FC<SessionCardProps> = ({
           <Stack spacing={0.8} alignItems="flex-end">
             <Chip label={toneLabel} color={toneColor} size="small" />
             <Chip
-              label={formatSessionTypeLabel(slot.session_type)}
-              color={getSessionTypeChipColor(slot.session_type)}
+              label={formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}
+              sx={getSessionTypeChipSx(slot.activity_type_key || slot.session_type)}
               size="small"
             />
           </Stack>
@@ -889,9 +889,9 @@ export const LecturerWeekPanel: React.FC<{
                             {slot.course_code} • {slot.course_name}
                           </Typography>
                           <Chip
-                            label={formatSessionTypeLabel(slot.session_type)}
+                            label={formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}
                             size="small"
-                            color={getSessionTypeChipColor(slot.session_type)}
+                            sx={getSessionTypeChipSx(slot.activity_type_key || slot.session_type)}
                           />
                         </Stack>
                         <Typography
@@ -1024,9 +1024,9 @@ export const LecturerSearchPanel: React.FC<{
                       </Typography>
                     </div>
                     <Chip
-                      label={formatSessionTypeLabel(slot.session_type)}
+                      label={formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}
                       size="small"
-                      color={getSessionTypeChipColor(slot.session_type)}
+                      sx={getSessionTypeChipSx(slot.activity_type_key || slot.session_type)}
                     />
                   </Stack>
                   <Stack spacing={0.8} sx={{ mt: 1.5 }}>
@@ -1213,6 +1213,88 @@ export const LecturerCoursesPanel: React.FC<{
           </CardContent>
         </Card>
       </Box>
+    </Stack>
+  );
+};
+
+// ── LecturerExamsPanel ─────────────────────────────────────────────────────
+
+export const LecturerExamsPanel: React.FC<{
+  loading: boolean;
+  exams: any[];
+  period: any;
+}> = ({ loading, exams, period }) => {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!period) {
+    return (
+      <Alert severity="info" sx={{ borderRadius: 3 }}>
+        No published exam timetable is currently available.
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Card sx={{ borderRadius: 5, background: 'linear-gradient(145deg, #1e3c72 0%, #2a5298 100%)', color: 'white' }}>
+        <CardContent sx={{ p: 2.5 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="overline" sx={{ letterSpacing: 1.1, opacity: 0.8 }}>EXAM PERIOD</Typography>
+              <Typography variant="h6" fontWeight={800}>{period.name}</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                {new Date(period.start_date).toLocaleDateString()} - {new Date(period.end_date).toLocaleDateString()}
+              </Typography>
+            </Box>
+            <AutoStoriesIcon sx={{ fontSize: 40, opacity: 0.5 }} />
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {exams.length === 0 ? (
+        <Alert severity="info" sx={{ borderRadius: 3 }}>
+          You have no exams assigned as chief invigilator in this period.
+        </Alert>
+      ) : (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
+          {exams.map((exam) => (
+            <Card key={exam.id} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+              <CardContent sx={{ p: 2.25 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.5}>
+                  <Box>
+                    <Typography variant="overline" sx={{ letterSpacing: 1.1, color: 'text.secondary' }}>{exam.paper_code}</Typography>
+                    <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.25 }}>{exam.paper_name}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>{exam.course_name}</Typography>
+                  </Box>
+                  <Chip label="Chief Invigilator" size="small" color="primary" />
+                </Stack>
+
+                <Divider sx={{ my: 1.5 }} />
+
+                <Stack spacing={1.2}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CalendarMonthIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">{new Date(exam.exam_date).toLocaleDateString()} • {exam.start_time} - {exam.end_time}</Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <PlaceOutlinedIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">{exam.rooms.join(', ')}</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Duration: {exam.duration_minutes} min
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
     </Stack>
   );
 };

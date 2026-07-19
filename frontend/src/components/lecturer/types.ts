@@ -13,6 +13,9 @@ export interface LecturerTimetableSlot {
   course_name: string;
   group_id: number;
   session_type: string;
+  activity_type_key?: string;
+  activity_display_name?: string;
+  activity_color?: string;
   day_of_week: string;
   start_time: string;
   end_time: string;

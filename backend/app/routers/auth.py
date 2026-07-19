@@ -39,7 +39,6 @@ def login(
         )
     
     # Authenticate user with username and password
-    print(f"[[DEBUG VERIFICATION]]: Received username: '{login_data.username}', password: '{login_data.password}', len: {len(login_data.password)}")
     user = authenticate_user(db, login_data.username, login_data.password)
     
     if not user:
@@ -58,6 +57,24 @@ def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Check Tenant Scope: User must belong to the tenant they are trying to log into.
+    # SUPERADMIN can login anywhere.
+    user_role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    if user_role_str != "SUPERADMIN" and login_data.university_id is not None:
+        if user.university_id != login_data.university_id:
+            AuditLogger.log_login_attempt(
+                request=request,
+                username=login_data.username,
+                success=False,
+                details={"reason": "Workspace mismatch", "user_id": user.id, "target_tenant": login_data.university_id}
+            )
+            rate_limiter.record_attempt(client_ip, success=False)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials for this workspace",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     
     if not user.is_active:
         # Log failed login attempt (inactive account)
@@ -82,10 +99,15 @@ def login(
         success=True,
         details={
             "user_id": user.id,
-            "role": user.role.value,
+            "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
             "department_id": user.department_id
         }
     )
+    
+    # Update last login timestamp
+    from datetime import datetime
+    user.last_login_at = datetime.utcnow()
+    db.commit()
     
     # Record successful attempt (clears failed attempts)
     rate_limiter.record_attempt(client_ip, success=True)
@@ -235,6 +257,10 @@ async def google_callback(
         success=True, details={"provider": "google", "user_id": user.id},
     )
 
+    from datetime import datetime
+    user.last_login_at = datetime.utcnow()
+    db.commit()
+
     return RedirectResponse(f"{frontend_cb}?token={token}", status_code=302)
 
 
@@ -299,6 +325,10 @@ async def microsoft_callback(
         request=request, username=user.username,
         success=True, details={"provider": "microsoft", "user_id": user.id},
     )
+
+    from datetime import datetime
+    user.last_login_at = datetime.utcnow()
+    db.commit()
 
     return RedirectResponse(f"{frontend_cb}?token={token}", status_code=302)
 

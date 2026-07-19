@@ -4,7 +4,7 @@ import { CircularProgress, Box } from '@mui/material';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
-    requiredRole?: 'admin' | 'coordinator' | 'hod' | 'lecturer';
+    requiredRole?: 'tenant_admin' | 'school_coordinator' | 'coordinator' | 'hod' | 'lecturer';
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({

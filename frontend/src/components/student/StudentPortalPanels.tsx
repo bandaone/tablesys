@@ -25,7 +25,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, type SxProps, type Theme } from '@mui/material/styles';
 import type { Course, FreeRoomsData, LookupDetail, LookupResult, TimetableSlot } from './types';
 
 /** Sanitize room display — hides missing/zero/TBA values gracefully */
@@ -54,7 +54,7 @@ const formatDayLabel = (day: string | number | undefined): string => {
   return s;
 };
 
-export type SessionFilter = 'all' | 'lecture' | 'tutorial' | 'lab';
+export type SessionFilter = string;
 
 interface SessionCardProps {
   slot: TimetableSlot;
@@ -67,7 +67,7 @@ interface SessionCardProps {
     currentMinutes: number,
   ) => { label: string; color: 'success' | 'warning' | 'default' };
   formatSessionTypeLabel: (value?: string) => string;
-  getSessionTypeChipColor: (value?: string) => 'primary' | 'secondary' | 'success' | 'warning';
+  getSessionTypeChipSx: (slot: TimetableSlot) => SxProps<Theme>;
 }
 
 export const StudentSessionCard: React.FC<SessionCardProps> = ({
@@ -77,7 +77,7 @@ export const StudentSessionCard: React.FC<SessionCardProps> = ({
   formatTimeRange,
   getSessionTone,
   formatSessionTypeLabel,
-  getSessionTypeChipColor,
+  getSessionTypeChipSx,
 }) => {
   const tone = getSessionTone(slot, currentDay, currentMinutes);
 
@@ -95,7 +95,11 @@ export const StudentSessionCard: React.FC<SessionCardProps> = ({
           <BoxText code={slot.course_code} title={slot.course_name} />
           <Stack spacing={0.8} alignItems="flex-end">
             <Chip label={tone.label} color={tone.color} size="small" />
-            <Chip label={formatSessionTypeLabel(slot.session_type)} color={getSessionTypeChipColor(slot.session_type)} size="small" />
+            <Chip
+              label={formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}
+              sx={getSessionTypeChipSx(slot)}
+              size="small"
+            />
           </Stack>
         </Stack>
 
@@ -164,13 +168,16 @@ export const SessionFilterChips: React.FC<{
   filters: SessionFilter[];
   activeFilter: SessionFilter;
   onChange: (filter: SessionFilter) => void;
-}> = ({ filters, activeFilter, onChange }) => (
+  getFilterLabel: (filter: SessionFilter) => string;
+  getFilterChipSx: (filter: SessionFilter) => SxProps<Theme>;
+}> = ({ filters, activeFilter, onChange, getFilterLabel, getFilterChipSx }) => (
   <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
     {filters.map((filter) => (
       <Chip
         key={filter}
-        label={filter === 'all' ? 'All sessions' : `${filter.charAt(0).toUpperCase()}${filter.slice(1)}s`}
-        color={activeFilter === filter ? 'primary' : 'default'}
+        label={getFilterLabel(filter)}
+        sx={activeFilter === filter ? getFilterChipSx(filter) : undefined}
+        variant={activeFilter === filter ? 'filled' : 'outlined'}
         onClick={() => onChange(filter)}
         clickable
       />
@@ -393,7 +400,9 @@ export const StudentTodayPanel: React.FC<{
   formatTimeRange: (slot: TimetableSlot) => string;
   getSessionTone: SessionCardProps['getSessionTone'];
   formatSessionTypeLabel: SessionCardProps['formatSessionTypeLabel'];
-  getSessionTypeChipColor: SessionCardProps['getSessionTypeChipColor'];
+  getSessionTypeChipSx: SessionCardProps['getSessionTypeChipSx'];
+  getFilterLabel: (filter: SessionFilter) => string;
+  getFilterChipSx: (filter: SessionFilter) => SxProps<Theme>;
 }> = ({
   currentDay,
   filters,
@@ -404,7 +413,9 @@ export const StudentTodayPanel: React.FC<{
   formatTimeRange,
   getSessionTone,
   formatSessionTypeLabel,
-  getSessionTypeChipColor,
+  getSessionTypeChipSx,
+  getFilterLabel,
+  getFilterChipSx,
 }) => (
   <Stack spacing={2}>
     <div>
@@ -416,7 +427,13 @@ export const StudentTodayPanel: React.FC<{
       </Typography>
     </div>
 
-    <SessionFilterChips filters={filters} activeFilter={todayFilter} onChange={onFilterChange} />
+    <SessionFilterChips
+      filters={filters}
+      activeFilter={todayFilter}
+      onChange={onFilterChange}
+      getFilterLabel={getFilterLabel}
+      getFilterChipSx={getFilterChipSx}
+    />
 
     {filteredTodaySlots.length ? (
       <Box
@@ -435,13 +452,13 @@ export const StudentTodayPanel: React.FC<{
             formatTimeRange={formatTimeRange}
             getSessionTone={getSessionTone}
             formatSessionTypeLabel={formatSessionTypeLabel}
-            getSessionTypeChipColor={getSessionTypeChipColor}
+            getSessionTypeChipSx={getSessionTypeChipSx}
           />
         ))}
       </Box>
     ) : (
       <Alert severity="info" sx={{ borderRadius: 3 }}>
-        No {todayFilter === 'all' ? '' : `${todayFilter} `}classes scheduled for today.
+        No {todayFilter === 'all' ? '' : `${getFilterLabel(todayFilter)} `}sessions scheduled for today.
       </Alert>
     )}
   </Stack>
@@ -456,7 +473,9 @@ export const StudentWeekPanel: React.FC<{
   dayOrder: string[];
   formatTimeRange: (slot: TimetableSlot) => string;
   formatSessionTypeLabel: (value?: string) => string;
-  getSessionTypeChipColor: (value?: string) => 'primary' | 'secondary' | 'success' | 'warning';
+  getSessionTypeChipSx: (slot: TimetableSlot) => SxProps<Theme>;
+  getFilterLabel: (filter: SessionFilter) => string;
+  getFilterChipSx: (filter: SessionFilter) => SxProps<Theme>;
   primaryColor: string;
 }> = ({
   currentDay,
@@ -467,7 +486,9 @@ export const StudentWeekPanel: React.FC<{
   dayOrder,
   formatTimeRange,
   formatSessionTypeLabel,
-  getSessionTypeChipColor,
+  getSessionTypeChipSx,
+  getFilterLabel,
+  getFilterChipSx,
   primaryColor,
 }) => (
   <Stack spacing={2}>
@@ -476,11 +497,17 @@ export const StudentWeekPanel: React.FC<{
         This week
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Swipe-free, clean daily sections optimized for small screens.
+        The complete week view
       </Typography>
     </div>
 
-    <SessionFilterChips filters={filters} activeFilter={weekFilter} onChange={onFilterChange} />
+    <SessionFilterChips
+      filters={filters}
+      activeFilter={weekFilter}
+      onChange={onFilterChange}
+      getFilterLabel={getFilterLabel}
+      getFilterChipSx={getFilterChipSx}
+    />
 
     <Box
       sx={{
@@ -517,9 +544,9 @@ export const StudentWeekPanel: React.FC<{
                         {slot.course_code} • {slot.course_name}
                       </Typography>
                       <Chip
-                        label={formatSessionTypeLabel(slot.session_type)}
+                        label={formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}
                         size="small"
-                        color={getSessionTypeChipColor(slot.session_type)}
+                        sx={getSessionTypeChipSx(slot)}
                       />
                     </Stack>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.4 }}>
@@ -907,3 +934,90 @@ export const StudentMorePanel: React.FC<{
     </Stack>
   </Stack>
 );
+
+export const StudentExamsPanel: React.FC<{
+  loading: boolean;
+  exams: any[];
+  period: any;
+}> = ({ loading, exams, period }) => {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!period) {
+    return (
+      <Alert severity="info" sx={{ borderRadius: 3 }}>
+        No published exam timetable is currently available.
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={2}>
+      <div>
+        <Typography variant="h6" fontWeight={800}>
+          {period.name}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {new Date(period.start_date).toLocaleDateString()} - {new Date(period.end_date).toLocaleDateString()}
+        </Typography>
+      </div>
+
+      {exams.length === 0 ? (
+        <Alert severity="info" sx={{ borderRadius: 3 }}>
+          You have no exams scheduled in this period.
+        </Alert>
+      ) : (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
+            gap: 2,
+          }}
+        >
+          {exams.map((exam) => (
+            <Card
+              key={exam.id}
+              sx={{
+                borderRadius: 4,
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 14px 34px rgba(0,0,0,0.05)',
+              }}
+            >
+              <CardContent sx={{ p: 2.25 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.5}>
+                  <BoxText code={exam.paper_code} title={exam.course_name || exam.paper_name} />
+                  <Chip label={exam.day_of_week} color="primary" size="small" />
+                </Stack>
+
+                <Stack spacing={1.2} sx={{ mt: 1.8 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CalendarMonthIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">{new Date(exam.exam_date).toLocaleDateString()} • {exam.start_time} - {exam.end_time}</Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <PlaceOutlinedIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">
+                      {exam.rooms.join(', ')}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Invigilator: {exam.chief_invigilator}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Duration: {exam.duration_minutes} min
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
+    </Stack>
+  );
+};

@@ -170,3 +170,83 @@ class RateLimiter:
                 self.attempts.pop(ip, None)
                 self.blocked.pop(ip, None)
                 logger.info(f"RATE LIMIT: Reset for IP {ip}")
+
+
+# ── Public Route Sliding-Window Rate Limiter ──────────────────────────────────
+# For unauthenticated endpoints (mobile/public/*, public/*).
+# Higher throughput than login limits, but bounded to block enumeration attacks.
+#
+# PHASE 5 TODO: Same Redis migration path as RateLimiter above.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PublicRouteRateLimiter:
+    """
+    Sliding-window rate limiter for unauthenticated public API routes.
+
+    Default: 60 requests per minute per IP. Violations return a 429 with
+    a Retry-After header. Uses a simple token-bucket-style sliding window
+    stored in process memory.
+    """
+
+    def __init__(
+        self,
+        max_requests: int = 60,
+        window_seconds: int = 60,
+        block_duration_seconds: int = 120,
+    ):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.block_duration_seconds = block_duration_seconds
+
+        self._hits: dict[str, list[datetime]] = {}
+        self._blocked: dict[str, datetime] = {}
+        self._lock = Lock()
+
+    def is_allowed(self, ip: str) -> tuple[bool, int]:
+        """
+        Check whether the IP is within its request quota.
+
+        Returns
+        -------
+        (allowed: bool, retry_after_seconds: int)
+            retry_after_seconds is 0 when allowed.
+        """
+        with self._lock:
+            now = datetime.utcnow()
+
+            # Check hard block first (triggered by sustained abuse)
+            if ip in self._blocked:
+                if now < self._blocked[ip]:
+                    retry = int((self._blocked[ip] - now).total_seconds())
+                    return False, retry
+                del self._blocked[ip]
+
+            # Slide the window: drop hits older than window_seconds
+            cutoff = now - timedelta(seconds=self.window_seconds)
+            self._hits[ip] = [t for t in self._hits.get(ip, []) if t > cutoff]
+
+            if len(self._hits[ip]) >= self.max_requests:
+                # Sustained abuse — apply a hard block
+                block_until = now + timedelta(seconds=self.block_duration_seconds)
+                self._blocked[ip] = block_until
+                logger.warning(
+                    "PUBLIC RATE LIMIT: IP %s exceeded %d requests/%ds — blocked for %ds",
+                    ip, self.max_requests, self.window_seconds, self.block_duration_seconds,
+                )
+                return False, self.block_duration_seconds
+
+            # Record this hit and allow
+            self._hits[ip].append(now)
+
+            # Periodic cleanup (1% chance) to prevent unbounded memory growth
+            if random.random() < 0.01:
+                self._evict_stale(now)
+
+            return True, 0
+
+    def _evict_stale(self, now: datetime) -> None:
+        """Remove IPs with no recent hits to prevent memory leaks."""
+        cutoff = now - timedelta(seconds=self.window_seconds)
+        self._hits = {ip: hits for ip, hits in self._hits.items() if hits and hits[-1] > cutoff}
+        self._blocked = {ip: until for ip, until in self._blocked.items() if until > now}
+

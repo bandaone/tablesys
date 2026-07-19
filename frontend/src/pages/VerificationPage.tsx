@@ -52,10 +52,10 @@ const VerificationPage: React.FC = () => {
 
   // Default Platform Colors
   const activeColors = {
-    primaryDark: '#0f172a',
-    primaryLight: '#334155',
-    secondary: '#6366f1',
-    accent: '#8b5cf6',
+    primaryDark: '#0d47a1',
+    primaryLight: '#1976d2',
+    secondary: '#9c27b0',
+    accent: '#7b1fa2',
   };
 
   return (
@@ -63,7 +63,7 @@ const VerificationPage: React.FC = () => {
       sx={{
         minHeight: '100vh',
         backgroundColor: activeColors.primaryDark,
-        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, #5c35cc 55%, #7c3aed 100%)`,
+        background: `linear-gradient(135deg, ${activeColors.primaryDark} 0%, ${activeColors.primaryLight} 55%, ${activeColors.secondary} 100%)`,
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
@@ -111,7 +111,7 @@ const VerificationPage: React.FC = () => {
       >
         {status === 'loading' && (
           <Box display="flex" flexDirection="column" alignItems="center" gap={3}>
-            <CircularProgress size={50} sx={{ color: '#6366f1' }} />
+            <CircularProgress size={50} sx={{ color: '#9c27b0' }} />
             <Typography variant="h6">Verifying your workspace...</Typography>
             <Typography variant="body2" color="rgba(255,255,255,0.6)">Please wait a moment.</Typography>
           </Box>
@@ -139,7 +139,7 @@ const VerificationPage: React.FC = () => {
             <Button
               variant="contained"
               onClick={() => window.location.href = '/register'}
-              sx={{ mt: 2, bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' } }}
+              sx={{ mt: 2, bgcolor: '#1976d2', '&:hover': { bgcolor: '#115293' } }}
             >
               Return to Registration
             </Button>

@@ -1,0 +1,17 @@
+{
+  "name": "TABLESYS Mobile Timetable",
+  "short_name": "TABLESYS",
+  "description": "Mobile-first timetable access for students and lecturers.",
+  "start_url": "/student",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#1976d2",
+  "icons": [
+    {
+      "src": "/tablesys-pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

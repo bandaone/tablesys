@@ -47,6 +47,57 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# ============================================================================
+# OPENTELEMETRY DATABASE INSTRUMENTATION
+# ============================================================================
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.metrics import CallbackOptions, Observation
+from sqlalchemy import event
+import time
+
+try:
+    from .observability import db_meter, db_query_duration_histogram
+    from .middleware.tenant import get_current_tenant_id
+    
+    SQLAlchemyInstrumentor().instrument(engine=engine)
+    
+    def pool_checked_out_callback(options: CallbackOptions):
+        yield Observation(engine.pool.checkedout())
+        
+    def pool_overflow_callback(options: CallbackOptions):
+        yield Observation(engine.pool.overflow())
+        
+    db_meter.create_observable_gauge(
+        "tablesys.db.pool.checked_out",
+        callbacks=[pool_checked_out_callback],
+        description="Number of checked out connections"
+    )
+    db_meter.create_observable_gauge(
+        "tablesys.db.pool.overflow",
+        callbacks=[pool_overflow_callback],
+        description="Number of overflow connections"
+    )
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        conn.info.setdefault('query_start_time', []).append(time.time())
+
+    @event.listens_for(engine, "after_cursor_execute")
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        start_time = conn.info['query_start_time'].pop(-1)
+        duration_ms = (time.time() - start_time) * 1000
+        
+        tenant_id = get_current_tenant_id()
+        # In a real app we'd cache plan_tier in contextvars as well.
+        attributes = {
+            "tenant_id": str(tenant_id) if tenant_id else "none",
+        }
+        db_query_duration_histogram.record(duration_ms, attributes)
+        
+except ImportError:
+    logger.warning("OpenTelemetry components not loaded in database.py")
+
+
 def setup_tenant_isolation():
     from .middleware.tenant import apply_orm_tenant_isolation
     apply_orm_tenant_isolation(SessionLocal)

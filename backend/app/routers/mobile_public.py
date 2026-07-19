@@ -23,19 +23,25 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 
 from ..database import get_db
 from ..models import (
+    ActivityType,
     Course,
     Department,
     Lecturer,
     Room,
+    School,
     StudentGroup,
     Timetable,
     TimetableSlot,
     University,
     CourseAnnouncement,
+    LabSession,
+    LabSessionStatus,
 )
+from ..utils.sanitization import sanitize_input
 
 router = APIRouter(prefix="/api/v1/mobile/public", tags=["mobile-public"])
 
@@ -61,6 +67,45 @@ def _day_name(val: Any) -> str:
     return str(val) if val is not None else ""
 
 
+def _resolve_public_university_id(
+    db: Session,
+    request: Optional[Request],
+    university_id: Optional[int],
+) -> int:
+    header_val = None
+    if request is not None:
+        header_val = request.headers.get("X-University-ID")
+
+    resolved_id: Optional[int] = None
+    if university_id is not None:
+        resolved_id = university_id
+    elif header_val:
+        try:
+            resolved_id = int(header_val)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid university context header.",
+            )
+
+    if resolved_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="University context is required.",
+        )
+
+    uni = db.query(University).filter(
+        University.id == resolved_id,
+        University.is_active == True,
+    ).first()
+    if not uni:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="University not found or inactive.",
+        )
+    return uni.id
+
+
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 
@@ -70,17 +115,44 @@ def _format_time(value: Optional[time]) -> str:
     return value.strftime("%H:%M")
 
 
-def _get_effective_group_ids(db: Session, group_id: int) -> set[int]:
-    """Walk up the parent_group_id chain and return all ancestor group IDs.
+def _activity_type_map(db: Session, university_id: Optional[int]) -> Dict[str, Dict[str, str]]:
+    if not university_id:
+        return {}
+    rows = (
+        db.query(ActivityType)
+        .filter(
+            ActivityType.university_id == university_id,
+            ActivityType.is_active == True,
+        )
+        .all()
+    )
+    return {
+        str(row.key).strip().lower(): {
+            "display_name": row.display_name,
+            "color": row.color or "#3B82F6",
+        }
+        for row in rows
+    }
 
-    If the student is in *Lab Group A* (tier 3), this returns the IDs for
-    Lab Group A, its parent Stream group, and its grandparent Department
-    group.  Slots assigned to any of these groups should be shown.
+
+def _get_effective_group_ids(
+    db: Session, group_id: int, *, include_descendants: bool = False
+) -> set[int]:
+    """
+    Return the groups whose normal teaching slots belong to a selected group.
+
+    A selection inherits its parents (cohort and stream teaching), but it does
+    not automatically inherit every child lab/tutorial group.  That previously
+    made a student selecting a parent cohort see every parallel lab.  Child
+    groups are added only when the student selects them in the lab selector.
+    Callers that genuinely need the full hierarchy, such as exam allocation,
+    can explicitly request descendants.
     """
     effective_ids: set[int] = set()
+    
+    # 1. Walk UP the chain (ancestors)
     current_id: Optional[int] = group_id
-    max_depth = 10  # safety valve against circular references
-
+    max_depth = 10
     while current_id and max_depth > 0:
         effective_ids.add(current_id)
         group = db.query(StudentGroup).filter(StudentGroup.id == current_id).first()
@@ -89,7 +161,57 @@ def _get_effective_group_ids(db: Session, group_id: int) -> set[int]:
         current_id = group.parent_group_id
         max_depth -= 1
 
+    if not include_descendants:
+        return effective_ids
+
+    # 2. Walk DOWN the chain (descendants) for aggregate use cases only.
+    from collections import deque
+    queue = deque([group_id])
+    while queue:
+        curr = queue.popleft()
+        effective_ids.add(curr)
+        children = db.query(StudentGroup.id).filter(StudentGroup.parent_group_id == curr).all()
+        for (child_id,) in children:
+            if child_id not in effective_ids:
+                queue.append(child_id)
+
     return effective_ids
+
+
+def _validate_selected_subgroups(
+    db: Session,
+    group_id: int,
+    selected_subgroup_ids: List[int],
+    university_id: int,
+) -> set[int]:
+    """Keep optional lab/tutorial selections within the selected group tree."""
+    if not selected_subgroup_ids:
+        return set()
+
+    # Lab groups may be attached directly to the selected stream or to its
+    # parent cohort (legacy data and rotating master labs).  They are optional
+    # viewer choices, never a login identity, so make both locations available.
+    permitted: set[int] = set()
+    for ancestor_id in _get_effective_group_ids(db, group_id):
+        permitted.update(_get_effective_group_ids(db, ancestor_id, include_descendants=True))
+    selected = {int(value) for value in selected_subgroup_ids}
+    if not selected.issubset(permitted):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selected lab or tutorial groups must belong to the selected programme group.",
+        )
+
+    valid_count = (
+        db.query(StudentGroup.id)
+        .filter(
+            StudentGroup.id.in_(selected),
+            StudentGroup.university_id == university_id,
+        )
+        .count()
+    )
+    if valid_count != len(selected):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid subgroup selection.")
+    return selected
 
 
 def _slot_matches_effective_groups(
@@ -114,13 +236,18 @@ def _sort_slots(slots: List[TimetableSlot]) -> List[TimetableSlot]:
     )
 
 
-def _resolve_group(db: Session, group_id: int) -> StudentGroup:
+def _resolve_group(db: Session, group_id: int, university_id: Optional[int] = None) -> StudentGroup:
     """Load and validate the requested group."""
     group = db.query(StudentGroup).filter(StudentGroup.id == group_id).first()
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Group not found. Please select a valid group.",
+        )
+    if university_id is not None and group.university_id != university_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Group does not belong to this institution.",
         )
     return group
 
@@ -145,16 +272,23 @@ def _get_local_now(db: Session, group: StudentGroup) -> datetime:
 def _find_candidate_timetables(
     db: Session, group: StudentGroup, effective_ids: set[int]
 ) -> List[Timetable]:
+    department = db.query(Department).filter(Department.id == group.department_id).first() if group else None
+    school_id = department.school_id if department else None
+
     timetables = (
         db.query(Timetable)
-        .filter(Timetable.university_id == group.university_id)
+        .filter(
+            Timetable.university_id == group.university_id,
+            Timetable.is_active == True,
+            or_(Timetable.school_id == school_id, Timetable.school_id == None) if school_id else True
+        )
         .options(
             joinedload(Timetable.slots).joinedload(TimetableSlot.course),
             joinedload(Timetable.slots).joinedload(TimetableSlot.lecturer),
             joinedload(Timetable.slots).joinedload(TimetableSlot.room),
             joinedload(Timetable.slots).joinedload(TimetableSlot.group),
         )
-        .order_by(Timetable.is_active.desc(), Timetable.id.desc())
+        .order_by(Timetable.id.desc())
         .all()
     )
 
@@ -165,9 +299,18 @@ def _find_candidate_timetables(
     return matching
 
 
-def _resolve_public_context(db: Session, group_id: int) -> Dict[str, Any]:
-    group = _resolve_group(db, group_id)
+def _resolve_public_context(
+    db: Session, 
+    group_id: int, 
+    university_id: int,
+    academic_week: Optional[int] = None,
+    lab_subgroup_ids: Optional[List[int]] = None
+) -> Dict[str, Any]:
+    group = _resolve_group(db, group_id, university_id)
     effective_ids = _get_effective_group_ids(db, group_id)
+    selected_subgroups = _validate_selected_subgroups(
+        db, group_id, lab_subgroup_ids or [], university_id
+    )
 
     candidates = _find_candidate_timetables(db, group, effective_ids)
     if not candidates:
@@ -179,6 +322,25 @@ def _resolve_public_context(db: Session, group_id: int) -> Dict[str, Any]:
     timetable = candidates[0]
     relevant_slots = _sort_slots(
         [s for s in timetable.slots if _slot_matches_effective_groups(s, effective_ids)]
+    )
+
+    # Labs/tutorials are separate events.  Show only the selected subgroup(s)
+    # plus any session intentionally attached to the selected parent group,
+    # and only when they belong to the currently published timetable.
+    lab_group_ids = effective_ids | selected_subgroups
+    lab_sessions = (
+        db.query(LabSession)
+        .filter(
+            LabSession.university_id == university_id,
+            LabSession.timetable_id == timetable.id,
+            LabSession.group_id.in_(lab_group_ids),
+            LabSession.status.in_([LabSessionStatus.PUBLISHED, LabSessionStatus.SCHEDULED]),
+        )
+        .options(
+            joinedload(LabSession.course),
+            joinedload(LabSession.room)
+        )
+        .all()
     )
 
     department = (
@@ -202,17 +364,25 @@ def _resolve_public_context(db: Session, group_id: int) -> Dict[str, Any]:
         "department": department,
         "timetable": timetable,
         "slots": relevant_slots,
+        "lab_sessions": lab_sessions,
         "effective_group_ids": effective_ids,
         "group_breadcrumb": breadcrumb,
+        "academic_week": academic_week,
+        "lab_subgroup_ids": list(selected_subgroups),
     }
 
 
-def _serialize_slot(slot: TimetableSlot) -> Dict[str, Any]:
+def _serialize_slot(
+    slot: TimetableSlot,
+    activity_types_by_key: Optional[Dict[str, Dict[str, str]]] = None,
+) -> Dict[str, Any]:
     """Serialize a slot — lecturer email is intentionally omitted."""
     course = slot.course
     lecturer = slot.lecturer
     room = slot.room
     group = slot.group
+    activity_key = str(slot.session_type or "").strip().lower()
+    activity_meta = (activity_types_by_key or {}).get(activity_key, {})
 
     return {
         "id": slot.id,
@@ -220,6 +390,9 @@ def _serialize_slot(slot: TimetableSlot) -> Dict[str, Any]:
         "start_time": _format_time(slot.start_time),
         "end_time": _format_time(slot.end_time),
         "session_type": slot.session_type,
+        "activity_type_key": activity_key or None,
+        "activity_display_name": activity_meta.get("display_name"),
+        "activity_color": activity_meta.get("color"),
         "course_id": slot.course_id,
         "course_code": course.code if course else "N/A",
         "course_name": course.name if course else "N/A",
@@ -229,6 +402,176 @@ def _serialize_slot(slot: TimetableSlot) -> Dict[str, Any]:
         "building": room.building if room else "TBA",
         "group_name": group.name if group else "N/A",
     }
+
+
+def _serialize_lab_session(
+    ls: LabSession,
+    activity_types_by_key: Optional[Dict[str, Dict[str, str]]] = None,
+    active_subgroup_ids: Optional[List[int]] = None,
+    subgroup_label: str = "Lab Group",
+) -> Dict[str, Any]:
+    course = ls.course
+    room = ls.room
+    activity_key = str(ls.session_type or "lab").strip().lower()
+    activity_meta = (activity_types_by_key or {}).get(activity_key, {})
+
+    return {
+        "id": f"lab_{ls.id}",
+        "day_of_week": _day_name(ls.day_of_week),
+        "start_time": _format_time(ls.start_time),
+        "end_time": _format_time(ls.end_time),
+        "session_type": ls.session_type,
+        "activity_type_key": activity_key or None,
+        "activity_display_name": activity_meta.get("display_name", "Lab Session"),
+        "activity_color": activity_meta.get("color", "#7C3AED"),
+        "course_id": ls.course_id,
+        "course_code": course.code if course else "N/A",
+        "course_name": course.name if course else "N/A",
+        "lecturer_name": "Unassigned",
+        "room_name": room.name if room else "TBA",
+        "room_number": room.name if room else "TBA",
+        "building": room.building if room else "TBA",
+        "group_name": subgroup_label,
+        "is_lab_session": True,
+        "lab_session_id": ls.id,
+        "rotation_cycle_length": ls.rotation_cycle_length,
+        "rotation_configuration": ls.rotation_configuration,
+        "active_subgroup_ids": active_subgroup_ids,
+    }
+
+
+def _get_all_serialized_sessions(db: Session, context: Dict[str, Any], activity_types_by_key: Dict[str, Any]) -> List[Dict[str, Any]]:
+    sessions = [_serialize_slot(s, activity_types_by_key) for s in context["slots"]]
+    academic_week = context.get("academic_week")
+    lab_subgroup_ids = context.get("lab_subgroup_ids", [])
+    effective_ids = context["effective_group_ids"]
+
+    for ls in context.get("lab_sessions", []):
+        active_subgroup_ids = None
+        subgroup_label = "Lab Group"
+        
+        if ls.rotation_configuration and academic_week is not None:
+            cycle_pos = str(((academic_week - 1) % ls.rotation_cycle_length) + 1)
+            active_subgroup_ids = ls.rotation_configuration.get(cycle_pos, [])
+            
+            # If the student selected specific lab subgroups, verify if their subgroup is active
+            if lab_subgroup_ids:
+                has_active = any(sg in active_subgroup_ids for sg in lab_subgroup_ids)
+                if not has_active:
+                    continue  # The student's chosen subgroup is not scheduled this week
+            
+            sub_names = []
+            for sg_id in active_subgroup_ids:
+                sg = db.query(StudentGroup).filter(StudentGroup.id == int(sg_id)).first()
+                if sg:
+                    sub_names.append(sg.name)
+            subgroup_label = ", ".join(sub_names) if sub_names else "No subgroups this week"
+
+        # A rotating master slot may be attached to a parent group.  Do not
+        # show it to a self-selected subgroup unless that subgroup is active.
+        if lab_subgroup_ids and active_subgroup_ids is None and ls.group_id not in lab_subgroup_ids:
+            continue
+        
+        sessions.append(_serialize_lab_session(ls, activity_types_by_key, active_subgroup_ids, subgroup_label))
+        
+    return sessions
+
+
+def _build_lab_subgroup_catalog(db: Session, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    catalog: Dict[int, Dict[str, Any]] = {}
+    academic_week = context.get("academic_week")
+
+    for ls in context.get("lab_sessions", []):
+        if not ls.rotation_configuration:
+            continue
+
+        course = ls.course
+        active_subgroup_ids: List[int] = []
+        if academic_week is not None:
+            cycle_pos = str(((academic_week - 1) % max(ls.rotation_cycle_length, 1)) + 1)
+            active_subgroup_ids = [
+                int(group_id)
+                for group_id in ls.rotation_configuration.get(cycle_pos, [])
+                if str(group_id).isdigit()
+            ]
+
+        for week_key, subgroup_ids in ls.rotation_configuration.items():
+            for subgroup_id_raw in subgroup_ids or []:
+                if not str(subgroup_id_raw).isdigit():
+                    continue
+                subgroup_id = int(subgroup_id_raw)
+                subgroup = db.query(StudentGroup).filter(StudentGroup.id == subgroup_id).first()
+                if not subgroup:
+                    continue
+
+                entry = catalog.setdefault(
+                    subgroup_id,
+                    {
+                        "id": subgroup.id,
+                        "name": subgroup.name,
+                        "display_code": subgroup.display_code,
+                        "group_type": getattr(subgroup.group_type, "value", str(subgroup.group_type)) if subgroup.group_type else None,
+                        "parent_group_id": subgroup.parent_group_id,
+                        "course_codes": [],
+                        "course_names": [],
+                        "rotation_weeks": [],
+                        "active_this_week": False,
+                    },
+                )
+
+                if course and course.code not in entry["course_codes"]:
+                    entry["course_codes"].append(course.code)
+                if course and course.name not in entry["course_names"]:
+                    entry["course_names"].append(course.name)
+                if week_key not in entry["rotation_weeks"]:
+                    entry["rotation_weeks"].append(week_key)
+                if subgroup_id in active_subgroup_ids:
+                    entry["active_this_week"] = True
+
+    # Also support individually scheduled lab/tutorial groups.  Older imports
+    # and manual schedules may create one LabSession per child group rather
+    # than one rotating master session on the parent group.
+    descendant_ids: set[int] = set()
+    for ancestor_id in context["effective_group_ids"]:
+        descendant_ids.update(_get_effective_group_ids(db, ancestor_id, include_descendants=True))
+    descendant_ids.difference_update(context["effective_group_ids"])
+    if descendant_ids:
+        direct_sessions = (
+            db.query(LabSession)
+            .filter(
+                LabSession.timetable_id == context["timetable"].id,
+                LabSession.group_id.in_(descendant_ids),
+                LabSession.status.in_([LabSessionStatus.PUBLISHED, LabSessionStatus.SCHEDULED]),
+            )
+            .options(joinedload(LabSession.course))
+            .all()
+        )
+        for ls in direct_sessions:
+            subgroup = db.query(StudentGroup).filter(StudentGroup.id == ls.group_id).first()
+            if not subgroup:
+                continue
+            entry = catalog.setdefault(
+                subgroup.id,
+                {
+                    "id": subgroup.id,
+                    "name": subgroup.name,
+                    "display_code": subgroup.display_code,
+                    "group_type": getattr(subgroup.group_type, "value", str(subgroup.group_type)) if subgroup.group_type else None,
+                    "parent_group_id": subgroup.parent_group_id,
+                    "course_codes": [],
+                    "course_names": [],
+                    "rotation_weeks": [],
+                    "active_this_week": True,
+                },
+            )
+            if ls.course and ls.course.code not in entry["course_codes"]:
+                entry["course_codes"].append(ls.course.code)
+            if ls.course and ls.course.name not in entry["course_names"]:
+                entry["course_names"].append(ls.course.name)
+            if "Every week" not in entry["rotation_weeks"]:
+                entry["rotation_weeks"].append("Every week")
+
+    return sorted(catalog.values(), key=lambda item: (item["name"] or "", item["id"]))
 
 
 def _compute_etag(payload: Dict[str, Any]) -> str:
@@ -336,6 +679,7 @@ def _find_next_session(
 
 @router.get("/onboarding-groups")
 async def get_onboarding_groups(
+    request: Request,
     university_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
@@ -344,20 +688,9 @@ async def get_onboarding_groups(
     Response shape::
 
         {
-          "departments": [
+          "schools": [
             {
-              "id": 1,
-              "name": "Engineering",
-              "levels": [
-                {
-                  "level": 1,
-                  "groups": [
-                    { "id": 5, "name": "GEN Year 1", "display_code": "GEN1", "size": 120 },
-                    ...
-                  ]
-                },
-                ...
-              ]
+              "id": 1, "name": "School of Engineering", "departments": [...]
             },
             ...
           ]
@@ -366,9 +699,11 @@ async def get_onboarding_groups(
     Only departments and levels that actually have groups are returned,
     so the frontend dropdown never shows an empty selection.
     """
-    query = db.query(StudentGroup)
-    if university_id:
-        query = query.filter(StudentGroup.university_id == university_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+
+    query = db.query(StudentGroup).filter(
+        StudentGroup.university_id == resolved_university_id
+    )
 
     all_groups = query.order_by(
         StudentGroup.department_id.asc(),
@@ -377,17 +712,35 @@ async def get_onboarding_groups(
     ).all()
 
     if not all_groups:
-        return {"departments": []}
+        return {"schools": [], "departments": []}
 
-    # ── Only expose leaf groups (no children) ────────────────────────────────
-    # Parent/cohort groups (Year 5 cohort) are infrastructure — students should
-    # only select the specific stream or single-group they actually belong to.
-    # A leaf group is one whose id does not appear as any group's parent_group_id.
-    all_parent_ids = {g.parent_group_id for g in all_groups if g.parent_group_id}
-    leaf_groups = [g for g in all_groups if g.id not in all_parent_ids]
+    # ── Login identity: stream or unsplit cohort only ────────────────────────
+    # Lab/tutorial/drawing groups are delivery detail.  They must never replace
+    # EMP/ET (or an unsplit cohort) in the student's initial selection.
+    #
+    # A stream remains selectable even when it has lab children.  A root cohort
+    # is selectable only if it has no elective streams; this keeps a simple
+    # cohort usable while preventing duplicate parent + stream choices.
+    child_stream_parent_ids = {
+        g.parent_group_id
+        for g in all_groups
+        if g.parent_group_id and str(getattr(g.group_type, "value", g.group_type)) == "stream"
+    }
+    selectable_groups = [
+        g
+        for g in all_groups
+        if (
+            str(getattr(g.group_type, "value", g.group_type)) == "stream"
+            or (
+                g.parent_group_id is None
+                and str(getattr(g.group_type, "value", g.group_type)) in {"general", "department", "None"}
+                and g.id not in child_stream_parent_ids
+            )
+        )
+    ]
 
     # ── Collect departments ───────────────────────────────────────────────────
-    dept_ids = {g.department_id for g in leaf_groups}
+    dept_ids = {g.department_id for g in selectable_groups}
     departments = (
         db.query(Department)
         .filter(Department.id.in_(dept_ids))
@@ -406,7 +759,7 @@ async def get_onboarding_groups(
 
     result: List[Dict[str, Any]] = []
     for dept in departments:
-        dept_leaves = [g for g in leaf_groups if g.department_id == dept.id]
+        dept_leaves = [g for g in selectable_groups if g.department_id == dept.id]
         level_map: Dict[int, List[Dict[str, Any]]] = {}
         for g in dept_leaves:
             norm_level = _normalize_level(g.level)
@@ -426,7 +779,63 @@ async def get_onboarding_groups(
         ]
         result.append({"id": dept.id, "name": dept.name, "code": dept.code, "levels": levels})
 
-    return {"departments": result}
+    # The public selector is intentionally school-first.  A department must
+    # belong to an active school before its students can self-identify; this
+    # prevents a timetable from one school appearing in another school's path.
+    # List every active school in this tenant first.  A school must not vanish
+    # from the public identity path merely because one of its departments has
+    # not yet had groups or a timetable loaded.
+    schools_by_id = {
+        school.id: school
+        for school in db.query(School).filter(
+            School.university_id == resolved_university_id,
+            School.is_active == True,
+        ).all()
+    }
+    school_buckets: Dict[int, Dict[str, Any]] = {
+        school.id: {
+            "id": school.id,
+            "name": school.name,
+            "code": school.code,
+            "departments": [],
+        }
+        for school in schools_by_id.values()
+    }
+    for department_entry, department_model in zip(result, departments):
+        school = schools_by_id.get(department_model.school_id)
+        if not school:
+            continue
+        school_id = school.id
+        bucket = school_buckets[school_id]
+        bucket["departments"].append(department_entry)
+
+    schools = sorted(
+        school_buckets.values(),
+        key=lambda item: item["name"].lower(),
+    )
+    for school in schools:
+        school["departments"].sort(key=lambda item: item["name"].lower())
+    # Keep departments during the transition so cached/mobile clients built on
+    # earlier versions do not fail. New clients use the school hierarchy only.
+    return {"schools": schools, "departments": result}
+
+
+@router.get("/lab-subgroups")
+async def get_public_lab_subgroups(
+    group_id: int = Query(..., description="Student group ID"),
+    academic_week: Optional[int] = Query(None, description="Academic week for lab rotation"),
+    university_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    """Return the rotating lab subgroups available to a student group."""
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    context = _resolve_public_context(db, group_id, resolved_university_id, academic_week)
+    return {
+        "group_id": group_id,
+        "academic_week": academic_week,
+        "lab_subgroups": _build_lab_subgroup_catalog(db, context),
+    }
 
 
 # ── Dashboard ───────────────────────────────────────────────────────────────
@@ -435,12 +844,18 @@ async def get_onboarding_groups(
 @router.get("/dashboard")
 async def get_public_dashboard(
     group_id: int = Query(..., description="Student group ID"),
+    academic_week: Optional[int] = Query(None, description="Academic week for lab rotation"),
+    lab_subgroup_ids: Optional[str] = Query(None, description="Comma-separated list of selected lab subgroups"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    context = _resolve_public_context(db, group_id)
-    serialized = [_serialize_slot(s) for s in context["slots"]]
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    subgroups = [int(i) for i in lab_subgroup_ids.split(",")] if lab_subgroup_ids else []
+    context = _resolve_public_context(db, group_id, resolved_university_id, academic_week, subgroups)
+    activity_types_by_key = _activity_type_map(db, context["group"].university_id)
+    serialized = _get_all_serialized_sessions(db, context, activity_types_by_key)
 
     local_now = _get_local_now(db, context["group"])
     today_name = local_now.strftime("%A")
@@ -473,12 +888,18 @@ async def get_public_dashboard(
 @router.get("/now")
 async def get_public_now(
     group_id: int = Query(..., description="Student group ID"),
+    academic_week: Optional[int] = Query(None, description="Academic week for lab rotation"),
+    lab_subgroup_ids: Optional[str] = Query(None, description="Comma-separated list of selected lab subgroups"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    context = _resolve_public_context(db, group_id)
-    serialized = [_serialize_slot(s) for s in context["slots"]]
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    subgroups = [int(i) for i in lab_subgroup_ids.split(",")] if lab_subgroup_ids else []
+    context = _resolve_public_context(db, group_id, resolved_university_id, academic_week, subgroups)
+    activity_types_by_key = _activity_type_map(db, context["group"].university_id)
+    serialized = _get_all_serialized_sessions(db, context, activity_types_by_key)
 
     local_now = _get_local_now(db, context["group"])
     today_name = local_now.strftime("%A")
@@ -508,18 +929,21 @@ async def get_public_now(
 @router.get("/today")
 async def get_public_today(
     group_id: int = Query(..., description="Student group ID"),
+    academic_week: Optional[int] = Query(None, description="Academic week for lab rotation"),
+    lab_subgroup_ids: Optional[str] = Query(None, description="Comma-separated list of selected lab subgroups"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    context = _resolve_public_context(db, group_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    subgroups = [int(i) for i in lab_subgroup_ids.split(",")] if lab_subgroup_ids else []
+    context = _resolve_public_context(db, group_id, resolved_university_id, academic_week, subgroups)
+    activity_types_by_key = _activity_type_map(db, context["group"].university_id)
     local_now = _get_local_now(db, context["group"])
     today_name = local_now.strftime("%A")
-    sessions = [
-        _serialize_slot(s)
-        for s in context["slots"]
-        if s.day_of_week == today_name
-    ]
+    all_sessions = _get_all_serialized_sessions(db, context, activity_types_by_key)
+    sessions = [s for s in all_sessions if s["day_of_week"] == today_name]
 
     payload = {
         "profile": _build_profile_payload(context),
@@ -537,12 +961,18 @@ async def get_public_today(
 @router.get("/week")
 async def get_public_week(
     group_id: int = Query(..., description="Student group ID"),
+    academic_week: Optional[int] = Query(None, description="Academic week for lab rotation"),
+    lab_subgroup_ids: Optional[str] = Query(None, description="Comma-separated list of selected lab subgroups"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    context = _resolve_public_context(db, group_id)
-    sessions = [_serialize_slot(s) for s in context["slots"]]
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    subgroups = [int(i) for i in lab_subgroup_ids.split(",")] if lab_subgroup_ids else []
+    context = _resolve_public_context(db, group_id, resolved_university_id, academic_week, subgroups)
+    activity_types_by_key = _activity_type_map(db, context["group"].university_id)
+    sessions = _get_all_serialized_sessions(db, context, activity_types_by_key)
 
     sessions_by_day: Dict[str, List[Dict[str, Any]]] = {}
     for session in sessions:
@@ -564,9 +994,12 @@ async def get_public_week(
 @router.get("/courses")
 async def get_public_courses(
     group_id: int = Query(..., description="Student group ID"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
-    context = _resolve_public_context(db, group_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    context = _resolve_public_context(db, group_id, resolved_university_id)
     slots = context["slots"]
 
     seen: set[int] = set()
@@ -600,12 +1033,15 @@ async def public_lookup(
     q: str,
     group_id: int = Query(..., description="Student group ID"),
     db: Session = Depends(get_db),
+    request: Request = None,
+    university_id: Optional[int] = None,
 ):
-    query = q.strip()
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    query = sanitize_input(q, max_length=100).strip()
     if len(query) < 2:
         return {"results": []}
 
-    group = _resolve_group(db, group_id)
+    group = _resolve_group(db, group_id, resolved_university_id)
     university_id = group.university_id
 
     lecturer_q = db.query(Lecturer).filter(Lecturer.department_id == group.department_id)
@@ -725,16 +1161,23 @@ def _build_availability_payload(sessions: List[Dict[str, Any]], local_now: datet
 
 
 def _resolve_reference_timetable(db: Session, group: StudentGroup) -> Optional[Timetable]:
+    department = db.query(Department).filter(Department.id == group.department_id).first() if group else None
+    school_id = department.school_id if department else None
+
     query = (
         db.query(Timetable)
-        .filter(Timetable.university_id == group.university_id)
+        .filter(
+            Timetable.university_id == group.university_id,
+            Timetable.is_active == True,
+            or_(Timetable.school_id == school_id, Timetable.school_id == None) if school_id else True
+        )
         .options(
             joinedload(Timetable.slots).joinedload(TimetableSlot.course),
             joinedload(Timetable.slots).joinedload(TimetableSlot.lecturer),
             joinedload(Timetable.slots).joinedload(TimetableSlot.room),
             joinedload(Timetable.slots).joinedload(TimetableSlot.group),
         )
-        .order_by(Timetable.is_active.desc(), Timetable.id.desc())
+        .order_by(Timetable.id.desc())
     )
     return query.first()
 
@@ -745,16 +1188,25 @@ async def public_lookup_detail(
     entity_id: int,
     group_id: int = Query(..., description="Student group ID"),
     db: Session = Depends(get_db),
+    request: Request = None,
+    university_id: Optional[int] = None,
 ):
-    group = _resolve_group(db, group_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    group = _resolve_group(db, group_id, resolved_university_id)
     timetable = _resolve_reference_timetable(db, group)
     if not timetable:
         raise HTTPException(status_code=404, detail="No timetable available for lookup.")
 
-    serialized = [_serialize_slot(s) for s in timetable.slots]
+    entity_type = sanitize_input(entity_type, max_length=50).strip().lower()
+
+    activity_types_by_key = _activity_type_map(db, group.university_id)
+    serialized = [_serialize_slot(s, activity_types_by_key) for s in timetable.slots]
 
     if entity_type == "lecturer":
-        entity_obj = db.query(Lecturer).filter(Lecturer.id == entity_id).first()
+        entity_obj = db.query(Lecturer).filter(
+            Lecturer.id == entity_id,
+            Lecturer.department_id == group.department_id,
+        ).first()
         if not entity_obj:
             raise HTTPException(status_code=404, detail="Lecturer not found")
         sessions = [s for s in serialized if s["lecturer_name"] == entity_obj.full_name]
@@ -765,7 +1217,10 @@ async def public_lookup_detail(
             "subtitle": entity_obj.staff_number,
         }
     elif entity_type == "room":
-        entity_obj = db.query(Room).filter(Room.id == entity_id).first()
+        entity_obj = db.query(Room).filter(
+            Room.id == entity_id,
+            Room.university_id == group.university_id,
+        ).first()
         if not entity_obj:
             raise HTTPException(status_code=404, detail="Room not found")
         sessions = [s for s in serialized if s["room_name"] == entity_obj.name]
@@ -777,7 +1232,10 @@ async def public_lookup_detail(
             "meta": f"Capacity {entity_obj.capacity}",
         }
     elif entity_type == "group":
-        entity_obj = db.query(StudentGroup).filter(StudentGroup.id == entity_id).first()
+        entity_obj = db.query(StudentGroup).filter(
+            StudentGroup.id == entity_id,
+            StudentGroup.university_id == group.university_id,
+        ).first()
         if not entity_obj:
             raise HTTPException(status_code=404, detail="Group not found")
         sessions = [s for s in serialized if s["group_name"] == entity_obj.name]
@@ -789,7 +1247,10 @@ async def public_lookup_detail(
             "meta": f"{entity_obj.size} students",
         }
     elif entity_type == "course":
-        entity_obj = db.query(Course).filter(Course.id == entity_id).first()
+        entity_obj = db.query(Course).filter(
+            Course.id == entity_id,
+            Course.department_id == group.department_id,
+        ).first()
         if not entity_obj:
             raise HTTPException(status_code=404, detail="Course not found")
         sessions = [s for s in serialized if s["course_id"] == entity_obj.id]
@@ -824,11 +1285,13 @@ async def public_lookup_detail(
 async def get_public_free_rooms_now(
     group_id: int = Query(..., description="Student group ID"),
     building: Optional[str] = None,
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    group = _resolve_group(db, group_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    group = _resolve_group(db, group_id, resolved_university_id)
     university_id = group.university_id
 
     timetable = _resolve_reference_timetable(db, group)
@@ -855,8 +1318,9 @@ async def get_public_free_rooms_now(
 
     rooms_query = db.query(Room).filter(Room.university_id == university_id)
     if building:
+        safe_building = sanitize_input(building, max_length=100).strip()
         rooms_query = rooms_query.filter(
-            Room.building.ilike(f"%{building.strip()}%")
+            Room.building.ilike(f"%{safe_building}%")
         )
 
     rooms = rooms_query.order_by(Room.building.asc(), Room.name.asc()).all()
@@ -889,11 +1353,13 @@ async def get_public_free_rooms_now(
 @router.get("/announcements")
 async def get_public_announcements(
     group_id: int = Query(..., description="Student group ID"),
+    university_id: Optional[int] = None,
     db: Session = Depends(get_db),
     request: Request = None,
     response: Response = None,
 ):
-    context = _resolve_public_context(db, group_id)
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    context = _resolve_public_context(db, group_id, resolved_university_id)
     slots = context["slots"]
 
     course_ids = list({s.course_id for s in slots if s.course_id})
@@ -923,3 +1389,131 @@ async def get_public_announcements(
     }
 
     return _with_conditional_etag(payload, request, response)
+
+# ── Exam Timetables ─────────────────────────────────────────────────────────
+
+@router.get("/exam-timetable")
+async def get_public_exam_timetable(
+    group_id: int = Query(..., description="Student group ID"),
+    university_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    request: Request = None,
+    response: Response = None,
+):
+    resolved_university_id = _resolve_public_university_id(db, request, university_id)
+    group = _resolve_group(db, group_id, resolved_university_id)
+    effective_ids = _get_effective_group_ids(db, group_id, include_descendants=True)
+
+    from ..models import ExamPeriod, ExamSlot, ExamSlotRoom, ExamPaper, Lecturer, Course, Room
+
+    # Get active published exam period
+    period = (
+        db.query(ExamPeriod)
+        .filter(
+            ExamPeriod.university_id == resolved_university_id,
+            ExamPeriod.is_published == True
+        )
+        .order_by(ExamPeriod.start_date.desc())
+        .first()
+    )
+
+    if not period:
+        return {"period": None, "slots": []}
+
+    # Find all slots where this group is allocated
+    slots = (
+        db.query(ExamSlot)
+        .join(ExamPaper, ExamSlot.exam_paper_id == ExamPaper.id)
+        .filter(ExamSlot.exam_period_id == period.id)
+        .options(
+            joinedload(ExamSlot.paper).joinedload(ExamPaper.course),
+            joinedload(ExamSlot.chief_invigilator),
+            joinedload(ExamSlot.room_allocations).joinedload(ExamSlotRoom.room),
+        )
+        .all()
+    )
+
+    # Build the full set of courses this student should see.
+    # Start with direct group-to-course links (GroupAssignment + CourseGroupLink).
+    from ..routers.groups import _effective_course_ids_for_group
+    student_course_ids: set[int] = _effective_course_ids_for_group(db, group)
+
+    # Also pull courses from the active lecture timetable — shared courses
+    # (e.g. EEE courses taken by GEN) have lecture slots assigned directly to
+    # the GEN group, so this captures cross-department courses that the
+    # GroupAssignment / CourseGroupLink tables might not reflect.
+    from ..models import Timetable as TimetableModel
+    department = db.query(Department).filter(Department.id == group.department_id).first() if group else None
+    school_id = department.school_id if department else None
+
+    active_tt = (
+        db.query(TimetableModel)
+        .filter(
+            TimetableModel.university_id == resolved_university_id,
+            TimetableModel.is_active == True,
+            or_(TimetableModel.school_id == school_id, TimetableModel.school_id == None) if school_id else True
+        )
+        .first()
+    )
+    if active_tt:
+        lecture_slots = (
+            db.query(TimetableSlot)
+            .filter(TimetableSlot.timetable_id == active_tt.id)
+            .all()
+        )
+        for ls in lecture_slots:
+            if _slot_matches_effective_groups(ls, effective_ids):
+                student_course_ids.add(ls.course_id)
+
+    relevant_slots = []
+    for slot in slots:
+        paper_group_ids = slot.paper.group_ids or []
+
+        if slot.paper.course_id is not None:
+            # Course-based exam paper: show it if the student takes this course.
+            # This handles shared / cross-department courses correctly — the
+            # paper's group_ids may point to the owning department's group, but
+            # the student still needs to sit the exam.
+            is_relevant = slot.paper.course_id in student_course_ids
+        else:
+            # Non-course (custom) paper: fall back to group hierarchy match.
+            is_relevant = any(gid in effective_ids for gid in paper_group_ids)
+
+        if is_relevant:
+            # Find exact room allocation
+            allocated_rooms = []
+            for alloc in slot.room_allocations:
+                alloc_group_ids = alloc.allocated_group_ids or paper_group_ids
+                if any(gid in effective_ids for gid in alloc_group_ids):
+                    allocated_rooms.append(alloc.room.name if alloc.room else "TBA")
+            
+            # If no specific room matched, but paper did, just show all rooms
+            if not allocated_rooms:
+                allocated_rooms = [a.room.name for a in slot.room_allocations if a.room]
+
+            relevant_slots.append({
+                "id": slot.id,
+                "exam_date": slot.exam_date.isoformat(),
+                "day_of_week": slot.exam_date.strftime("%A"),
+                "start_time": _format_time(slot.start_time),
+                "end_time": _format_time(slot.end_time),
+                "paper_code": slot.paper.paper_code,
+                "paper_name": slot.paper.paper_name,
+                "course_name": slot.paper.course.name if slot.paper.course else None,
+                "chief_invigilator": slot.chief_invigilator.full_name if slot.chief_invigilator else "TBA",
+                "rooms": allocated_rooms or ["TBA"],
+                "duration_minutes": slot.paper.duration_minutes
+            })
+
+    # Sort slots by date and time
+    relevant_slots.sort(key=lambda s: (s["exam_date"], s["start_time"]))
+
+    return {
+        "period": {
+            "id": period.id,
+            "name": period.name,
+            "start_date": period.start_date.isoformat(),
+            "end_date": period.end_date.isoformat(),
+        },
+        "slots": relevant_slots
+    }

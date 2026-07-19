@@ -243,7 +243,7 @@ function normalizeAnalyticsData(raw: Partial<AnalyticsData> | null | undefined):
 // Utility helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-const BRAND_PALETTE = ['#003366', '#FF8C00', '#4A90E2', '#2e7d32', '#9c27b0', '#d32f2f'];
+const BRAND_PALETTE = ['#1976d2', '#9c27b0', '#115293', '#2e7d32', '#7b1fa2', '#d32f2f'];
 
 function dayLabel(dayIndex: number): string {
   return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][dayIndex] || `Day ${dayIndex + 1}`;
@@ -758,7 +758,7 @@ const TimetableAnalytics: React.FC = () => {
     { label: 'Active Courses',     value: summary.unique_courses,       unit: '',   icon: <CourseIcon sx={{ fontSize: 20 }} />,    color: '#FF8C00',       subtitle: 'in the timetable' },
     { label: 'Venues Used',        value: summary.unique_rooms,         unit: '',   icon: <RoomIcon sx={{ fontSize: 20 }} />,      color: '#4A90E2',       subtitle: `of ${room_utilization.length} total rooms` },
     { label: 'Active Lecturers',   value: summary.unique_lecturers,     unit: '',   icon: <PersonIcon sx={{ fontSize: 20 }} />,   color: '#2e7d32',       subtitle: `of ${lecturer_workload.length} total` },
-    { label: 'Student Groups',     value: summary.unique_groups,        unit: '',   icon: <GroupsIcon sx={{ fontSize: 20 }} />,   color: '#9c27b0',       subtitle: 'with assigned sessions' },
+    { label: 'Student Groups',     value: summary.unique_groups,        unit: '',   icon: <GroupsIcon sx={{ fontSize: 20 }} />,   color: '#1976d2',       subtitle: 'with assigned sessions' },
     { label: 'Contact Hours/Wk',   value: summary.total_contact_hours,  unit: 'h',  icon: <AccessTimeIcon sx={{ fontSize: 20 }} />, color: '#d32f2f',    subtitle: 'total teaching time' },
     { label: 'Capacity Warnings',  value: warnings.total, unit: '', icon: <WarnIcon sx={{ fontSize: 20 }} />, color: '#b26a00', subtitle: capacityFallbacks.length > 0 ? `largest gap ${warnings.largest_overflow} seats` : 'no room overflows detected' },
   ];
@@ -963,7 +963,7 @@ const TimetableAnalytics: React.FC = () => {
         <Grid item xs={12} md={7}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-              <Box sx={{ p: 0.75, borderRadius: 2, bgcolor: alpha('#9c27b0', 0.1), color: '#9c27b0', display: 'flex' }}>
+              <Box sx={{ p: 0.75, borderRadius: 2, bgcolor: alpha('#1976d2', 0.1), color: '#1976d2', display: 'flex' }}>
                 <AccessTimeIcon sx={{ fontSize: 20 }} />
               </Box>
               <Box>
@@ -975,7 +975,7 @@ const TimetableAnalytics: React.FC = () => {
             <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
               <TimePeriodBlock label="Morning"   data={time_slot_utilization.morning}   color="#FF8C00" emoji="🌅" />
               <TimePeriodBlock label="Afternoon" data={time_slot_utilization.afternoon} color="#4A90E2" emoji="☀️" />
-              <TimePeriodBlock label="Evening"   data={time_slot_utilization.evening}   color="#9c27b0" emoji="🌙" />
+              <TimePeriodBlock label="Evening"   data={time_slot_utilization.evening}   color="#7b1fa2" emoji="🌙" />
             </Stack>
 
             <Divider sx={{ mb: 2.5 }} />

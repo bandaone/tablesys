@@ -18,6 +18,7 @@ from ..models import (
     StudentGroup,
 )
 from .exam_seating_service import ExamSeatingService
+from ..utils.transit import DEFAULT_TRANSIT_MINUTES, insufficient_transit_time
 
 
 class ExamValidationService:
@@ -114,20 +115,35 @@ class ExamValidationService:
 
         requested_room_ids = {int(item["room_id"]) for item in room_allocations}
 
+        # A multi-room paper has no guaranteed single location for every
+        # candidate, so it must not use the same-room exception.
+        requested_transit_room_id = next(iter(requested_room_ids)) if len(requested_room_ids) == 1 else None
+
         for slot in existing_slots:
             if slot_id and slot.id == slot_id:
                 continue
             if slot.exam_date != exam_date:
                 continue
-            if not self._overlaps(start_time, end_time, slot.start_time, slot.end_time):
-                continue
-
             overlapping_group_ids = set(group_ids).intersection(set(slot.paper.group_ids or []))
-            if overlapping_group_ids:
+            existing_room_ids = existing_rooms_by_slot.get(slot.id, set())
+            existing_transit_room_id = next(iter(existing_room_ids)) if len(existing_room_ids) == 1 else None
+            overlaps = self._overlaps(start_time, end_time, slot.start_time, slot.end_time)
+            transit_clash = insufficient_transit_time(
+                start_time, end_time, requested_transit_room_id,
+                slot.start_time, slot.end_time, existing_transit_room_id,
+            )
+            if overlaps and overlapping_group_ids:
                 errors.append({"field": "group_conflict", "message": f"Groups {sorted(overlapping_group_ids)} already have an overlapping exam", "severity": "error"})
+            elif transit_clash and overlapping_group_ids:
+                errors.append({
+                    "field": "transit_time",
+                    "message": (f"Groups {sorted(overlapping_group_ids)} need at least {DEFAULT_TRANSIT_MINUTES} "
+                                "minutes between exams in different rooms"),
+                    "severity": "error",
+                })
 
-            overlapping_rooms = requested_room_ids.intersection(existing_rooms_by_slot.get(slot.id, set()))
-            if overlapping_rooms:
+            overlapping_rooms = requested_room_ids.intersection(existing_room_ids)
+            if overlaps and overlapping_rooms:
                 errors.append({"field": "room_conflict", "message": f"Rooms {sorted(overlapping_rooms)} already have an overlapping exam booking", "severity": "error"})
 
         if requested_room_ids:

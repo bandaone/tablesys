@@ -6,6 +6,7 @@ from app.models import Timetable, User
 from app.config import settings
 from app.middleware.tenant import get_current_tenant_id
 from app.tasks.generation import generate_timetable_task
+from app.middleware.quota import enforce_generation_quota
 import redis
 import json
 from datetime import datetime
@@ -76,6 +77,7 @@ def trigger_async_generation(
     end_time: str = Query(None, description="Generation end time in HH:MM format"),
     lunch_start: str = Query(None, description="Lunch break start time in HH:MM format"),
     lunch_end: str = Query(None, description="Lunch break end time in HH:MM format"),
+    profile: str = Query("balanced", description="Scheduling profile (balanced, compact, wellbeing)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -85,6 +87,9 @@ def trigger_async_generation(
     timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
     if not timetable:
         raise HTTPException(status_code=404, detail="Timetable not found")
+
+    tenant_id = get_current_tenant_id() or getattr(current_user, "university_id", None)
+    quota_info = enforce_generation_quota(db, tenant_id)
 
     # Persist coordinator-selected window before background task starts.
     _persist_generation_window(db, timetable, start_time, end_time, lunch_start, lunch_end)
@@ -98,17 +103,22 @@ def trigger_async_generation(
                 'timetable_id': timetable_id,
                 'components': comp_list,
                 'university_id': get_current_tenant_id(),
-                'user_id': current_user.id
+                'user_id': current_user.id,
+                'profile': profile
             }
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Broker error: {e}")
     
-    return {
+    response_payload = {
         "job_id": task.id, 
         "status": "started", 
         "message": "Timetable generation enqueued."
     }
+    if quota_info:
+        response_payload["quota"] = quota_info
+
+    return response_payload
 
 @router.get("/status/{job_id}")
 def get_job_status(job_id: str, current_user: User = Depends(get_current_user)):

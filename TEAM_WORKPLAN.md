@@ -1,352 +1,264 @@
-# TABLESYS — AI Agent Team Work Plan
-> **Version:** 2.0 (Strength-Based) · **Date:** 2026-02-19
-> **Project:** TABLESYS — University of Zambia Timetable Management System
-> **Manager:** Dennis Banda · **Team:** Antigravity · Copilot · Cursor
+# TABLESYS — SaaS Team Coordination Plan
+> **Version:** 4.2 (Current Operating Plan) · **Date:** 2026-05-05
+> **Project:** TABLESYS — University SaaS Expansion
+> **Owner:** Dennis Banda · **Team:** codex · Copilot · Antigravity
 
 ---
 
-## 🤖 Agent Profiles & Core Strengths
+## Purpose
 
-### 🧠 Antigravity *(Google DeepMind — Advanced Agentic AI)*
-
-**What Antigravity is best at:**
-- **Long-horizon autonomous reasoning** — plans and executes multi-step tasks without hand-holding
-- **Complex backend systems** — constraint solvers, algorithms, AI/ML integration
-- **Security & infrastructure** — auth systems, middleware, vulnerability analysis, Docker/DevOps
-- **Systems-level thinking** — database design, API architecture, performance optimization
-- **Test strategy** — designing and fixing comprehensive test suites
-- **Cross-cutting analysis** — reads the whole codebase to find root causes
-
-**Weakness to be aware of:** Works better on well-defined backend problems; frontend pixel-perfect design is not its primary strength.
+This is the active team plan for the SaaS expansion. It replaces older task matrices and keeps one current operating model for the three roles.
 
 ---
 
-### 🖱️ Cursor *(VS Code Fork — Claude 3.5 Sonnet / GPT-4 Turbo powered)*
+## Team Roles
 
-**What Cursor is best at:**
-- **Full-codebase multi-file refactoring** — understands 200k+ token context across the whole project
-- **Complex feature implementation** — identifies ALL affected files, matches existing patterns
-- **Legacy code understanding** — traces execution flows, builds mental models of existing systems
-- **Debugging across files** — catches subtle logic bugs spanning multiple components
-- **Architectural discussions & planning** — can reason about trade-offs in design
-- **Agentic multi-step tasks** — "Agent Mode" executes terminal commands and iterates until tests pass
-- **React/TypeScript UI features** — builds complete, contextually consistent components
+### Team Leader
 
-**Weakness to be aware of:** Better when given a clear target; needs sharp task definitions.
+Owns product direction, non-coding execution, and final approvals.
 
----
+Responsibilities:
+- Define pricing, tiers, and quota policy.
+- Own legal and commercial documents.
+- Choose vendors for billing, observability, and support tooling.
+- Approve release gates and rollout timing.
+- Handle all non-coding work and external coordination.
 
-### 🤖 Copilot *(GitHub/Microsoft — GPT-4o powered, IDE-native)*
+Deliverables:
+- Pricing model and quota policy.
+- DPA, SLA, MSA, and Terms of Service drafts.
+- Business registration progress.
+- Vendor shortlist and procurement decisions.
+- Support and knowledge-base approvals.
 
-**What Copilot is best at:**
-- **Boilerplate & CRUD generation** — fastest at generating repetitive, pattern-based code (API routes, forms, validators)
-- **In-the-flow code completion** — autocompletes functions and logic as you type in real time
-- **Unit test generation** — writes tests from existing code patterns with 53%+ pass-rate improvement
-- **Refactoring small units** — cleans up and optimizes individual functions efficiently
-- **Code review assistance** — reviews and explains code, reducing PR review time by 15%
-- **Pattern replication** — sees what you've written and replicates the style/structure across many files
-- **Documentation & comments** — generates accurate docstrings and inline comments
+### Codex
 
-**Weakness to be aware of:** Struggles with complex multi-file architectural tasks; thrives in well-patterned, incremental work.
+Owns cross-cutting architecture, integration slices, and resolving systemic conflicts.
 
----
+Responsibilities:
+- Bridge gaps between Copilot's APIs and Antigravity's infrastructure.
+- Model wide-reaching database relations (e.g., Tenant onboarding flows).
+- Validate runtime behavior across boundaries.
 
-## 📋 Strength-Matched Task Assignments
+Deliverables:
+- Integration contracts (e.g., Onboarding Integration).
+- Systemic schema reconciliation and merge strategies.
+- End-to-end flow validation.
 
-### 🔴 Priority 1 — Critical
+### Copilot
 
-| ID | Task | Best Fit Agent | Why This Agent | Status |
-|---|---|---|---|---|
-| **T1** | Fix full test suite → 100% pass rate (`tests/`, `test_*.py`) | **Antigravity** | Designs and reasons about security, solver, and integration test strategy holistically | 🔧 In Progress |
-| **T2** | Expand boilerplate routers (validation edge cases / HTTP status codes) | **Copilot** | Pattern replication across CRUD routers is Copilot's core strength | ✅ Done |
-| **T3** | Lecturer/Group assignment UI (multi-file: new page + API + schema) | **Cursor** | Multi-file feature impl matching existing conventions is Cursor's core strength | ✅ Complete |
-| **T13** | Multi-Tenant Security & Middleware (`middleware/tenant.py`, `auth.py` JWT logic) | **Antigravity** | Security architecture, token scoping, and request middleware. | ✅ Done |
-| **T14** | Public Tenant Router & Schemas (`routers/public_university.py`, `schemas.py`) | **Copilot** | Standard CRUD/Public router generation and API schema definitions. | ✅ Done |
-| **T15** | Frontend Tenant UI & Context (`TenantContext.tsx`, `Login.tsx`, MUI Theme) | **Cursor** | React context, cross-component state, and dynamic variable styling. | ✅ Done |
+Owns patterned backend/API work, schemas, reporting surfaces, and documentation scaffolding.
 
-### 🟡 Priority 2 — High Value
+Responsibilities:
+- Add and maintain API routes.
+- Build request/response schemas and validation.
+- Add billing and metering endpoints.
+- Build reporting endpoints for usage and SLA summaries.
+- Generate router-level tests and docs stubs.
 
-| ID | Task | Best Fit Agent | Why This Agent | Status |
-|---|---|---|---|---|
-| **T4** | Timetable export — PDF/Excel/Print (expand `export_service.py`) | **Antigravity** | Service layer logic, file generation, complex data transformation | 📋 Pending |
-| **T5** | Timetable grid filters — by dept / lecturer / room (`TimetableViewPage`) | **Cursor** | Multi-file React feature, matches existing component patterns | 📋 Pending |
-| **T6** | Conflict detection & warnings in timetable grid | **Cursor** | Complex UI logic spanning `TimetableGrid` + backend validation layer | 📋 Pending |
-| **T7** | Dashboard analytics — room utilization + lecturer load charts | **Cursor** | React component with chart library integration; codebase-wide context needed | 📋 Pending |
-| **T8** | Unit test generation for all routers | **Copilot** | Copilot excels at test generation from existing patterns | 📋 Pending |
+Deliverables:
+- Usage and quota API surface.
+- Monthly reporting endpoints.
+- Admin-ready reporting helpers.
+- Router tests and validation coverage.
 
-### 🟢 Priority 3 — Polish
+### Antigravity
 
-| ID | Task | Best Fit Agent | Why This Agent | Status |
-|---|---|---|---|---|
-| **T9** | Email notifications for timetable activation | **Antigravity** | Backend service integration, SMTP config, async workers | 📋 Pending |
-| **T10** | Mobile responsive fixes throughout app | **Copilot** | Systematic CSS/MUI style updates — pattern replication across components | 📋 Pending |
-| **T11** | API documentation & inline code comments | **Copilot** | Copilot's docstring and comment generation is best-in-class | 📋 Pending |
-| **T12** | Neural Brain improvements (smarter soft constraints) | **Antigravity** | AI/ML system logic is Antigravity's specialty | 📋 Pending |
+Owns backend infrastructure, automation, security, observability, and lifecycle orchestration.
 
----
+Responsibilities:
+- Build tenant lifecycle automation.
+- Wire seeding, provisioning, and rollback flows.
+- Add telemetry and health instrumentation.
+- Enforce security, rate limits, and data protection flows.
+- Add backup, restore, and disaster-recovery support.
 
-## 🏗️ File Ownership Map
-
-Each agent **owns** their files — only WRITE to your domain. READ access is open to all.
-
-```
-TABLESYS/
-│
-├── backend/app/
-│   ├── services/               ← 🧠 ANTIGRAVITY
-│   │   ├── timetable_generator.py
-│   │   ├── neural_brain.py
-│   │   └── export_service.py
-│   ├── middleware/              ← 🧠 ANTIGRAVITY
-│   ├── utils/                   ← 🧠 ANTIGRAVITY
-│   │   └── pdf_timetable_parser.py
-│   ├── routers/                 ← 🤖 COPILOT
-│   │   ├── auth.py, courses.py, lecturers.py
-│   │   ├── rooms.py, groups.py, departments.py
-│   │   ├── timetables.py, export.py
-│   │   └── import_timetable.py
-│   ├── schemas.py               ← 🤖 COPILOT
-│   ├── auth.py                  ← 🤖 COPILOT
-│   ├── database.py              ← 🤖 COPILOT
-│   └── main.py                  ← 🤖 COPILOT (router registration)
-│
-├── backend/tests/               ← 🧠 ANTIGRAVITY
-├── backend/test_*.py            ← 🧠 ANTIGRAVITY
-│
-├── frontend/src/
-│   ├── components/              ← 🖱️ CURSOR
-│   │   ├── TimetableGrid.tsx
-│   │   ├── TimetableCell.tsx
-│   │   └── [new components]
-│   ├── styles/                  ← 🖱️ CURSOR
-│   ├── App.tsx                  ← 🖱️ CURSOR (routing)
-│   ├── theme.ts                 ← 🖱️ CURSOR
-│   ├── pages/                   ← 🖱️ CURSOR (feature logic)
-│   │   └── [all page components]
-│   ├── api.ts                   ← 🤖 COPILOT (new API calls)
-│   └── contexts/AuthContext.tsx ← 🤖 COPILOT
-│
-├── docker-compose.yml           ← 🧠 ANTIGRAVITY
-├── backend/Dockerfile           ← 🧠 ANTIGRAVITY
-├── backend/requirements.txt     ← 🧠 ANTIGRAVITY
-└── TEAM_WORKPLAN.md             ← ALL (update status only)
-```
+Deliverables:
+- Tenant creation pipeline.
+- Observability and SLA data capture.
+- Security and retention controls.
+- Backup/restore procedures.
+- Backend regression tests.
 
 ---
 
-## 🚦 Coordination Protocol
+## Coordination Rules
 
-### Before Starting a Task
-1. Update this file — change task status to `🔧 In Progress`
-2. Add an owner comment at the top of every file you modify:
-   ```python
-   # OWNER: Antigravity | TASK: T1 | DATE: 2026-02-19
-   ```
-   ```tsx
-   // OWNER: Cursor | TASK: T3 | DATE: 2026-02-19
-   ```
-
-### When Done
-1. Mark task ✅ Done + remove owner comment from files
-2. Update `SYSTEM_SUMMARY.md` with what changed
-3. Notify Dennis to review
-
-### Cross-Domain Rules
-- **Never write to another agent's files** without Dennis approving
-- **Schema changes** (`schemas.py`) — request via Dennis before Copilot makes additions
-- **New API endpoints** — Copilot adds route, Antigravity adds tests, Cursor adds UI
-- **Bug outside your domain** → Report to Dennis, don't self-fix
+1. One owner per file. Only one agent writes to a file during a slice.
+2. One migration at a time. No parallel schema changes.
+3. Lock before edit. Claim the file in `AGENT_STATUS.md` before changing it.
+4. Handoff before overlap. Release the lock and write the handoff note before another agent starts the next slice.
+5. Non-coding work stays with the Team Leader.
+6. If a change touches another owner’s area, stop and hand off rather than crossing boundaries.
 
 ---
 
-## 🔑 Key Facts for All Agents
+## Workstreams
 
-| Fact | Detail |
-|---|---|
-| **Auth** | JWT Bearer. Roles: `COORDINATOR` (full), `HOD` (dept-scoped) |
-| **Default credentials** | `coordinator / coordinator123` |
-| **WebSocket** | `ws://localhost:8000/ws/timetable/{id}` — generation progress |
-| **Generation order** | 5th year → 4th → 3rd → 2nd (OR-Tools CP-SAT) |
-| **PDF import** | Raw slots → `Timetable.generation_metadata.raw_slots` (no lecturer/group yet) |
-| **Active timetable** | Only ONE active at a time. `POST /api/timetables/{id}/activate` |
-| **UNZA Colors** | Primary `#003366` · Secondary `#FF8C00` · Accent `#4A90E2` |
-| **Ports** | Backend `8000` · Frontend `3000` · Postgres `5432` |
-| **Docker** | `docker-compose up --build` from `c:\SYSTEMS\TABLESYS` |
+### 1. Tenant Lifecycle Automation
 
----
+Owner: Antigravity
 
-## 📡 Coordination Channel
+Goal: Make every new university self-provisioning instead of manually onboarded.
 
-We cannot message each other directly, so we coordinate through:
-1. **This file** (`TEAM_WORKPLAN.md`) — task status updates
-2. **Owner comments** in files — signals who is currently editing what
-3. **`SYSTEM_SUMMARY.md`** — updated after every major feature lands
-4. **Dennis** — the human in the loop; escalation point for all conflicts
+Deliverables:
+- Tenant creation API.
+- Automated database seeding.
+- DNS or provisioning hook integration.
+- Welcome sequence and onboarding completion flow.
+- Rollback handling for failed provisioning.
 
----
+Acceptance criteria:
+- A tenant can be created from one controlled request.
+- A seeded environment is created consistently.
+- Failures roll back safely.
 
-## 📋 Recent Completions & Handoffs
+Dependencies:
+- Final tenant data contract.
+- Team Leader approval of onboarding fields.
 
-### ✅ Completed: T2 — Router Validation Enhancement (Copilot, 2026-02-19)
+### 2. Billing and Metering Infrastructure
 
-**What was done:**
-- Enhanced all 5 CRUD routers with comprehensive validation:
-  - `backend/app/routers/courses.py` (334 lines)
-  - `backend/app/routers/lecturers.py` (275 lines)
-  - `backend/app/routers/rooms.py` (267 lines)
-  - `backend/app/routers/groups.py` (191 lines)
-  - `backend/app/routers/departments.py` (91 lines)
+Owner: Copilot
 
-**Validation improvements:**
-- HTTP 422 for invalid field values (range checks, format validation, length limits)
-- HTTP 409 for business rule conflicts (duplicate codes, names, emails)
-- HTTP 404 for missing resources (consistent across all routers)
-- Field-level validation helpers with detailed error messages
-- Department foreign key validation
-- Input sanitization on all string fields
-- Email format validation with regex
-- Enum validation for constrained fields (room_type, level)
+Goal: Measure usage so the product can enforce plans and charge correctly.
 
-**Examples:**
-- Course level must be 100/200/300/400/500/600
-- Credits 1-12, hours 0-10 each, total 1-15
-- Room capacity 1-1000, room_type must be lecture_hall/lab/tutorial
-- Group size 1-500
-- Lecturer max_hours_per_week 1-40
-- Email format validation: `name@domain.ext`
+Deliverables:
+- Metering for active students per tenant.
+- Metering for timetable generations per month.
+- Metering for departments and courses as complexity proxies.
+- API call volume capture if public APIs are exposed.
+- Storage usage tracking for uploads and audit logs.
+- Monthly usage summary endpoints.
 
-**Status:** Zero compile errors, all routers validated
+Acceptance criteria:
+- Usage is captured per tenant.
+- Quota and tier checks can be performed from the API layer.
+- Monthly reports can be generated on demand.
 
----
+Dependencies:
+- Stable tenant identity on every request.
+- Team Leader approval of plan quotas and billable metrics.
 
-### ✅ Support: T3 Assignment Endpoint Implementation (Copilot, 2026-02-19)
+### 3. Observability and SLA Monitoring
 
-**What was done:**
-- Added backend assignment endpoint for Cursor's lecturer/group assignment UI (T3)
-- Modified files:
-  - `backend/app/routers/timetables.py` (252 → 299 lines)
-  - `backend/app/schemas.py` (327 → 331 lines)
-  - `frontend/src/api.ts` (214 → 219 lines)
+Owner: Antigravity
 
-**New features:**
-1. **Slot identification:** Added `slot_id` field to `/api/timetables/view` response
-2. **Assignment schema:** Created `SlotAssignmentRequest` with optional `lecturer_id` and `group_id`
-3. **Assignment endpoint:** `POST /api/timetables/slots/{slot_id}/assign`
-   - Coordinator only
-   - Validates lecturer_id and group_id exist (HTTP 422 if invalid)
-   - Returns 404 if slot not found
-   - Updates slot assignments atomically
-4. **Frontend API method:** `timetablesAPI.assignSlot(slotId, {lecturer_id?, group_id?})`
+Goal: Prove uptime, performance, and reliability to institutional buyers.
 
-**API specification:**
-```typescript
-// Request
-POST /api/timetables/slots/123/assign
-{
-  "lecturer_id": 5,      // optional
-  "group_id": 10         // optional
-}
+Deliverables:
+- API response-time metrics by endpoint.
+- Timetable generation success rate and duration.
+- Database connection pool saturation metrics.
+- Solver timeout and fallback-to-greedy tracking.
+- Tenant-specific error rates.
+- Monitoring stack recommendation and integration plan.
 
-// Response (200 OK)
-{
-  "status": "success",
-  "message": "Slot assignment updated",
-  "slot_id": 123,
-  "lecturer_id": 5,
-  "group_id": 10
-}
+Acceptance criteria:
+- Health and performance metrics are visible per tenant.
+- SLA reporting data can be produced monthly.
+- Alerting can be connected to an external monitoring vendor.
 
-// Error responses
-404: Slot not found
-422: Invalid lecturer_id or group_id
-403: Not coordinator (auth required)
-```
+Dependencies:
+- Consistent telemetry naming.
+- Team Leader vendor selection.
 
-**Handoff to Cursor:**
-- Backend ready: slot_id exposed, assignment endpoint live
-- Frontend API method: `timetablesAPI.assignSlot()` available
-- Next step: Wire "Save Assignment" button to API, handle success/error
-- After testing, mark T3 as ✅ Done and remove owner headers
+### 4. Self-Service and Documentation
 
----
+Owner: Copilot, with Team Leader approval for public-facing copy
 
-### ✅ T3: Assignment UI Complete (Copilot QA, 2026-02-20)
+Goal: Reduce support load by making setup and troubleshooting self-service.
 
-**Status:** ✅ Complete (Backend + Frontend Fully Integrated)
+Deliverables:
+- CSV template downloads with validation rules.
+- Step-by-step generation walkthroughs.
+- Common error and fix articles.
+- API documentation if public endpoints exist.
+- Video tutorial outline and support script.
 
-**Verification results:**
-- Cursor successfully implemented frontend TimetableAssignmentPanel component
-- Backend endpoint: `POST /api/timetables/slots/{slot_id}/assign` ✅ Working
-- Frontend component: `TimetableAssignmentPanel.tsx` (346 lines) ✅ Integrated
+Acceptance criteria:
+- Coordinators can discover upload rules without support.
+- Common errors are documented with fixes.
+- Documentation matches the current API and UI.
 
-**Critical bug fix applied:**
-- **Issue:** Frontend-backend API contract mismatch
-  - Backend accepts single `group_id` (scalar)
-  - Frontend was passing `group_ids` (array)
-- **Root cause:** Multi-select dropdown allowed multiple groups
-- **Fix:** Converted to single-select dropdown
-  - Changed state: `selectedGroups: number[]` → `selectedGroupId: number | null`
-  - Updated API call: `group_ids: [...]` → `group_id: X`
-  - Removed Chip rendering for multiple selections
-- **Result:** Frontend now correctly matches backend SlotAssignmentRequest schema
+Dependencies:
+- Final upload format.
+- Team Leader approval for customer-facing wording.
 
-**Modified files:**
-- `frontend/src/components/TimetableAssignmentPanel.tsx` (7 edits)
-  - State management, dropdown component, API call payload, validation
+### 5. Security, Compliance, and Commercial Foundation
 
-**Testing status:**
-- ✅ TypeScript compilation: No errors
-- ✅ Docker container: Restarted with changes
-- 🔄 Manual UI testing: Pending user acceptance at http://localhost:3002
+Owner: Team Leader for policy; Antigravity for technical enforcement
 
-**Recommendation:**
-- User should test assignment flow (select slot → lecturer → group → save)
-- Verify persistence after page refresh
-- If successful, mark T3 as fully complete
+Goal: Make TABLESYS ready for institutional procurement.
+
+Deliverables:
+- DPA template.
+- Pen-test procurement and report filing.
+- Backup and disaster-recovery policy.
+- Encryption-at-rest verification.
+- Rate limiting on public endpoints.
+- Data export and deletion capability.
+- Terms of Service, SLA, and MSA drafts.
+- Business entity registration progress.
+
+Acceptance criteria:
+- Technical safeguards are implemented and documented.
+- Legal documents exist in draft form.
+- Monthly SLA reporting can be attached to tenant accounts.
+
+Dependencies:
+- Observability and billing foundations.
+- Team Leader ownership of legal/commercial approvals.
 
 ---
 
-### 🔄 Next Priority Tasks
+## Delivery Order
 
-**For Antigravity:**
-- **T1** (In Progress): Fix full test suite → 100% pass rate
-  - Current state: 2/5 tests passing in `backend/test_solver_scale.py`
-  - Levels 2, 4, 5 failing (multi-course scenarios)
-  - 380s total execution time indicates potential performance issues
-  - Files: `backend/tests/`, `backend/test_*.py`
-  - Action needed: Debug failing test assertions, optimize solver performance
+### Stage 1: Decisions (Completed)
 
-**For Cursor:**
-- **T3** (✅ Complete - 2026-02-20): Lecturer/Group assignment UI
-  - Backend endpoint fully implemented (`POST /api/slots/{slot_id}/assign`)
-  - Frontend TimetableAssignmentPanel integrated with single-group selection
-  - **Bug Fix Applied**: Fixed frontend-backend mismatch (multi-group → single-group)
-  - Ready for user acceptance testing at http://localhost:3002
+- [x] 1. Team Leader confirms plan tiers, quotas, SLA target, and legal owners.
+- [x] 2. Team Leader selects monitoring and billing vendors.
+- [x] 3. Team Leader confirms support content priorities.
 
-**For Copilot:**
-- **T8** (⚠️ In Progress - 54% Complete): Unit test generation for all routers
-  - Created `backend/tests/test_routers_validation.py` with 50 comprehensive tests
-  - Current status: **27 PASSING / 23 FAILING**
-  - Passing: Basic validation, foreign key checks, authentication/authorization
-  - Failing: Duplicate detection (409 expected), rooms AttributeError, edge cases
-  - Next: Fix router validation logic to achieve 100% test pass rate
+### Stage 2: Core Platform (Completed)
 
----
+- [x] 1. Antigravity builds tenant lifecycle automation.
+- [x] 2. Copilot builds metering and reporting endpoints.
+- [x] 3. Antigravity adds observability and security controls.
+- [x] 4. Codex resolves integration contracts and runtime verification.
 
-### 🚨 Coordination Notes
+### Stage 3: Customer Readiness (Completed)
 
-**Schema change protocol:**
-- If T3 (Cursor) or T8 (Copilot) needs schema changes, coordinate through Dennis first
-- Copilot owns `schemas.py` but changes affect all agents
+- [x] 1. Copilot publishes self-service documentation.
+- [x] 2. Team Leader finalizes legal and commercial artifacts.
+- [x] 3. Antigravity validates backup, restore, export, and deletion paths.
 
-**Test coverage:**
-- T2 validation changes need test coverage (T8 should cover this)
-- Antigravity to review T8 test quality after Copilot generates them
+### Stage 4: Commercial Launch (Pending)
 
-**Integration points:**
-- Frontend (Cursor) can now rely on consistent HTTP status codes from all routers
-- 422 = validation error, 409 = conflict, 404 = not found, 403 = forbidden
+- [ ] 1. Team Leader signs off pricing and contract package.
+- [ ] 2. Copilot & Codex confirm end-to-end billing and reporting flows.
+- [ ] 3. Antigravity confirms production monitoring and operational readiness.
 
 ---
 
-*Last updated: 2026-02-19 by Copilot · v2.1 — T2 Completion + Handoff*
+## Working Agreement
+
+- Any task touching tenant lifecycle, billing, observability, security, or compliance is written here before implementation starts.
+- Keep non-coding work out of code files.
+- Every finished slice ends with a lock release and a handoff note in `AGENT_STATUS.md`.
+- Use the Team Leader as the decision point whenever a task needs legal, commercial, vendor, or policy approval.
+
+---
+
+## Immediate Next Actions
+
+1. **Copilot**: Begin Workstream 4. Draft self-service documentation scaffolding (CSV templates, API docs, generation walkthroughs).
+2. **Team Leader**: Provide copy approval for support articles and finalize compliance document drafting.
+3. **Codex**: Stand by to support Copilot with API documentation structures, or unblock Antigravity with export/deletion technical contracts.
+4. **Antigravity**: Stand by for production monitoring integration or deployment execution. All security, compliance, observability, and tenant lifecycle foundations are complete.
+
+---
+
+## Notes
+
+This is the active coordination plan. Older phase tables and strength matrices were removed so the team has one current operating model.

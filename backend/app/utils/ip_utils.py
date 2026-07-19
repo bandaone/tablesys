@@ -14,4 +14,4 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     
     # Direct connection (no proxy)
-    return request.client.host
+    return request.client.host if request.client else "unknown"

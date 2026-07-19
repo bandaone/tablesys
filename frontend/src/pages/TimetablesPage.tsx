@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Button, Paper, Typography, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, LinearProgress, Alert, Card, CardContent,
+  DialogActions, TextField, Alert, Card, CardContent,
   Grid, Chip, InputLabel, Select, MenuItem, FormGroup, FormControlLabel,
   Checkbox, FormControl, IconButton, Tooltip, Fade, Zoom, Stack,
   Divider, CircularProgress, Switch,
@@ -23,8 +23,9 @@ import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { timetablesAPI, coursesAPI, lecturersAPI, roomsAPI, groupsAPI } from '../api';
+import { timetablesAPI, coursesAPI, lecturersAPI, roomsAPI, groupsAPI, schoolsAPI, School as SchoolRecord } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranding } from '../contexts/BrandingContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import VersionHistory from '../components/VersionHistory';
 import api from '../api';
@@ -61,6 +62,7 @@ interface Timetable {
   min_score?: number;
   max_score?: number;
   avg_score?: number;
+  school_id?: number | null;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +108,7 @@ const TimetablesPage: React.FC = () => {
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [stats, setStats] = useState({ courses: 0, lecturers: 0, rooms: 0, groups: 0 });
+  const [schools, setSchools] = useState<SchoolRecord[]>([]);
 
   // Create dialog
   const [openCreate, setOpenCreate] = useState(false);
@@ -114,6 +117,7 @@ const TimetablesPage: React.FC = () => {
     semester: 'Semester 1',
     year: new Date().getFullYear(),
     academic_half: 'first_half',
+    school_id: undefined as number | undefined,
     grid_config: {
       start_time: DEFAULT_GRID_CONFIG.start_time,
       end_time: DEFAULT_GRID_CONFIG.end_time,
@@ -131,8 +135,6 @@ const TimetablesPage: React.FC = () => {
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const [generationComplete, setGenerationComplete] = useState(false);
   const [generationError, setGenerationError] = useState('');
-  const [levelProgress, setLevelProgress] = useState<Record<number, boolean>>({});
-  const [components, setComponents] = useState({ lecture: true, practical: false, tutorial: false });
   const [generationWindow, setGenerationWindow] = useState({
     start_time: DEFAULT_GRID_CONFIG.start_time,
     end_time: DEFAULT_GRID_CONFIG.end_time,
@@ -140,6 +142,7 @@ const TimetablesPage: React.FC = () => {
     lunch_end: DEFAULT_GRID_CONFIG.lunch_end,
   });
   const [runInBackground, setRunInBackground] = useState(true);
+  const [schedulingProfile, setSchedulingProfile] = useState('balanced');
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -152,13 +155,25 @@ const TimetablesPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Timetable | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { isCoordinator } = useAuth();
+  const { isCoordinator, isTenantAdmin, user } = useAuth();
+  const { branding } = useBranding();
   const navigate = useNavigate();
 
   useEffect(() => {
     void fetchStats();
     void fetchTimetables();
+    void fetchSchools();
   }, []);
+
+  const fetchSchools = async () => {
+    try {
+      const data = await schoolsAPI.getAll();
+      setSchools(data);
+      if (!isTenantAdmin && user?.school_id) {
+        setFormData((prev) => ({ ...prev, school_id: user.school_id || undefined }));
+      }
+    } catch {}
+  };
 
   const fetchStats = async () => {
     try {
@@ -192,6 +207,10 @@ const TimetablesPage: React.FC = () => {
   const handleCreate = async () => {
     if (!formData.name.trim() || !formData.semester.trim()) {
       setCreateError('Name and Semester are required.');
+      return;
+    }
+    if (!formData.school_id) {
+      setCreateError('Select the school that owns this timetable.');
       return;
     }
     if (formData.grid_config.start_time >= formData.grid_config.end_time) {
@@ -247,7 +266,6 @@ const TimetablesPage: React.FC = () => {
     setGenerationProgress(null);
     setGenerationComplete(false);
     setGenerationError('');
-    setLevelProgress({});
     setCurrentJobId(null);
     if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current as any);
@@ -264,6 +282,7 @@ const TimetablesPage: React.FC = () => {
       lunch_start: grid.lunch_start,
       lunch_end: grid.lunch_end,
     });
+    setSchedulingProfile('balanced');
     resetGenState();
     setOpenGenerate(true);
   };
@@ -272,10 +291,7 @@ const TimetablesPage: React.FC = () => {
     if (!selectedTimetable) return;
     resetGenState();
 
-    const selectedComponents = Object.entries(components)
-      .filter(([, v]) => v)
-      .map(([k]) => k)
-      .join(',');
+    const selectedComponents = 'lecture';
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = getToken();
@@ -285,6 +301,7 @@ const TimetablesPage: React.FC = () => {
       end_time: generationWindow.end_time,
       lunch_start: generationWindow.lunch_start,
       lunch_end: generationWindow.lunch_end,
+      profile: schedulingProfile,
       token,
     });
     const wsUrl = `${protocol}//${window.location.host}/api/v1/timetables/generate/${selectedTimetable.id}?${params.toString()}`;
@@ -298,9 +315,6 @@ const TimetablesPage: React.FC = () => {
 
         if (data.level) {
           setGenerationProgress(data);
-          if (data.status === 'completed') {
-            setLevelProgress(prev => ({ ...prev, [data.level]: true }));
-          }
         }
 
         if (data.status === 'success') {
@@ -334,10 +348,7 @@ const TimetablesPage: React.FC = () => {
     if (!selectedTimetable) return;
     resetGenState();
 
-    const selectedComponents = Object.entries(components)
-      .filter(([, v]) => v)
-      .map(([k]) => k)
-      .join(',');
+    const selectedComponents = 'lecture';
 
     try {
       setGenerationProgress({ level: 0, status: 'started', percentage: 0, message: 'Starting generation...' });
@@ -351,6 +362,7 @@ const TimetablesPage: React.FC = () => {
             end_time: generationWindow.end_time,
             lunch_start: generationWindow.lunch_start,
             lunch_end: generationWindow.lunch_end,
+            profile: schedulingProfile,
           },
         }
       );
@@ -366,9 +378,6 @@ const TimetablesPage: React.FC = () => {
           if (progress && progress.length > 0) {
             const latest = progress[progress.length - 1];
             setGenerationProgress(latest);
-            if (latest.status === 'completed') {
-              setLevelProgress(prev => ({ ...prev, [latest.level]: true }));
-            }
           }
 
           if (state === 'SUCCESS') {
@@ -386,6 +395,15 @@ const TimetablesPage: React.FC = () => {
                 setOpenGenerate(false);
                 void fetchTimetables();
               }, 2000);
+            } else if (result?.status === 'degraded') {
+              setGenerationComplete(true);
+              setGenerationProgress((prev) => (
+                prev ?? { level: 0, status: 'warning', percentage: 100, message: 'Timetable generated with some unplaced sessions.' }
+              ));
+              setTimeout(() => {
+                setOpenGenerate(false);
+                void fetchTimetables();
+              }, 4000);
             } else {
               const savedSlotCount = typeof result?.saved_slot_count === 'number'
                 ? result.saved_slot_count
@@ -468,31 +486,35 @@ const TimetablesPage: React.FC = () => {
   return (
     <Fade in timeout={500}>
       <Box>
-        {/* Generation Readiness UI Tracker */}
-        <Paper sx={{ p: 4, mb: 4, borderRadius: 3, background: 'linear-gradient(145deg, #ffffff, #f0f4f8)', border: '1px solid #e0e0e0' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h5" fontWeight="bold">
-              Timetable Generation Readiness
-            </Typography>
-            {(stats.courses > 0 && stats.lecturers > 0 && stats.rooms > 0 && stats.groups > 0) ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main', bgcolor: '#e8f5e9', px: 2, py: 1, borderRadius: 2 }}>
-                <CheckCircleIcon sx={{ mr: 1 }} fontSize="small" />
-                <Typography fontWeight="bold" variant="body2">Ready to Generate</Typography>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', color: 'error.main', bgcolor: '#ffebee', px: 2, py: 1, borderRadius: 2 }}>
-                <CancelIcon sx={{ mr: 1 }} fontSize="small" />
-                <Typography fontWeight="bold" variant="body2">Missing Prerequisites</Typography>
-              </Box>
-            )}
-          </Box>
+        {/* ══ HERO — bold tenant-gradient ══ */}
+        <Box
+          sx={{
+            position: 'relative',
+            borderRadius: 4,
+            overflow: 'hidden',
+            background: `linear-gradient(135deg, ${branding.primary_color || '#1976d2'} 0%, #1976d2 55%, #9c27b0 100%)`,
+            boxShadow: `0 12px 40px ${(branding.primary_color || '#1976d2')}55`,
+            mb: 5,
+            p: { xs: 3, md: 5 },
+          }}
+        >
+          {/* Decorative orbs */}
+          <Box sx={{ position: 'absolute', top: -60,  left: -60,   width: 260, height: 260, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+          <Box sx={{ position: 'absolute', bottom: -80, right: 140, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+          <Box sx={{ position: 'absolute', top: 20,  right: '34%', width: 80,  height: 80,  borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
 
-          <Grid container spacing={3}>
+          <Grid container spacing={4} sx={{ position: 'relative', zIndex: 1 }} alignItems="center">
             <Grid item xs={12} md={7}>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                The AI Engine requires base academic data to safely construct an optimal, conflict-free timetable.
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <ScheduleIcon sx={{ color: '#fff', fontSize: 32, opacity: 0.9 }} />
+                <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', lineHeight: 1.15 }}>
+                  Timetables
+                </Typography>
+              </Box>
+              <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.78)', mb: 3, maxWidth: 500, lineHeight: 1.7 }}>
+                Prepare clear, reliable lecture timetables from your school’s approved academic data.
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                 {[
                   { label: 'Courses', value: stats.courses },
                   { label: 'Lecturers', value: stats.lecturers },
@@ -501,38 +523,61 @@ const TimetablesPage: React.FC = () => {
                 ].map(item => (
                   <Chip
                     key={item.label}
-                    icon={item.value > 0 ? <CheckCircleIcon sx={{ color: '#4caf50 !important' }}/> : <CancelIcon sx={{ color: '#f44336 !important' }} />}
+                    icon={item.value > 0 ? <CheckCircleIcon sx={{ color: '#fff !important', opacity: 0.9 }}/> : <CancelIcon sx={{ color: '#ffcdd2 !important' }} />}
                     label={`${item.label}: ${item.value}`}
-                    variant="outlined"
-                    sx={{ borderColor: item.value > 0 ? '#4caf50' : '#f44336', bgcolor: 'white', pr: 1 }}
+                    sx={{ 
+                      bgcolor: item.value > 0 ? 'rgba(255,255,255,0.15)' : 'rgba(244, 67, 54, 0.3)', 
+                      color: '#fff',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid',
+                      borderColor: item.value > 0 ? 'rgba(255,255,255,0.3)' : 'rgba(244, 67, 54, 0.5)'
+                    }}
                   />
                 ))}
               </Box>
             </Grid>
-            <Grid item xs={12} md={5} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-end' }, gap: 2 }}>
+              {(stats.courses > 0 && stats.lecturers > 0 && stats.rooms > 0 && stats.groups > 0) ? (
+                <Chip 
+                  label="Ready to Generate" 
+                  color="success" 
+                  icon={<CheckCircleIcon />}
+                  sx={{ fontWeight: 'bold', bgcolor: 'rgba(76, 175, 80, 0.9)', color: '#fff', px: 1, py: 2.5 }} 
+                />
+              ) : (
+                <Chip 
+                  label="Missing Prerequisites" 
+                  color="error" 
+                  icon={<CancelIcon />}
+                  sx={{ fontWeight: 'bold', bgcolor: 'rgba(244, 67, 54, 0.9)', color: '#fff', px: 1, py: 2.5 }} 
+                />
+              )}
+              
                <Button 
                  variant="contained" 
                  size="large"
                  disabled={!(stats.courses > 0 && stats.lecturers > 0 && stats.rooms > 0 && stats.groups > 0)}
                  startIcon={<AddIcon />}
                  onClick={() => setOpenCreate(true)}
-                 sx={{ borderRadius: 8, px: 4, py: 1.5, fontWeight: 'bold' }}
+                 sx={{ 
+                   bgcolor: '#fff', 
+                   color: branding.primary_color || '#1976d2',
+                   fontWeight: 'bold',
+                   mt: 1,
+                   px: 4, 
+                   py: 1.5,
+                   '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                   '&.Mui-disabled': {
+                     bgcolor: 'rgba(255,255,255,0.3)',
+                     color: 'rgba(255,255,255,0.5)'
+                   }
+                 }}
                >
                  Configure New Timetable
                </Button>
             </Grid>
           </Grid>
-        </Paper>
-
-        {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" fontWeight="bold">Timetables</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Create, generate and manage your institution's timetables
-            </Typography>
-          </Box>
-
         </Box>
 
         {/* ── Timetable cards ───────────────────── */}
@@ -553,7 +598,7 @@ const TimetablesPage: React.FC = () => {
               No timetables yet
             </Typography>
             <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-              Create your first timetable and the AI will generate a schedule for all year levels.
+              Create your first timetable to prepare lecture schedules for your school.
             </Typography>
           </Paper>
         ) : (
@@ -608,7 +653,7 @@ const TimetablesPage: React.FC = () => {
                               size="small" variant="contained" fullWidth
                               startIcon={<ViewIcon />}
                               onClick={() => navigate(`/timetables/${tt.id}/view`)}
-                              sx={{ background: `linear-gradient(135deg, ${(window as any).__PRIMARY_COLOR || '#1976d2'} 0%, #00224d 100%)` }}
+                              sx={{ background: `linear-gradient(135deg, ${(window as any).__PRIMARY_COLOR || '#1976d2'} 0%, #115293 100%)` }}
                             >
                               View Timetable
                             </Button>
@@ -735,6 +780,21 @@ const TimetablesPage: React.FC = () => {
                 <MenuItem value="second_half">Second Half</MenuItem>
               </Select>
             </FormControl>
+            <FormControl fullWidth margin="dense" required>
+              <InputLabel>School</InputLabel>
+              <Select
+                value={formData.school_id || ''}
+                label="School"
+                onChange={e => setFormData({ ...formData, school_id: e.target.value ? Number(e.target.value) : undefined })}
+                disabled={!isTenantAdmin}
+              >
+                {schools.map((school) => (
+                  <MenuItem key={school.id} value={school.id}>
+                    {school.name} ({school.code})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -817,7 +877,7 @@ const TimetablesPage: React.FC = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenCreate(false)}>Cancel</Button>
-            <Button onClick={() => void handleCreate()} variant="contained" disabled={creating}>
+            <Button onClick={() => void handleCreate()} variant="contained" disabled={creating || !formData.school_id}>
               {creating ? <CircularProgress size={18} /> : 'Create & Configure'}
             </Button>
           </DialogActions>
@@ -830,7 +890,7 @@ const TimetablesPage: React.FC = () => {
           maxWidth="sm" fullWidth
         >
           <DialogTitle>
-            Generate: {selectedTimetable?.name}
+            Prepare Lectures: {selectedTimetable?.name}
           </DialogTitle>
           <DialogContent>
             <Box sx={{ mt: 1 }}>
@@ -838,33 +898,9 @@ const TimetablesPage: React.FC = () => {
               {/* Pre-generation options */}
               {!generationProgress && !generationComplete && !generationError && (
                 <>
-                   <Alert severity="info" sx={{ mb: 2 }}>
-                    The AI will schedule level by level from <strong>highest to lowest</strong>.
-                    You can generate lectures now and add labs/tutorials later without overwriting.
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    This run prepares <strong>lecture sessions only</strong>. Lab and tutorial schedules are managed separately.
                   </Alert>
-
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                    Components to Generate
-                  </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-                    <FormGroup>
-                      <FormControlLabel
-                        control={<Checkbox checked={components.lecture}
-                          onChange={e => setComponents({ ...components, lecture: e.target.checked })} />}
-                        label="Lectures (main groups)"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={components.practical}
-                          onChange={e => setComponents({ ...components, practical: e.target.checked })} />}
-                        label="Labs / Practicals (lab subgroups)"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={components.tutorial}
-                          onChange={e => setComponents({ ...components, tutorial: e.target.checked })} />}
-                        label="Tutorials (tutorial subgroups)"
-                      />
-                    </FormGroup>
-                  </Paper>
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
                     Execution Mode
                   </Typography>
@@ -876,6 +912,25 @@ const TimetablesPage: React.FC = () => {
                         label="Run in background (Recommended)"
                       />
                     </FormGroup>
+                  </Paper>
+
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Scheduling Profile
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={schedulingProfile}
+                        onChange={(e) => setSchedulingProfile(e.target.value)}
+                      >
+                        <MenuItem value="balanced">Balanced (Default)</MenuItem>
+                        <MenuItem value="compact">Compact Week (Prioritize free days)</MenuItem>
+                        <MenuItem value="wellbeing">Student Wellbeing (Limit daily load & fatigue)</MenuItem>
+                      </Select>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                        Choose the timetable style that best fits your school’s teaching week.
+                      </Typography>
+                    </FormControl>
                   </Paper>
 
                   <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
@@ -939,32 +994,45 @@ const TimetablesPage: React.FC = () => {
 
               {/* Live progress */}
               {generationProgress && !generationComplete && !generationError && (
-                <Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    {generationProgress.message}
+                <Box
+                  sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: 4,
+                    px: { xs: 2.5, sm: 4 },
+                    py: 4.5,
+                    textAlign: 'center',
+                    color: '#fff',
+                    background: 'linear-gradient(135deg, #0f4c81 0%, #276fd1 52%, #7651c8 100%)',
+                    boxShadow: '0 18px 40px rgba(41, 91, 173, 0.28)',
+                    '@keyframes timetableGlow': {
+                      '0%, 100%': { transform: 'scale(0.92)', opacity: 0.38 },
+                      '50%': { transform: 'scale(1.12)', opacity: 0.68 },
+                    },
+                    '@keyframes timetableDrift': {
+                      '0%': { transform: 'translateX(-30%) rotate(0deg)' },
+                      '100%': { transform: 'translateX(30%) rotate(360deg)' },
+                    },
+                  }}
+                >
+                  <Box sx={{ position: 'absolute', width: 260, height: 260, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.10)', top: -145, left: -80, animation: 'timetableGlow 4s ease-in-out infinite', pointerEvents: 'none' }} />
+                  <Box sx={{ position: 'absolute', width: 190, height: 190, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.18)', bottom: -125, right: -25, animation: 'timetableDrift 18s linear infinite', pointerEvents: 'none' }} />
+                  <Box sx={{ position: 'relative', zIndex: 1, mx: 'auto', width: 76, height: 76, display: 'grid', placeItems: 'center', borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.28)', boxShadow: '0 0 0 10px rgba(255,255,255,0.05)', mb: 2.5 }}>
+                    <CircularProgress size={50} thickness={3.2} sx={{ color: '#fff' }} />
+                  </Box>
+                  <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: '-0.01em' }}>
+                    {generationProgress.percentage < 20
+                      ? 'Preparing your lecture timetable'
+                      : generationProgress.percentage < 70
+                        ? 'Arranging your teaching week'
+                        : 'Adding the finishing touches'}
                   </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={generationProgress.percentage}
-                    sx={{ height: 8, borderRadius: 4, mb: 0.5 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {Math.round(generationProgress.percentage)}% — Year {generationProgress.level}
+                  <Typography variant="body2" sx={{ mt: 1, color: 'rgba(255,255,255,0.78)' }}>
+                    Please keep this page open while we prepare your schedule.
                   </Typography>
-
-                  {/* Level badges */}
-                  <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap', gap: 1 }}>
-                    {Object.keys(levelProgress).sort((a, b) => Number(b) - Number(a)).map(lvl => (
-                      <Chip
-                        key={lvl}
-                        label={`Year ${lvl}`}
-                        size="small"
-                        color={levelProgress[Number(lvl)] ? 'success' : 'default'}
-                        icon={levelProgress[Number(lvl)] ? <CheckIcon /> : undefined}
-                        variant={levelProgress[Number(lvl)] ? 'filled' : 'outlined'}
-                      />
-                    ))}
-                  </Stack>
+                  <Box sx={{ mt: 3.5, mx: 'auto', maxWidth: 370, height: 8, overflow: 'hidden', borderRadius: 99, bgcolor: 'rgba(255,255,255,0.18)' }}>
+                    <Box sx={{ width: `${Math.max(6, generationProgress.percentage)}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #d8efff, #ffffff)', transition: 'width 700ms cubic-bezier(0.22, 1, 0.36, 1)', boxShadow: '0 0 18px rgba(255,255,255,0.75)' }} />
+                  </Box>
                 </Box>
               )}
 
@@ -991,10 +1059,9 @@ const TimetablesPage: React.FC = () => {
                   onClick={handleGenerate}
                   variant="contained"
                   startIcon={<PlayIcon />}
-                  disabled={!components.lecture && !components.practical && !components.tutorial}
-                  sx={{ background: 'linear-gradient(135deg, #006837 0%, #004826 100%)' }}
+                  sx={{ background: 'linear-gradient(135deg, #1976d2 0%, #115293 100%)' }}
                 >
-                  Start Generation
+                  Prepare Lectures
                 </Button>
               </>
             )}

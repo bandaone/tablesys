@@ -1,14 +1,83 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Any
 from datetime import time, date, datetime
 from enum import Enum
+import re
+
+
+def _normalize_activity_key(value: str) -> str:
+    key = re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+    if not key:
+        raise ValueError("activity_type_key cannot be blank")
+    return key
+
+
+def _normalize_tag_list(values: Optional[List[str]]) -> List[str]:
+    normalized: List[str] = []
+    seen = set()
+    for item in values or []:
+        tag = re.sub(r"[^a-z0-9]+", "_", str(item or "").strip().lower()).strip("_")
+        if tag and tag not in seen:
+            normalized.append(tag)
+            seen.add(tag)
+    return normalized
+
+
+class ActivityRequirement(BaseModel):
+    activity_type_key: str
+    hours_per_session: int = Field(..., ge=1)
+    frequency_per_week: Optional[int] = Field(default=None, ge=0)
+    activity_display_name: Optional[str] = None
+    requires_subgroups: Optional[bool] = None
+    required_room_tags: Optional[List[str]] = Field(default_factory=list)
+    legacy_session_type: Optional[str] = None
+    subgroup_key: Optional[str] = None
+
+    @field_validator("activity_type_key")
+    @classmethod
+    def validate_activity_type_key(cls, value: str) -> str:
+        return _normalize_activity_key(value)
+
+    @field_validator("legacy_session_type")
+    @classmethod
+    def validate_legacy_session_type(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_activity_key(value)
+
+    @field_validator("subgroup_key")
+    @classmethod
+    def validate_subgroup_key(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_activity_key(value)
+
+    @field_validator("required_room_tags")
+    @classmethod
+    def validate_required_room_tags(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
+
+def _validate_activity_requirements(value: Optional[List[ActivityRequirement]]) -> Optional[List[ActivityRequirement]]:
+    if not value:
+        return value
+    seen = set()
+    for requirement in value:
+        key = requirement.activity_type_key
+        if key in seen:
+            raise ValueError(f"Duplicate activity_type_key '{key}' is not allowed within one course")
+        seen.add(key)
+    return value
 
 class UserRole(str, Enum):
     SUPERADMIN = "superadmin"
-    ADMIN = "admin"
+    TENANT_ADMIN = "tenant_admin"
+    SCHOOL_COORDINATOR = "school_coordinator"
     COORDINATOR = "coordinator"
     HOD = "hod"
     LAB_COORDINATOR = "lab_coordinator"
+    LECTURER = "lecturer"
+    STUDENT = "student"
 
 class RoomType(str, Enum):
     LECTURE_HALL   = "lecture_hall"
@@ -51,12 +120,20 @@ class RoomCategory(str, Enum):
     SEMINAR_ROOM = "seminar_room"
     CONFERENCE_ROOM = "conference_room"
 
+class UsageMetricKey(str, Enum):
+    SEATS_ACTIVE = "seats_active"
+    TIMETABLE_GENERATIONS = "timetable_generations"
+    DEPARTMENT_COUNT = "department_count"
+    COURSE_COUNT = "course_count"
+    STORAGE_BYTES = "storage_bytes"
+
 # User Schemas
 class UserBase(BaseModel):
     email: Optional[str] = None
     username: str
     full_name: str
     role: UserRole
+    school_id: Optional[int] = None
     department_id: Optional[int] = None
 
 class UserCreate(UserBase):
@@ -65,13 +142,46 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    school_id: Optional[int] = None
     department_id: Optional[int] = None
     is_active: Optional[bool] = None
 
 class User(UserBase):
     id: int
+    university_id: Optional[int] = None
     is_active: bool
     
+    class Config:
+        from_attributes = True
+
+# School Schemas
+class SchoolBase(BaseModel):
+    name: str
+    code: str
+    description: Optional[str] = None
+    academic_calendar_id: Optional[int] = None
+    scheduling_policy: Optional[dict] = None
+    is_active: bool = True
+
+
+class SchoolCreate(SchoolBase):
+    pass
+
+
+class SchoolUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    description: Optional[str] = None
+    academic_calendar_id: Optional[int] = None
+    scheduling_policy: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+
+class School(SchoolBase):
+    id: int
+    university_id: int
+
     class Config:
         from_attributes = True
 
@@ -79,12 +189,14 @@ class User(UserBase):
 class DepartmentBase(BaseModel):
     name: str
     code: str
+    school_id: Optional[int] = None
 
 class DepartmentCreate(DepartmentBase):
     pass
 
 class Department(DepartmentBase):
     id: int
+    university_id: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -95,24 +207,31 @@ class CourseBase(BaseModel):
     name: str
     department_id: int
     level: int
-    credits: int
-    lecture_hours: int
-    tutorial_hours: int = 0
-    practical_hours: int = 0
     preferred_room_type: RoomType = RoomType.ANY
     course_type: CourseType = CourseType.DEPARTMENT_SPECIFIC
     session_configuration: Optional[dict] = None
     group_division_type: GroupDivisionType = GroupDivisionType.FULL_GROUP
+    activity_requirements: Optional[List[ActivityRequirement]] = None
     # Departments that also take this course (Option A: course stays with owning dept).
     # null = not shared (or for GEN dept = shared with ALL depts by default)
     # [1, 5] = explicitly shared only with depts 1 and 5 at this course's level
     shared_with_department_ids: Optional[List[int]] = None
 
+    @field_validator("activity_requirements")
+    @classmethod
+    def validate_activity_requirements(cls, value: Optional[List[ActivityRequirement]]) -> Optional[List[ActivityRequirement]]:
+        return _validate_activity_requirements(value)
+
 class CourseCreate(CourseBase):
-    pass
+    credits: int
+    lecture_hours: int
+    tutorial_hours: int = 0
+    practical_hours: int = 0
 
 class CourseUpdate(BaseModel):
+    code: Optional[str] = None
     name: Optional[str] = None
+    department_id: Optional[int] = None
     level: Optional[int] = None
     credits: Optional[int] = None
     lecture_hours: Optional[int] = None
@@ -122,16 +241,88 @@ class CourseUpdate(BaseModel):
     course_type: Optional[CourseType] = None
     session_configuration: Optional[dict] = None
     group_division_type: Optional[GroupDivisionType] = None
+    activity_requirements: Optional[List[ActivityRequirement]] = None
     shared_with_department_ids: Optional[List[int]] = None  # set to [] to make dept-private; null = GEN default (all)
+
+    @field_validator("activity_requirements")
+    @classmethod
+    def validate_activity_requirements(cls, value: Optional[List[ActivityRequirement]]) -> Optional[List[ActivityRequirement]]:
+        return _validate_activity_requirements(value)
 
 class Course(CourseBase):
     id: int
+    credits: Optional[int] = None
+    lecture_hours: Optional[int] = None
+    tutorial_hours: Optional[int] = None
+    practical_hours: Optional[int] = None
+    profile_status: Optional[str] = "profile_complete"
     
     class Config:
         from_attributes = True
 
 class CourseBulkUpload(BaseModel):
     courses: List[CourseCreate]
+
+
+class SchoolProfileUploadPreviewRow(BaseModel):
+    row_number: int
+    school: str
+    programme: str
+    year_level: int
+    course_code: str
+    course_name: str
+    lecturer_name: Optional[str] = None
+    status: str
+    can_apply: bool
+    department_name: str
+    department_code: Optional[str] = None
+    department_action: str
+    course_action: str
+    lecturer_action: str
+    assignment_action: str
+    issues: List[str] = Field(default_factory=list)
+
+
+class SchoolProfileUploadPreviewSummary(BaseModel):
+    total_rows: int
+    ready_rows: int
+    conflicted_rows: int
+    skipped_rows: int
+    departments_to_create: int
+    departments_reused: int
+    courses_to_create: int
+    courses_to_update: int
+    courses_unchanged: int
+    lecturers_to_create: int
+    lecturers_reused: int
+    assignments_to_create: int
+    assignments_reused: int
+
+
+class SchoolProfileUploadPreviewResponse(BaseModel):
+    school_id: int
+    fingerprint: str
+    expires_at: datetime
+    rows: List[SchoolProfileUploadPreviewRow]
+    summary: SchoolProfileUploadPreviewSummary
+
+
+class SchoolProfileUploadApplyRequest(BaseModel):
+    fingerprint: str
+    expires_at: datetime
+    rows: List[SchoolProfileUploadPreviewRow]
+
+
+class SchoolProfileUploadApplyResponse(BaseModel):
+    school_id: int
+    created_departments: int
+    created_courses: int
+    updated_courses: int
+    created_lecturers: int
+    reused_lecturers: int
+    created_assignments: int
+    skipped_rows: int
+    issues: List[str] = Field(default_factory=list)
 
 # Lecturer Schemas
 class LecturerBase(BaseModel):
@@ -157,6 +348,42 @@ class LecturerUpdate(BaseModel):
 
 class LecturerBulkUpload(BaseModel):
     lecturers: List[LecturerCreate]
+
+
+class UsageEventCreate(BaseModel):
+    tenant_id: Optional[int] = None
+    metric_key: UsageMetricKey
+    quantity: int = Field(1, gt=0)
+    occurred_at: Optional[datetime] = None
+    source: Literal["api", "job", "admin"] = "api"
+    metadata: Optional[dict] = None
+
+
+class UsageEventResponse(BaseModel):
+    id: int
+    tenant_id: int
+    metric_key: UsageMetricKey
+    quantity: int
+    occurred_at: datetime
+    source: str
+    metadata: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UsageSummaryMetric(BaseModel):
+    metric_key: UsageMetricKey
+    total: int
+    limit: Optional[int] = None
+    percent: Optional[float] = None
+    status: str
+
+
+class UsageSummaryResponse(BaseModel):
+    tenant_id: int
+    period: str
+    metrics: List[UsageSummaryMetric]
 
 # Lecturer Assignment Schemas
 class LecturerAssignmentCreate(BaseModel):
@@ -194,6 +421,22 @@ class Lecturer(LecturerBase):
     class Config:
         from_attributes = True
 
+
+class LecturerBrief(BaseModel):
+    """Lightweight lecturer snapshot used in nested exam-slot responses.
+
+    Avoids loading the full assignment graph when all we need is an
+    identification label for the Chief Invigilator field.
+    """
+
+    id: int
+    staff_number: str
+    full_name: str
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 # Lecturer Unavailability Schemas
 class LecturerUnavailabilityCreate(BaseModel):
     lecturer_id: int
@@ -218,6 +461,8 @@ class RoomBase(BaseModel):
     building: str
     capacity: int
     room_type: str
+    school_id: Optional[int] = None
+    tags: Optional[List[str]] = None
 
     # Core teaching equipment — the only three that matter for session delivery
     has_whiteboard: bool = True
@@ -234,6 +479,11 @@ class RoomBase(BaseModel):
     availability_blocks: Optional[List[dict]] = Field(default_factory=list) # e.g. [{"day": "Monday", "start_time": "08:00", "end_time": "17:00"}]
     department_id: Optional[int] = None
 
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
 class RoomCreate(RoomBase):
     pass
 
@@ -242,6 +492,8 @@ class RoomUpdate(BaseModel):
     building: Optional[str] = None
     capacity: Optional[int] = None
     room_type: Optional[str] = None
+    school_id: Optional[int] = None
+    tags: Optional[List[str]] = None
     has_whiteboard: Optional[bool] = None
     has_chalkboard: Optional[bool] = None
     has_projector: Optional[bool] = None
@@ -252,8 +504,14 @@ class RoomUpdate(BaseModel):
     availability_blocks: Optional[List[dict]] = None
     department_id: Optional[int] = None
 
+    @field_validator("tags")
+    @classmethod
+    def validate_room_tags(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
 class Room(RoomBase):
     id: int
+    university_id: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -271,6 +529,14 @@ class StudentGroupBase(BaseModel):
     parent_group_id: Optional[int] = None
     display_code: Optional[str] = None
     preferred_venues: Optional[dict] = None # { "room_id": priority_1_10 }
+    custom_subtype: Optional[str] = None
+
+    @field_validator("custom_subtype")
+    @classmethod
+    def validate_custom_subtype(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_activity_key(value)
 
 class StudentGroupCreate(StudentGroupBase):
     pass
@@ -283,6 +549,14 @@ class StudentGroupUpdate(BaseModel):
     parent_group_id: Optional[int] = None
     display_code: Optional[str] = None
     preferred_venues: Optional[dict] = None
+    custom_subtype: Optional[str] = None
+
+    @field_validator("custom_subtype")
+    @classmethod
+    def validate_custom_subtype(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_activity_key(value)
 
 class StudentGroup(StudentGroupBase):
     id: int
@@ -442,6 +716,106 @@ class GridConfig(BaseModel):
     end_time: str = "17:00"
     lunch_start: str = "13:00"
     lunch_end: str = "14:00"
+    slot_duration_minutes: int = 60
+
+
+class ActivityTypeBase(BaseModel):
+    key: str
+    display_name: str
+    color: str = "#3B82F6"
+    default_duration_periods: int = 1
+    default_frequency_per_week: int = 1
+    requires_subgroups: bool = False
+    resource_tags_required: Optional[List[str]] = None
+    counts_toward_contact_hours: bool = True
+    is_active: bool = True
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, value: str) -> str:
+        return _normalize_activity_key(value)
+
+    @field_validator("resource_tags_required")
+    @classmethod
+    def validate_resource_tags_required(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
+
+class ActivityTypeCreate(ActivityTypeBase):
+    pass
+
+
+class ActivityTypeUpdate(BaseModel):
+    display_name: Optional[str] = None
+    color: Optional[str] = None
+    default_duration_periods: Optional[int] = None
+    default_frequency_per_week: Optional[int] = None
+    requires_subgroups: Optional[bool] = None
+    resource_tags_required: Optional[List[str]] = None
+    counts_toward_contact_hours: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("resource_tags_required")
+    @classmethod
+    def validate_resource_tags_required(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
+
+class ActivityType(ActivityTypeBase):
+    id: int
+    university_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class UniversitySchedulingPolicy(BaseModel):
+    default_lecture_frequency: int = 2
+    default_tutorial_frequency: int = 1
+    default_practical_frequency: int = 1
+    daily_max_teaching_hours: int = 8
+    enforce_lunch_break: bool = True
+    lunch_start: Optional[str] = "13:00"
+    lunch_end: Optional[str] = "14:00"
+    institution_template_key: Optional[str] = None
+    room_tag_catalog: Optional[List[str]] = None
+    solver_timeout_seconds: Optional[int] = Field(default=120, ge=10, le=600)
+
+    @field_validator("institution_template_key")
+    @classmethod
+    def validate_template_key(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_activity_key(value)
+
+    @field_validator("room_tag_catalog")
+    @classmethod
+    def validate_room_tag_catalog(cls, value: Optional[List[str]]) -> List[str]:
+        return _normalize_tag_list(value)
+
+
+class InstitutionSetupPayload(BaseModel):
+    template_key: str = "custom"
+    calendar_name: str = "Institution Calendar"
+    days_of_week: List[str]
+    start_time: str
+    end_time: str
+    slot_duration_minutes: int = 60
+    lunch_start: Optional[str] = "13:00"
+    lunch_end: Optional[str] = "14:00"
+    scheduling_policy: UniversitySchedulingPolicy
+    room_tags: List[str] = Field(default_factory=list)
+    activity_types: List[ActivityTypeCreate] = Field(default_factory=list)
+
+
+class InstitutionSetupResponse(BaseModel):
+    university_id: int
+    template_key: str
+    scheduling_policy: UniversitySchedulingPolicy
+    room_tags: List[str]
+    activity_types: List[ActivityType]
+    calendar: Optional[dict] = None
+    onboarding_completed_at: Optional[datetime] = None
     active_days: List[str] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
 class TimetableBase(BaseModel):
@@ -449,6 +823,7 @@ class TimetableBase(BaseModel):
     semester: str
     year: int
     academic_half: str = "first_half"
+    school_id: int
     grid_config: Optional[GridConfig] = None
 
 class TimetableCreate(TimetableBase):
@@ -464,6 +839,7 @@ class TimetableUpdate(BaseModel):
 
 class Timetable(TimetableBase):
     id: int
+    university_id: Optional[int] = None
     is_active: bool
     generation_metadata: Optional[dict] = None
     
@@ -485,7 +861,7 @@ class ManualSlotCreate(BaseModel):
     day_of_week: int
     start_time: time
     end_time: time
-    session_type: str = "practical"
+    session_type: str = "lecture"
 
 # Authentication Schemas
 class Token(BaseModel):
@@ -495,9 +871,12 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+from typing import Optional
+
 class LoginRequest(BaseModel):
     username: str
     password: str
+    university_id: Optional[int] = None
 
 # Timetable Generation Schemas
 class GenerationProgress(BaseModel):
@@ -590,9 +969,9 @@ class ExamPeriodUpdate(BaseModel):
     year: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    is_published: Optional[bool] = None
-    is_locked: Optional[bool] = None
     constraint_settings: Optional[ExamConstraintSettings] = None
+
+    model_config = {"extra": "forbid"}
 
 
 class ExamSessionWindowBase(BaseModel):
@@ -780,6 +1159,11 @@ class ExamSlotBase(BaseModel):
 class ExamSlot(ExamSlotBase):
     id: int
     exam_period_id: int
+    # The primary lecturer for the course, automatically resolved during
+    # generation as the overall responsible Chief Invigilator for this paper
+    # even when the exam is physically split across multiple rooms.
+    chief_invigilator_id: Optional[int] = None
+    chief_invigilator: Optional[LecturerBrief] = None
     paper: Optional[ExamPaper] = None
     session_window: Optional[ExamSessionWindow] = None
     seating_profile: Optional[ExamSeatingProfile] = None

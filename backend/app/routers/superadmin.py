@@ -3,8 +3,9 @@ Super Admin Router
 Platform-level endpoints for managing universities (tenants).
 ALL routes require the SUPERADMIN role — school coordinators cannot access these.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
@@ -13,21 +14,35 @@ import os
 import shutil
 import time
 import redis as redis_lib
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from jose import JWTError, jwt
 from ..database import get_db
-from ..models import University, User, UserRole, AuditLog
+from ..models import University, User, UserRole, AuditLog, Timetable, Room, Lecturer, ExamPeriod, PendingRegistration
 from ..auth import get_current_superadmin, get_password_hash, create_access_token, oauth2_scheme
 from ..config import settings
 from ..utils.audit_logger import AuditLogger
-from jose import JWTError, jwt
+from ..services.tenant_performance_service import TenantPerformanceService
+from ..services.superadmin_business_metrics_service import SuperAdminBusinessMetricsService
+from ..services.superadmin_operational_metrics_service import SuperAdminOperationalMetricsService
 from ..schemas import Token
+
+# Initialize router first before using it in decorators
+router = APIRouter(prefix="/api/v1/superadmin", tags=["superadmin"])
+
+
+@router.post("/backfill/universal-scheduling", status_code=200)
+def backfill_universal_scheduling(
+    seed_activity_types: bool = False,
+    current_user=Depends(get_current_superadmin),
+    db: Session = Depends(get_db),
+):
+    """Admin-only endpoint to idempotently backfill scheduling defaults for pre-migration tenants."""
+    from ..seeding_utils import backfill_universal_scheduling_defaults
+
+    touched = backfill_universal_scheduling_defaults(db, template_key="custom", seed_activity_types=seed_activity_types)
+    return {"touched_universities": touched}
 
 
 PROCESS_START_TS = time.time()
-
-router = APIRouter(prefix="/api/v1/superadmin", tags=["superadmin"])
 
 # 0 means unlimited tenant capacity.
 UNLIMITED_MAX_USERS = 0
@@ -39,13 +54,14 @@ class UniversityCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     short_name: Optional[str] = Field(None, max_length=20)
     domain: str = Field(..., min_length=3, max_length=100)
-    timezone: str = Field(default="Africa/Harare")
+    timezone: str = Field(default="Africa/Lusaka")
     plan_tier: str = Field(default="free")  # free | pro | enterprise
     max_users: int = Field(default=UNLIMITED_MAX_USERS, ge=0)  # 0 = unlimited
     primary_color: str = Field(default="#1976d2")
     secondary_color: str = Field(default="#9c27b0")
     tagline: Optional[str] = None
-    # Initial coordinator account
+    scheduling_policy: Optional[dict] = None
+    # Initial tenant admin account
     coordinator_username: str = Field(..., min_length=3, max_length=50)
     coordinator_email: EmailStr
     coordinator_password: str = Field(..., min_length=8)
@@ -64,6 +80,7 @@ class UniversityUpdate(BaseModel):
     tagline: Optional[str] = None
     logo_url: Optional[str] = None
     is_active: Optional[bool] = None
+    scheduling_policy: Optional[dict] = None
 
 
 class UniversityResponse(BaseModel):
@@ -81,6 +98,8 @@ class UniversityResponse(BaseModel):
     tagline: Optional[str]
     logo_url: Optional[str]
     user_count: int = 0
+    scheduling_policy: Optional[dict] = None
+    onboarding_completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -89,6 +108,25 @@ class UniversityPaginatedResponse(BaseModel):
     items: List[UniversityResponse]
     total: int
 
+
+class PendingRegistrationResponse(BaseModel):
+    id: int
+    token: str
+    org_name: str
+    subdomain: str
+    admin_email: str
+    admin_username: str
+    admin_full_name: str
+    status: str
+    created_at: datetime
+    expires_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class PendingRegistrationPaginatedResponse(BaseModel):
+    items: List[PendingRegistrationResponse]
+    total: int
 
 class SuperAdminStats(BaseModel):
     total_universities: int
@@ -131,6 +169,216 @@ class SuperAdminAnalytics(BaseModel):
     recent_events: List[RecentEvent]
 
 
+class FailureEndpointSummary(BaseModel):
+    endpoint: str
+    count: int
+    status_codes: Optional[List[int]] = None
+
+
+class RecentGenerationRunSummary(BaseModel):
+    timetable_id: int
+    timetable_name: str
+    status: str
+    completed_at: Optional[str] = None
+    duration_ms: Optional[int] = None
+    saved_slot_count: int = 0
+    fallback_used: bool = False
+    error_message: Optional[str] = None
+
+
+class TenantPerformanceRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    domain: str
+    plan_tier: str
+    requests: int
+    server_errors: int
+    client_errors: int
+    error_rate_percent: float
+    avg_response_ms: float
+    sla_target_ms: int
+    sla_breaches: int
+    sla_compliance_percent: float
+    generation_attempts: int
+    generation_success_rate_percent: Optional[float] = None
+    generation_avg_duration_ms: Optional[float] = None
+    generation_failures: int
+    generation_fallback_runs: int
+    generation_timeout_runs: int
+    generated_timetables: int
+    draft_timetables: int
+    health_status: str
+    top_failure_endpoints: List[FailureEndpointSummary]
+    recent_generation_runs: List[RecentGenerationRunSummary]
+
+
+class TenantPerformanceSummary(BaseModel):
+    tenant_count: int
+    active_tenants: int
+    tenants_meeting_sla: int
+    platform_avg_response_ms: float
+    platform_error_rate_percent: float
+    platform_generation_success_rate_percent: float
+    at_risk_tenants: int
+
+
+class SuperAdminPerformanceResponse(BaseModel):
+    window_days: int
+    generated_at: str
+    summary: TenantPerformanceSummary
+    top_failure_endpoints: List[FailureEndpointSummary]
+    tenants: List[TenantPerformanceRow]
+
+
+class FeatureAdoptionTopTenant(BaseModel):
+    tenant_name: str
+    events: int
+
+
+class FeatureAdoptionRow(BaseModel):
+    feature_key: str
+    feature_name: str
+    tenant_count: int
+    adoption_percent: float
+    usage_events: int
+    top_tenants: List[FeatureAdoptionTopTenant]
+
+
+class TenantFeatureMatrixRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    plan_tier: str
+    feature_count: int
+    features_used: List[str]
+    top_feature: Optional[str] = None
+    total_feature_events: int
+
+
+class EngagementMetricsRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    plan_tier: str
+    login_count: int
+    active_days: int
+    avg_logins_per_week: float
+    avg_session_duration_minutes: Optional[float] = None
+    api_requests: int
+    avg_api_requests_per_active_day: float
+    peak_hour_utc: Optional[int] = None
+
+
+class PlanCorrelationRow(BaseModel):
+    plan_tier: str
+    tenant_count: int
+    avg_features_adopted: float
+    avg_api_requests: float
+    avg_generation_runs: float
+    avg_login_count: float
+    avg_session_duration_minutes: Optional[float] = None
+    most_adopted_feature: Optional[str] = None
+
+
+class BusinessMetricsSummary(BaseModel):
+    tenant_count: int
+    active_tenants: int
+    adopted_feature_count: int
+    avg_features_per_tenant: float
+    avg_logins_per_tenant: float
+    avg_session_duration_minutes: Optional[float] = None
+    login_data_available: bool
+
+
+class SuperAdminBusinessMetricsResponse(BaseModel):
+    window_days: int
+    generated_at: str
+    summary: BusinessMetricsSummary
+    feature_adoption: List[FeatureAdoptionRow]
+    tenant_feature_matrix: List[TenantFeatureMatrixRow]
+    engagement: List[EngagementMetricsRow]
+    plan_correlation: List[PlanCorrelationRow]
+
+
+class SolverReliabilityRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    domain: str
+    plan_tier: str
+    attempts: int
+    successes: int
+    failures: int
+    fallback_runs: int
+    timeout_runs: int
+    fallback_rate_percent: Optional[float] = None
+    timeout_rate_percent: Optional[float] = None
+
+
+class ConflictResolutionRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    plan_tier: str
+    evaluated_runs: int
+    conflict_free_runs: int
+    unresolved_runs: int
+    conflict_free_rate_percent: Optional[float] = None
+    total_conflicts: int
+    top_conflict_type: Optional[str] = None
+
+
+class StorageGrowthPoint(BaseModel):
+    label: str
+    total_bytes_added: int
+    top_tenant_name: Optional[str] = None
+    top_tenant_bytes: int = 0
+
+
+class TenantStorageRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    plan_tier: str
+    current_estimated_storage_bytes: int
+    storage_added_bytes_window: int
+    storage_added_bytes_previous_window: int
+    growth_percent: Optional[float] = None
+
+
+class RateLimitEndpointRow(BaseModel):
+    endpoint: str
+    count: int
+
+
+class RateLimitHitRow(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    plan_tier: str
+    hit_count: int
+    distinct_user_count: int
+    last_hit_at: Optional[str] = None
+    top_endpoints: List[RateLimitEndpointRow]
+
+
+class OperationalMetricsSummary(BaseModel):
+    tenant_count: int
+    active_tenants: int
+    total_solver_runs: int
+    avg_fallback_rate_percent: Optional[float] = None
+    avg_timeout_rate_percent: Optional[float] = None
+    conflict_free_rate_percent: Optional[float] = None
+    storage_growth_bytes_window: int
+    current_estimated_storage_bytes: int
+    rate_limit_hits: int
+
+
+class SuperAdminOperationalMetricsResponse(BaseModel):
+    window_days: int
+    generated_at: str
+    summary: OperationalMetricsSummary
+    solver_reliability: List[SolverReliabilityRow]
+    conflict_resolution: List[ConflictResolutionRow]
+    storage_growth: List[StorageGrowthPoint]
+    tenant_storage: List[TenantStorageRow]
+    rate_limits: List[RateLimitHitRow]
+
+
 class SupportUserSnapshot(BaseModel):
     id: int
     email: str
@@ -154,8 +402,50 @@ def _safe_len_map_entries(payload: Optional[dict]) -> int:
     return sum(len(items or []) for items in payload.values())
 
 
+class RoleCount(BaseModel):
+    role: str
+    count: int
+
+class TimetableStats(BaseModel):
+    generated_count: int
+    draft_count: int
+
+class ResourceUtilization(BaseModel):
+    total_rooms: int
+    total_lecturers: int
+    total_capacity: int
+
+class TenantActivityLog(BaseModel):
+    action: str
+    entity_type: str
+    user_email: Optional[str] = None
+    timestamp: str
+
+class TenantDashboardMetricsResponse(BaseModel):
+    user_counts: List[RoleCount]
+    timetable_stats: TimetableStats
+    resource_utilization: ResourceUtilization
+    recent_activity_logs: List[TenantActivityLog]
+
+
 def _select_impersonation_target(db: Session, university_id: int) -> Optional[User]:
     """Select the best active tenant user to impersonate for support operations."""
+    target = db.query(User).filter(
+        User.university_id == university_id,
+        User.role == UserRole.TENANT_ADMIN,
+        User.is_active == True,
+    ).order_by(User.id.asc()).first()
+    if target:
+        return target
+
+    target = db.query(User).filter(
+        User.university_id == university_id,
+        User.role == UserRole.SCHOOL_COORDINATOR,
+        User.is_active == True,
+    ).order_by(User.id.asc()).first()
+    if target:
+        return target
+
     target = db.query(User).filter(
         User.university_id == university_id,
         User.role == UserRole.COORDINATOR,
@@ -305,6 +595,54 @@ def get_platform_telemetry(
     )
 
 
+@router.get("/performance", response_model=SuperAdminPerformanceResponse)
+def get_platform_performance(
+    window_days: int = 30,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """Tenant performance, SLA, and generation health overview for platform owners."""
+    if window_days < 1:
+        window_days = 1
+    if window_days > 90:
+        window_days = 90
+
+    service = TenantPerformanceService(db)
+    return service.get_platform_performance_overview(window_days=window_days)
+
+
+@router.get("/business-metrics", response_model=SuperAdminBusinessMetricsResponse)
+def get_business_metrics(
+    window_days: int = 30,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """Business usage analytics for platform owners across tenant feature adoption and engagement."""
+    if window_days < 1:
+        window_days = 1
+    if window_days > 90:
+        window_days = 90
+
+    service = SuperAdminBusinessMetricsService(db)
+    return service.get_business_metrics_overview(window_days=window_days)
+
+
+@router.get("/operational-metrics", response_model=SuperAdminOperationalMetricsResponse)
+def get_operational_metrics(
+    window_days: int = 30,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """Operational health analytics for platform owners across solver reliability, storage, and rate-limit pressure."""
+    if window_days < 1:
+        window_days = 1
+    if window_days > 90:
+        window_days = 90
+
+    service = SuperAdminOperationalMetricsService(db)
+    return service.get_operational_metrics_overview(window_days=window_days)
+
+
 @router.get("/universities", response_model=UniversityPaginatedResponse)
 def list_universities(
     skip: int = 0,
@@ -353,11 +691,66 @@ def list_universities(
             secondary_color=uni.secondary_color,
             tagline=uni.tagline,
             logo_url=uni.logo_url,
+            scheduling_policy=uni.scheduling_policy,
+            onboarding_completed_at=getattr(uni, "onboarding_completed_at", None),
             user_count=user_counts.get(uni.id, 0),
         )
         result.append(resp)
         
     return UniversityPaginatedResponse(items=result, total=total_count)
+
+
+@router.get("/pending-registrations", response_model=PendingRegistrationPaginatedResponse)
+def list_pending_registrations(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """List pending registrations for super admin review."""
+    query = db.query(PendingRegistration)
+    if status_filter:
+        query = query.filter(PendingRegistration.status == status_filter)
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            (func.lower(PendingRegistration.org_name).like(search_term)) |
+            (func.lower(PendingRegistration.subdomain).like(search_term)) |
+            (func.lower(PendingRegistration.admin_email).like(search_term))
+        )
+    
+    total_count = query.count()
+    registrations = query.order_by(PendingRegistration.created_at.desc()).offset(skip).limit(limit).all()
+
+    return PendingRegistrationPaginatedResponse(items=registrations, total=total_count)
+
+
+@router.post("/pending-registrations/{registration_id}/retry", response_model=Token)
+def retry_failed_registration(
+    registration_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """Manually retry a registration that failed provisioning."""
+    from ..services.provisioning import provision_tenant, ProvisioningError
+
+    pending = db.query(PendingRegistration).filter(PendingRegistration.id == registration_id).first()
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending registration not found.")
+    
+    if pending.status != "failed_provisioning":
+        raise HTTPException(status_code=400, detail="Only failed registrations can be retried.")
+
+    try:
+        result = provision_tenant(db, pending)
+        return Token(access_token=result.access_token, token_type=result.token_type)
+    except ProvisioningError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Provisioning retry failed again: {str(exc)}"
+        )
 
 
 @router.post("/universities", response_model=UniversityResponse, status_code=status.HTTP_201_CREATED)
@@ -370,15 +763,15 @@ def register_university(
     # Domain uniqueness check (lowercase)
     normalized_domain = request.domain.lower()
     if db.query(University).filter(func.lower(University.domain) == normalized_domain).first():
-        raise HTTPException(status_code=400, detail="A university with this domain is already registered.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A university with this domain is already registered.")
     if db.query(University).filter(University.name == request.name).first():
-        raise HTTPException(status_code=400, detail="A university with this name is already registered.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A university with this name is already registered.")
 
     # Email/username uniqueness
     if db.query(User).filter(User.email == request.coordinator_email).first():
-        raise HTTPException(status_code=400, detail="Email is already registered on the platform.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered on the platform.")
     if db.query(User).filter(User.username == request.coordinator_username).first():
-        raise HTTPException(status_code=400, detail="Username is already taken on the platform.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username is already taken on the platform.")
 
     # Create university
     normalized_max_users = request.max_users if request.max_users and request.max_users > 0 else UNLIMITED_MAX_USERS
@@ -395,29 +788,39 @@ def register_university(
         primary_color=request.primary_color,
         secondary_color=request.secondary_color,
         tagline=request.tagline,
+        scheduling_policy=request.scheduling_policy,
     )
     db.add(uni)
-    db.commit()
-    db.refresh(uni)
+    try:
+        db.commit()
+        db.refresh(uni)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Concurrency conflict: A university with these details was just registered.")
 
-    # Create coordinator account
+    # Create tenant admin account
     coordinator = User(
         university_id=uni.id,
         username=request.coordinator_username,
         email=request.coordinator_email,
         hashed_password=get_password_hash(request.coordinator_password),
         full_name=request.coordinator_full_name,
-        role=UserRole.COORDINATOR,
+        role=UserRole.TENANT_ADMIN,
         is_active=True,
     )
     db.add(coordinator)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Concurrency conflict: A user with this email or username was just registered.")
 
     return UniversityResponse(
         id=uni.id, name=uni.name, short_name=uni.short_name, domain=uni.domain,
         timezone=uni.timezone, is_active=uni.is_active, registered_at=uni.registered_at,
         plan_tier=uni.plan_tier, max_users=uni.max_users, primary_color=uni.primary_color,
         secondary_color=uni.secondary_color, tagline=uni.tagline, logo_url=uni.logo_url,
+        scheduling_policy=uni.scheduling_policy, onboarding_completed_at=getattr(uni, "onboarding_completed_at", None),
         user_count=1,
     )
 
@@ -455,6 +858,7 @@ def update_university(
         timezone=uni.timezone, is_active=uni.is_active, registered_at=uni.registered_at,
         plan_tier=uni.plan_tier, max_users=uni.max_users, primary_color=uni.primary_color,
         secondary_color=uni.secondary_color, tagline=uni.tagline, logo_url=uni.logo_url,
+        scheduling_policy=uni.scheduling_policy, onboarding_completed_at=getattr(uni, "onboarding_completed_at", None),
         user_count=user_count,
     )
 
@@ -544,6 +948,7 @@ async def upload_university_logo(
         timezone=uni.timezone, is_active=uni.is_active, registered_at=uni.registered_at,
         plan_tier=uni.plan_tier, max_users=uni.max_users, primary_color=uni.primary_color,
         secondary_color=uni.secondary_color, tagline=uni.tagline, logo_url=uni.logo_url,
+        scheduling_policy=uni.scheduling_policy, onboarding_completed_at=getattr(uni, "onboarding_completed_at", None),
         user_count=user_count,
     )
 
@@ -633,3 +1038,75 @@ def revert_impersonation(
         return Token(access_token=access_token, token_type="bearer")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+@router.get("/universities/{university_id}/dashboard-metrics", response_model=TenantDashboardMetricsResponse)
+def get_tenant_dashboard_metrics(
+    university_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_superadmin)
+):
+    """Aggregate per-tenant dashboard metrics: users by role, timetable stats, resources, and recent logs."""
+    uni = db.query(University).filter(University.id == university_id).first()
+    if not uni:
+        raise HTTPException(status_code=404, detail="University not found.")
+
+    # 1. User counts by role
+    role_counts_query = db.query(User.role, func.count(User.id)).filter(
+        User.university_id == university_id,
+        User.role != UserRole.SUPERADMIN
+    ).group_by(User.role).all()
+    user_counts = [RoleCount(role=role.value, count=count) for role, count in role_counts_query]
+
+    # 2. Timetable stats
+    # Lecture timetables
+    lecture_active = db.query(Timetable).filter(Timetable.university_id == university_id, Timetable.is_active == True).count()
+    lecture_draft = db.query(Timetable).filter(Timetable.university_id == university_id, Timetable.is_active == False).count()
+    # Exam periods
+    exam_active = db.query(ExamPeriod).filter(ExamPeriod.university_id == university_id, ExamPeriod.is_published == True).count()
+    exam_draft = db.query(ExamPeriod).filter(ExamPeriod.university_id == university_id, ExamPeriod.is_published == False).count()
+    
+    timetable_stats = TimetableStats(
+        generated_count=lecture_active + exam_active,
+        draft_count=lecture_draft + exam_draft
+    )
+
+    # 3. Resource utilization
+    total_rooms = db.query(Room).filter(Room.university_id == university_id).count()
+    # Calculate sum of room capacities safely
+    capacity_result = db.query(func.sum(Room.capacity)).filter(Room.university_id == university_id).scalar()
+    total_capacity = int(capacity_result) if capacity_result else 0
+    
+    # Lecturers belong to a department, and a department belongs to a university.
+    # We can join Lecturer -> Department to filter by university_id.
+    from ..models import Department
+    total_lecturers = db.query(Lecturer).join(Department).filter(Department.university_id == university_id).count()
+
+    resource_utilization = ResourceUtilization(
+        total_rooms=total_rooms,
+        total_lecturers=total_lecturers,
+        total_capacity=total_capacity
+    )
+
+    # 4. Recent activity logs
+    # Join with User to capture logs by tenant users, or fallback to university-level entity logs
+    logs = db.query(AuditLog).outerjoin(User, AuditLog.user_id == User.id).filter(
+        (User.university_id == university_id) | 
+        ((AuditLog.entity_type == "university") & (AuditLog.entity_id == university_id))
+    ).order_by(AuditLog.timestamp.desc()).limit(10).all()
+
+    recent_logs = [
+        TenantActivityLog(
+            action=log.action,
+            entity_type=log.entity_type,
+            user_email=log.user_email,
+            timestamp=log.timestamp.isoformat()
+        )
+        for log in logs
+    ]
+
+    return TenantDashboardMetricsResponse(
+        user_counts=user_counts,
+        timetable_stats=timetable_stats,
+        resource_utilization=resource_utilization,
+        recent_activity_logs=recent_logs
+    )

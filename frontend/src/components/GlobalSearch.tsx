@@ -164,16 +164,16 @@ const GlobalSearch: React.FC = () => {
                             color: '#1a1a1a',
                             borderRadius: '8px',
                             '& fieldset': {
-                                borderColor: '#006837',
+                                borderColor: '#1976d2',
                                 borderWidth: '1.5px',
                                 transition: 'all 0.2s ease',
                             },
                             '&:hover fieldset': {
-                                borderColor: '#FDB913',
+                                borderColor: '#9c27b0',
                                 borderWidth: '1.5px',
                             },
                             '&.Mui-focused fieldset': {
-                                borderColor: '#006837',
+                                borderColor: '#1976d2',
                                 borderWidth: '2px',
                                 boxShadow: '0 0 0 3px rgba(0, 104, 55, 0.1)',
                             },
@@ -191,12 +191,12 @@ const GlobalSearch: React.FC = () => {
                         ...params.InputProps,
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon sx={{ color: '#006837' }} />
+                                <SearchIcon sx={{ color: '#1976d2' }} />
                             </InputAdornment>
                         ),
                         endAdornment: (
                             <>
-                                {loading ? <CircularProgress sx={{ color: '#006837' }} size={20} /> : null}
+                                {loading ? <CircularProgress sx={{ color: '#1976d2' }} size={20} /> : null}
                                 {params.InputProps.endAdornment}
                             </>
                         ),

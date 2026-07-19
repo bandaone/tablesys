@@ -24,6 +24,7 @@ from ..models import (
     Timetable
 )
 from ..utils.room_matching import room_match_rank, room_type_matches
+from ..utils.transit import DEFAULT_TRANSIT_MINUTES, insufficient_transit_time
 
 
 class ValidationError:
@@ -88,6 +89,19 @@ class ValidationService:
         if day_name:
             return day_name
         return self._day_name(slot_data.get("day_of_week"))
+
+    @staticmethod
+    def _day_index(day_value: Optional[int | str]) -> Optional[int]:
+        if isinstance(day_value, int):
+            return day_value if 0 <= day_value <= 6 else None
+        day_name = ValidationService._day_name(day_value)
+        if not day_name:
+            return None
+        names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        try:
+            return names.index(day_name.lower())
+        except ValueError:
+            return None
 
     @classmethod
     def _minimum_acceptable_fallback_capacity(cls, required_size: int) -> int:
@@ -425,7 +439,9 @@ class ValidationService:
         start_time: time,
         end_time: time,
         lecturer_id: Optional[int] = None,
-        group_id: Optional[int] = None
+        group_id: Optional[int] = None,
+        room_id: Optional[int] = None,
+        exclude_slot_id: Optional[int] = None,
     ) -> bool:
         """
         Validate that entities have adequate break time between consecutive classes.
@@ -434,40 +450,34 @@ class ValidationService:
         """
         valid = True
         
-        # Check for back-to-back classes for lecturer
+        day_index = self._day_index(day)
+        if day_index is None:
+            return valid
+
+        # A transition is only required if the person changes rooms.  This
+        # allows a class to continue in the same venue at the exact boundary.
         if lecturer_id:
             adjacent_slots = (
                 self.db.query(TimetableSlot)
                 .filter(
                     TimetableSlot.timetable_id == timetable_id,
-                    TimetableSlot.day == day,
+                    TimetableSlot.day_of_week == day_index,
                     TimetableSlot.lecturer_id == lecturer_id
                 )
                 .all()
             )
-            
             for slot in adjacent_slots:
-                # Check if new slot starts immediately after existing slot
-                if slot.end_time == start_time:
+                if exclude_slot_id and slot.id == exclude_slot_id:
+                    continue
+                if insufficient_transit_time(start_time, end_time, room_id, slot.start_time, slot.end_time, slot.room_id):
                     lecturer = self.db.query(Lecturer).get(lecturer_id)
                     self.errors.append(ValidationError(
                         entity_type="time_slot",
                         entity_id=0,
-                        field="break_time",
-                        message=f"No break between classes for lecturer {lecturer.full_name if lecturer else 'Unknown'} on {day}",
-                        severity="warning"
-                    ))
-                    valid = False
-                
-                # Check if existing slot starts immediately after new slot
-                if end_time == slot.start_time:
-                    lecturer = self.db.query(Lecturer).get(lecturer_id)
-                    self.errors.append(ValidationError(
-                        entity_type="time_slot",
-                        entity_id=0,
-                        field="break_time",
-                        message=f"No break between classes for lecturer {lecturer.full_name if lecturer else 'Unknown'} on {day}",
-                        severity="warning"
+                        field="transit_time",
+                        message=(f"Lecturer {lecturer.full_name if lecturer else 'Unknown'} needs at least "
+                                 f"{DEFAULT_TRANSIT_MINUTES} minutes between classes in different rooms on {day}"),
+                        severity="error"
                     ))
                     valid = False
         
@@ -477,21 +487,24 @@ class ValidationService:
                 self.db.query(TimetableSlot)
                 .filter(
                     TimetableSlot.timetable_id == timetable_id,
-                    TimetableSlot.day == day,
+                    TimetableSlot.day_of_week == day_index,
                     TimetableSlot.group_id == group_id
                 )
                 .all()
             )
             
             for slot in adjacent_slots:
-                if slot.end_time == start_time or end_time == slot.start_time:
+                if exclude_slot_id and slot.id == exclude_slot_id:
+                    continue
+                if insufficient_transit_time(start_time, end_time, room_id, slot.start_time, slot.end_time, slot.room_id):
                     group = self.db.query(StudentGroup).get(group_id)
                     self.errors.append(ValidationError(
                         entity_type="time_slot",
                         entity_id=0,
-                        field="break_time",
-                        message=f"No break between classes for group {self._group_label(group)} on {day}",
-                        severity="warning"
+                        field="transit_time",
+                        message=(f"Group {self._group_label(group)} needs at least {DEFAULT_TRANSIT_MINUTES} "
+                                 f"minutes between classes in different rooms on {day}"),
+                        severity="error"
                     ))
                     valid = False
         
@@ -569,12 +582,15 @@ class ValidationService:
         """
         Validate room is not double-booked at the specified time.
         """
+        day_index = self._day_index(day)
+        if day_index is None:
+            return False
         query = (
             self.db.query(TimetableSlot)
             .filter(
                 TimetableSlot.timetable_id == timetable_id,
                 TimetableSlot.room_id == room_id,
-                TimetableSlot.day == day
+                TimetableSlot.day_of_week == day_index
             )
         )
         
@@ -692,7 +708,9 @@ class ValidationService:
             slot_data["start_time"],
             slot_data["end_time"],
             slot_data.get("lecturer_id"),
-            slot_data.get("group_id")
+            slot_data.get("group_id"),
+            slot_data.get("room_id"),
+            exclude_slot_id,
         )
         
         # Validate room double booking

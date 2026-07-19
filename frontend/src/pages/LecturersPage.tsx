@@ -52,6 +52,7 @@ interface Lecturer {
   email: string;
   department_id: number;
   max_hours_per_week: number;
+  welcome_email_sent?: boolean;
   teaching_preferences?: {
     avoid_early_morning: boolean;
     avoid_late_afternoon: boolean;
@@ -86,6 +87,7 @@ const issueLabels: Record<string, string> = {
   missing_lecturer_match: 'Lecturers not found for assignment',
   missing_course_value: 'Rows missing course values',
   row_validation_error: 'Other row validation issues',
+  missing_email: 'Lecturers loaded without email — portal access link NOT sent',
 };
 
 const LecturersPage: React.FC = () => {
@@ -413,7 +415,7 @@ const LecturersPage: React.FC = () => {
                 startIcon={<AddIcon />}
                 onClick={() => { handleOpenDialog(); }}
                 sx={{
-                  background: 'linear-gradient(135deg, #006837 0%, #004826 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #115293 100%)',
                   transition: 'all 0.3s ease',
                   '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 16px rgba(0,104,55,0.3)' },
                 }}
@@ -460,7 +462,18 @@ const LecturersPage: React.FC = () => {
                   <TableRow key={lecturer.id} hover>
                     <TableCell>{lecturer.staff_number}</TableCell>
                     <TableCell>{formatPersonName(lecturer.full_name)}</TableCell>
-                    <TableCell>{lecturer.email}</TableCell>
+                    <TableCell>
+                      {lecturer.email ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <span>{lecturer.email}</span>
+                          {!lecturer.welcome_email_sent && (
+                            <Chip label="Access link not sent" size="small" color="warning" variant="outlined" sx={{ fontSize: '0.68rem' }} />
+                          )}
+                        </Box>
+                      ) : (
+                        <Chip label="No email — add to notify" size="small" color="error" variant="outlined" sx={{ fontSize: '0.68rem' }} />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={departments.find((d) => d.id === lecturer.department_id)?.code || 'N/A'}

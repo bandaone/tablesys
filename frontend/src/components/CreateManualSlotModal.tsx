@@ -15,6 +15,7 @@ import {
     Grid
 } from '@mui/material';
 import { timetablesAPI, coursesAPI, lecturersAPI, roomsAPI, groupsAPI } from '../api';
+import { useInstitutionSetup } from '../hooks/useInstitutionSetup';
 import { formatGroupName, formatPersonName, formatRoomName } from '../utils/displayFormatters';
 
 interface CreateManualSlotModalProps {
@@ -33,6 +34,7 @@ const DAYS = [
 ];
 
 export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ open, onClose, onSuccess, timetableId }) => {
+    const { activityTypes } = useInstitutionSetup();
     const [loading, setLoading] = useState(false);
     const [dataLoading, setDataLoading] = useState(false);
     const [error, setError] = useState('');
@@ -50,14 +52,37 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
         day_of_week: 0,
         start_time: '08:00',
         end_time: '10:00',
-        session_type: 'lab'
+        session_type: 'lecture'
     });
+
+    const activityOptions = activityTypes.length > 0
+        ? activityTypes.map((activityType) => ({
+            value: activityType.key,
+            label: activityType.display_name,
+        }))
+        : [
+            { value: 'lecture', label: 'Lecture' },
+            { value: 'practical', label: 'Practical/Lab' },
+            { value: 'tutorial', label: 'Tutorial' },
+        ];
 
     useEffect(() => {
         if (open) {
             loadFormData();
         }
     }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const currentValue = String(formData.session_type || '').trim().toLowerCase();
+        const validValues = new Set(activityOptions.map((option) => option.value));
+        if (!validValues.has(currentValue)) {
+            setFormData((prev) => ({
+                ...prev,
+                session_type: activityOptions[0]?.value || 'lecture',
+            }));
+        }
+    }, [activityOptions, formData.session_type, open]);
 
     const loadFormData = async () => {
         setDataLoading(true);
@@ -71,8 +96,7 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
             setCourses(coursesRes);
             setLecturers(lecturersRes);
             setRooms(roomsRes);
-            // Filter to only show lab/tutorial groups for easier selection
-            setGroups(groupsRes.filter((g: any) => g.group_type === 'lab_group' || g.group_type === 'tutorial_group' || !g.group_type));
+            setGroups(groupsRes);
         } catch (err) {
             setError('Failed to load selection data.');
         } finally {
@@ -111,7 +135,7 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Create Custom Slot (e.g., Lab Session)</DialogTitle>
+            <DialogTitle>Create Custom Timetable Slot</DialogTitle>
             <DialogContent dividers>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -119,6 +143,23 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
                     <CircularProgress sx={{ display: 'block', mx: 'auto', my: 2 }} />
                 ) : (
                     <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Activity Type</InputLabel>
+                                <Select
+                                    value={formData.session_type}
+                                    label="Activity Type"
+                                    onChange={(e) => setFormData({ ...formData, session_type: e.target.value as string })}
+                                >
+                                    {activityOptions.map((option) => (
+                                        <MenuItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+
                         <Grid item xs={12}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Course</InputLabel>
@@ -134,10 +175,10 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
 
                         <Grid item xs={12}>
                             <FormControl fullWidth size="small">
-                                <InputLabel>Lab Group</InputLabel>
+                                <InputLabel>Student Group</InputLabel>
                                 <Select
                                     value={formData.group_id}
-                                    label="Lab Group"
+                                    label="Student Group"
                                     onChange={(e) => setFormData({ ...formData, group_id: e.target.value as string })}
                                 >
                                     {groups.map(g => <MenuItem key={g.id} value={g.id}>{formatGroupName(g.group_name, g.display_code)} ({g.size} students)</MenuItem>)}
@@ -160,10 +201,10 @@ export const CreateManualSlotModal: React.FC<CreateManualSlotModalProps> = ({ op
 
                         <Grid item xs={12} sm={6}>
                             <FormControl fullWidth size="small">
-                                <InputLabel>Room / Lab</InputLabel>
+                                <InputLabel>Room / Venue</InputLabel>
                                 <Select
                                     value={formData.room_id}
-                                    label="Room / Lab"
+                                    label="Room / Venue"
                                     onChange={(e) => setFormData({ ...formData, room_id: e.target.value as string })}
                                 >
                                     {rooms.map(r => <MenuItem key={r.id} value={r.id}>{formatRoomName(r.name)} (Cap: {r.capacity})</MenuItem>)}

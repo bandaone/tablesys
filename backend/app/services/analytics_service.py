@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import time
 from typing import Any, Dict, List
 
-from sqlalchemy import func
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
 from ..models import (
@@ -25,14 +25,33 @@ from ..models import (
     StudentGroup,
     Timetable,
     TimetableSlot,
+    User,
 )
+from ..auth import is_tenant_admin
 
 
 class AnalyticsService:
     """Generates analytics and statistics for timetables."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, current_user: User | None = None):
         self.db = db
+        self.current_user = current_user
+
+    def _timetable_query(self):
+        """Keep analytics inside the caller's tenant and school boundary."""
+        query = self.db.query(Timetable)
+        if not self.current_user:
+            return query
+
+        university_id = getattr(self.current_user, "university_id", None)
+        if university_id is not None:
+            query = query.filter(Timetable.university_id == university_id)
+        if not is_tenant_admin(self.current_user):
+            school_id = getattr(self.current_user, "school_id", None)
+            # A staff account without a school assignment must not fall back to
+            # tenant-wide analytics.
+            query = query.filter(Timetable.school_id == school_id) if school_id is not None else query.filter(false())
+        return query
     
     def get_timetable_analytics(self, timetable_id: int) -> Dict[str, Any]:
         """
@@ -43,7 +62,7 @@ class AnalyticsService:
             and other timetable statistics.
         """
         # Check if timetable exists
-        timetable = self.db.query(Timetable).get(timetable_id)
+        timetable = self._timetable_query().filter(Timetable.id == timetable_id).first()
         if not timetable:
             raise ValueError(f"Timetable {timetable_id} not found")
         
@@ -57,8 +76,8 @@ class AnalyticsService:
         return {
             "timetable_id": timetable_id,
             "timetable_name": timetable.name,
-            "room_utilization": self._calculate_room_utilization(slots),
-            "lecturer_workload": self._calculate_lecturer_workload(slots),
+            "room_utilization": self._calculate_room_utilization(timetable, slots),
+            "lecturer_workload": self._calculate_lecturer_workload(timetable, slots),
             "course_distribution": self._calculate_course_distribution(slots),
             "time_slot_utilization": self._calculate_time_slot_utilization(effective_slots),
             "day_distribution": self._calculate_day_distribution(effective_slots),
@@ -69,8 +88,9 @@ class AnalyticsService:
     def get_active_timetable_analytics(self) -> Dict[str, Any]:
         """Get analytics for the currently active timetable."""
         timetable = (
-            self.db.query(Timetable)
+            self._timetable_query()
             .filter(Timetable.is_active == True)
+            .order_by(Timetable.id.desc())
             .first()
         )
         
@@ -79,7 +99,7 @@ class AnalyticsService:
         
         return self.get_timetable_analytics(timetable.id)
     
-    def _calculate_room_utilization(self, slots: List[TimetableSlot]) -> List[Dict[str, Any]]:
+    def _calculate_room_utilization(self, timetable: Timetable, slots: List[TimetableSlot]) -> List[Dict[str, Any]]:
         """Calculate utilization rate for each room."""
         # Count slots per room
         room_usage: Dict[int, int] = defaultdict(int)
@@ -89,7 +109,14 @@ class AnalyticsService:
                 room_usage[slot.room_id] += 1
         
         # Get all rooms
-        rooms = self.db.query(Room).all()
+        rooms = (
+            self.db.query(Room)
+            .filter(
+                Room.university_id == timetable.university_id,
+                Room.school_id == timetable.school_id,
+            )
+            .all()
+        )
         
         # Calculate total possible slots per week (5 days, ~10 hours/day)
         TOTAL_POSSIBLE_SLOTS_PER_WEEK = 50  # Approximate
@@ -115,7 +142,7 @@ class AnalyticsService:
         
         return utilization_data
     
-    def _calculate_lecturer_workload(self, slots: List[TimetableSlot]) -> List[Dict[str, Any]]:
+    def _calculate_lecturer_workload(self, timetable: Timetable, slots: List[TimetableSlot]) -> List[Dict[str, Any]]:
         """Calculate workload hours for each lecturer."""
         # Count hours per lecturer
         lecturer_hours: Dict[int, float] = defaultdict(float)
@@ -128,7 +155,15 @@ class AnalyticsService:
                 lecturer_hours[slot.lecturer_id] += duration
         
         # Get all lecturers
-        lecturers = self.db.query(Lecturer).all()
+        lecturers = (
+            self.db.query(Lecturer)
+            .join(Department, Lecturer.department_id == Department.id)
+            .filter(
+                Department.university_id == timetable.university_id,
+                Department.school_id == timetable.school_id,
+            )
+            .all()
+        )
         
         workload_data = []
         for lecturer in lecturers:

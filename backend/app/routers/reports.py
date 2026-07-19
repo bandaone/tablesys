@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from ..database import get_db
-from ..auth import get_current_user
-from ..models import User
+from ..auth import get_current_active_hod_or_school_operator
+from ..models import User, UserRole
 from ..services.report_service import ReportService
 
 
@@ -26,21 +26,16 @@ class CustomReportConfig(BaseModel):
     order_by: Optional[str] = None
 
 
-def require_coordinator_or_admin(current_user: User = Depends(get_current_user)):
+def require_reports_access(current_user: User = Depends(get_current_active_hod_or_school_operator)):
     """
     Dependency to ensure only Coordinators, HODs, or Admins can access reports
     """
-    if current_user.role not in ["Admin", "HOD", "Coordinator"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators, HODs, and coordinators can access reports"
-        )
     return current_user
 
 
 @router.get("/types", response_model=List[Dict[str, str]])
 async def get_report_types(
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -51,7 +46,7 @@ async def get_report_types(
     - name: Display name
     - description: Report description
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     return service.get_available_report_types()
 
 
@@ -59,7 +54,7 @@ async def get_report_types(
 async def generate_lecturer_workload_report(
     department_id: Optional[int] = None,
     lecturer_id: Optional[int] = None,
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -75,7 +70,7 @@ async def generate_lecturer_workload_report(
     - Workload percentage vs maximum hours
     - Workload status (optimal/overloaded/underutilized)
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     report = service.generate_lecturer_workload_report(
         department_id=department_id,
         lecturer_id=lecturer_id
@@ -87,7 +82,7 @@ async def generate_lecturer_workload_report(
 async def generate_room_utilization_report(
     building: Optional[str] = None,
     category: Optional[str] = None,
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -103,7 +98,7 @@ async def generate_room_utilization_report(
     - Average capacity usage
     - Courses scheduled in each room
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     report = service.generate_room_utilization_report(
         building=building,
         category=category
@@ -113,7 +108,7 @@ async def generate_room_utilization_report(
 
 @router.get("/department-comparison", response_model=Dict[str, Any])
 async def generate_department_comparison_report(
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -125,7 +120,7 @@ async def generate_department_comparison_report(
     - Teaching hours distribution
     - Student-to-lecturer ratios
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     report = service.generate_department_comparison_report()
     return report
 
@@ -133,7 +128,7 @@ async def generate_department_comparison_report(
 @router.get("/timetable-summary/{timetable_id}", response_model=Dict[str, Any])
 async def generate_timetable_summary_report(
     timetable_id: int,
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -147,7 +142,7 @@ async def generate_timetable_summary_report(
     - Statistics (total slots, unique resources)
     - Distribution by day and time
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     report = service.generate_timetable_summary_report(timetable_id=timetable_id)
     
     if 'error' in report:
@@ -162,7 +157,7 @@ async def generate_timetable_summary_report(
 @router.post("/custom", response_model=Dict[str, Any])
 async def generate_custom_report(
     config: CustomReportConfig,
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -188,7 +183,7 @@ async def generate_custom_report(
     }
     ```
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     report = service.generate_custom_report(config.dict())
     return report
 
@@ -202,7 +197,7 @@ async def export_report(
     building: Optional[str] = None,
     category: Optional[str] = None,
     timetable_id: Optional[int] = None,
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(require_reports_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -217,7 +212,7 @@ async def export_report(
     
     Returns file download with appropriate content type
     """
-    service = ReportService(db)
+    service = ReportService(db, current_user)
     
     # Generate report based on type
     if report_type == "lecturer-workload":
@@ -275,7 +270,7 @@ async def export_report(
 
 @router.get("/quick-stats", response_model=Dict[str, Any])
 async def get_quick_stats(
-    current_user: User = Depends(require_coordinator_or_admin),
+    current_user: User = Depends(get_current_active_hod_or_school_operator),
     db: Session = Depends(get_db)
 ):
     """

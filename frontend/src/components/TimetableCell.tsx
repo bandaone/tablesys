@@ -5,6 +5,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import ReplayIcon from '@mui/icons-material/Replay';
+import { activityTypeColors } from '../hooks/useInstitutionSetup';
+import { resolveActivityPresentation } from '../utils/activityPresentation';
 
 // ---------------------------------------------------------------------------
 // TimetableSlot — canonical shape returned by GET /api/v1/timetables/view
@@ -17,6 +19,9 @@ export interface TimetableSlot {
     room: string;
     lecturer?: string;
     session_type?: string;
+    activity_type_key?: string;
+    activity_display_name?: string;
+    activity_color?: string;
 
     // Populated by backend for every slot:
     slot_id?: number;
@@ -56,6 +61,13 @@ interface TimetableCellProps {
     dragEnabled?: boolean;
     /** Called when the coordinator clicks the "reset override" button */
     onResetOverride?: (slot: TimetableSlot) => void;
+    /**
+     * Optional map from activity_type_key → { color } provided by the
+     * parent page via useInstitutionSetup().  When present, non-legacy
+     * session types (e.g. 'theory', 'clinical_skills') will be rendered
+     * with the institution-defined colour rather than the DEFAULT_COLOR.
+     */
+    activityTypesMap?: Record<string, { color: string; display_name: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +95,7 @@ const TimetableCell: React.FC<TimetableCellProps> = ({
     selected,
     dragEnabled = false,
     onResetOverride,
+    activityTypesMap,
 }) => {
     // ---- Empty cell --------------------------------------------------------
     if (!slot) {
@@ -90,7 +103,17 @@ const TimetableCell: React.FC<TimetableCellProps> = ({
     }
 
     // ---- Colour by session type --------------------------------------------
-    const colors = SESSION_COLOR_MAP[slot.session_type ?? ''] ?? DEFAULT_COLOR;
+    // Priority order:
+    //  1. Static legacy map (lecture / practical / tutorial)
+    //  2. Dynamic activity type from parent-provided map
+    //  3. Generic default (purple tint)
+    const activityPresentation = resolveActivityPresentation(slot, activityTypesMap);
+    const sessionKey = activityPresentation.key;
+    let colors = SESSION_COLOR_MAP[sessionKey];
+    if (!colors && activityPresentation.color) {
+        colors = activityTypeColors(activityPresentation.color);
+    }
+    if (!colors) colors = DEFAULT_COLOR;
 
     // ---- Drag start --------------------------------------------------------
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -183,7 +206,7 @@ const TimetableCell: React.FC<TimetableCellProps> = ({
                     className="timetable-cell-session-type"
                     style={{ color: colors.text, opacity: 0.75 }}
                 >
-                    {slot.session_type.charAt(0).toUpperCase() + slot.session_type.slice(1)}
+                    {activityPresentation.displayName}
                 </div>
             )}
 

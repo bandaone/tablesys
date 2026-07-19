@@ -1,0 +1,283 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.3, pluggy-1.6.0 -- /home/on3/.pyenv/versions/3.12.3/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-22-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '7.4.3', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'anyio': '4.13.0', 'langsmith': '0.7.24', 'asyncio': '0.23.8', 'cov': '4.1.0', 'hypothesis': '6.98.6', 'html': '4.1.1'}}
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase(PosixPath('/home/on3/DENNIS/TABLESYS/backend/.hypothesis/examples'))
+rootdir: /home/on3/DENNIS/TABLESYS/backend
+configfile: pytest.ini
+plugins: metadata-3.1.1, anyio-4.13.0, langsmith-0.7.24, asyncio-0.23.8, cov-4.1.0, hypothesis-6.98.6, html-4.1.1
+asyncio: mode=Mode.AUTO
+collecting ... collected 1 item
+
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_first_request_is_always_allowed ERROR [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestPublicRouteRateLimiter.test_first_request_is_always_allowed _
+
+self = <sqlalchemy.engine.base.Connection object at 0x7119c4b4a240>
+engine = Engine(postgresql://tablesys:***@localhost:5432/tablesys_test)
+connection = None, _has_events = None, _allow_revalidate = True
+_allow_autobegin = True
+
+    def __init__(
+        self,
+        engine: Engine,
+        connection: Optional[PoolProxiedConnection] = None,
+        _has_events: Optional[bool] = None,
+        _allow_revalidate: bool = True,
+        _allow_autobegin: bool = True,
+    ):
+        """Construct a new Connection."""
+        self.engine = engine
+        self.dialect = dialect = engine.dialect
+    
+        if connection is None:
+            try:
+>               self._dbapi_connection = engine.raw_connection()
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:3317: in raw_connection
+    return self.pool.connect()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:1272: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:712: in checkout
+    rec = pool._do_get()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/impl.py:177: in _do_get
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/impl.py:175: in _do_get
+    return self._create_connection()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:389: in _create_connection
+    return _ConnectionRecord(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:674: in __init__
+    self.__connect()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:900: in __connect
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+dsn = 'host=localhost dbname=tablesys_test user=tablesys password=J8rQ4mN2xV9pL6cT1sW7kD3hF5bZ0yUa port=5432'
+connection_factory = None, cursor_factory = None
+kwargs = {'dbname': 'tablesys_test', 'host': 'localhost', 'password': 'J8rQ4mN2xV9pL6cT1sW7kD3hF5bZ0yUa', 'port': 5432, ...}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+    
+        The connection parameters can be specified as a string:
+    
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+    
+        or using a set of keyword arguments:
+    
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+    
+        Or as a mix of both. The basic connection parameters are:
+    
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+    
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+    
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+    
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+    
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+    
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+    
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+E       psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed: FATAL:  database "tablesys_test" does not exist
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+>   ???
+
+C:\SYSTEMS\TABLESYS\backend\tests\conftest.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/schema.py:5931: in create_all
+    bind._run_ddl_visitor(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:3267: in _run_ddl_visitor
+    with self.begin() as conn:
+../../../.pyenv/versions/3.12.3/lib/python3.12/contextlib.py:137: in __enter__
+    return next(self.gen)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:3257: in begin
+    with self.connect() as conn:
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:3293: in connect
+    return self._connection_cls(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:145: in __init__
+    Connection._handle_dbapi_exception_noconnection(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2448: in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:143: in __init__
+    self._dbapi_connection = engine.raw_connection()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:3317: in raw_connection
+    return self.pool.connect()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:448: in connect
+    return _ConnectionFairy._checkout(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:1272: in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:712: in checkout
+    rec = pool._do_get()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/impl.py:177: in _do_get
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/impl.py:175: in _do_get
+    return self._create_connection()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:389: in _create_connection
+    return _ConnectionRecord(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:674: in __init__
+    self.__connect()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:900: in __connect
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/pool/base.py:896: in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/create.py:667: in connect
+    return dialect.connect(*cargs_tup, **cparams)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:630: in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+dsn = 'host=localhost dbname=tablesys_test user=tablesys password=J8rQ4mN2xV9pL6cT1sW7kD3hF5bZ0yUa port=5432'
+connection_factory = None, cursor_factory = None
+kwargs = {'dbname': 'tablesys_test', 'host': 'localhost', 'password': 'J8rQ4mN2xV9pL6cT1sW7kD3hF5bZ0yUa', 'port': 5432, ...}
+kwasync = {}
+
+    def connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
+        """
+        Create a new database connection.
+    
+        The connection parameters can be specified as a string:
+    
+            conn = psycopg2.connect("dbname=test user=postgres password=secret")
+    
+        or using a set of keyword arguments:
+    
+            conn = psycopg2.connect(database="test", user="postgres", password="secret")
+    
+        Or as a mix of both. The basic connection parameters are:
+    
+        - *dbname*: the database name
+        - *database*: the database name (only as keyword argument)
+        - *user*: user name used to authenticate
+        - *password*: password used to authenticate
+        - *host*: database host address (defaults to UNIX socket if not provided)
+        - *port*: connection port number (defaults to 5432 if not provided)
+    
+        Using the *connection_factory* parameter a different class or connections
+        factory can be specified. It should be a callable object taking a dsn
+        argument.
+    
+        Using the *cursor_factory* parameter, a new default cursor factory will be
+        used by cursor().
+    
+        Using *async*=True an asynchronous connection will be created. *async_* is
+        a valid alias (for Python versions where ``async`` is a keyword).
+    
+        Any other keyword parameter will be passed to the underlying client
+        library: the list of supported parameters depends on the library version.
+    
+        """
+        kwasync = {}
+        if 'async' in kwargs:
+            kwasync['async'] = kwargs.pop('async')
+        if 'async_' in kwargs:
+            kwasync['async_'] = kwargs.pop('async_')
+    
+        dsn = _ext.make_dsn(dsn, **kwargs)
+>       conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+E       sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "localhost" (127.0.0.1), port 5432 failed: FATAL:  database "tablesys_test" does not exist
+E       
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/psycopg2/__init__.py:122: OperationalError
+=============================== warnings summary ===============================
+app/database.py:48
+  /home/on3/DENNIS/TABLESYS/backend/app/database.py:48: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: 29 warnings
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11: DeprecationWarning: ast.NameConstant is deprecated and will be removed in Python 3.14; use ast.Constant instead
+    haveNameConstant = hasattr(ast,'NameConstant')
+
+app/main.py:310
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:310: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app/main.py:319
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:319: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_first_request_is_always_allowed
+======================== 38 warnings, 1 error in 1.04s =========================

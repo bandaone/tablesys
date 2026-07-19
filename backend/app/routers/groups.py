@@ -23,6 +23,7 @@ from ..services.notification_service import NotificationService
 from ..services.group_course_mapping_service import GroupCourseMappingService
 from ..utils.bulk_import_helpers import resolve_department_id, ffill_department_columns
 from ..utils.department_utils import find_general_department, is_general_department
+from ..utils.school_scope import filter_group_query_for_user
 
 router = APIRouter(prefix="/api/v1/groups", tags=["student-groups"])
 
@@ -268,21 +269,8 @@ async def get_groups(
     Use ?tier=main for main groups only, ?tier=stream for stream groups,
     ?tier=lab for lab subgroups.
     """
-    query = db.query(StudentGroupModel)
-    
-    # HODs see their department's groups AND GEN department groups (universal grouping)
-    if current_user.role == UserRole.HOD and current_user.department_id:
-        from sqlalchemy import or_
-        gen_dept = find_general_department(db)
-        gen_dept_id = gen_dept.id if gen_dept else -1
-        
-        query = query.filter(
-            or_(
-                StudentGroupModel.department_id == current_user.department_id,
-                StudentGroupModel.department_id == gen_dept_id
-            )
-        )
-    
+    query = filter_group_query_for_user(db.query(StudentGroupModel), current_user)
+
     # Optional department filter
     if department_id:
         query = query.filter(StudentGroupModel.department_id == department_id)
@@ -970,12 +958,6 @@ async def generate_subgroups(
 
     # Enforce size constraints for lab subgroups
     is_lab_type = request.group_type in ["lab_group", "tutorial_group", "drawing_group"]
-    if is_lab_type:
-        if request.size_per_group < 4 or request.size_per_group > 13:
-            raise HTTPException(
-                status_code=422,
-                detail="Lab subgroup size must be between 4 and 13 students"
-            )
 
     # Resolve subgroup label suffixes based on naming_mode
     ALPHA = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")

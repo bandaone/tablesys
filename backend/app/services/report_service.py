@@ -9,17 +9,48 @@ from typing import Dict, List, Any, Optional
 from io import BytesIO
 import json
 
-from ..models import (
-    User, Department, Course, Lecturer, Room, StudentGroup,
-    Timetable, TimetableSlot
-)
+from ..models import User, Department, Course, Lecturer, Room, StudentGroup, Timetable, TimetableSlot
+from ..auth import is_tenant_admin, is_school_operator
 
 
 class ReportService:
     """Service for generating various system reports"""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user: Optional[User] = None):
         self.db = db
+        self.user = user
+
+    def _scoped_departments(self):
+        query = self.db.query(Department)
+        if self.user and getattr(self.user, "university_id", None):
+            query = query.filter(Department.university_id == self.user.university_id)
+        if self.user and is_school_operator(self.user) and getattr(self.user, "school_id", None) is not None and not is_tenant_admin(self.user):
+            query = query.filter(Department.school_id == self.user.school_id)
+        return query
+
+    def _scoped_lecturers(self):
+        query = self.db.query(Lecturer).join(Department, Lecturer.department_id == Department.id)
+        if self.user and getattr(self.user, "university_id", None):
+            query = query.filter(Department.university_id == self.user.university_id)
+        if self.user and is_school_operator(self.user) and getattr(self.user, "school_id", None) is not None and not is_tenant_admin(self.user):
+            query = query.filter(Department.school_id == self.user.school_id)
+        return query
+
+    def _scoped_rooms(self):
+        query = self.db.query(Room)
+        if self.user and getattr(self.user, "university_id", None):
+            query = query.filter(Room.university_id == self.user.university_id)
+        if self.user and is_school_operator(self.user) and getattr(self.user, "school_id", None) is not None and not is_tenant_admin(self.user):
+            query = query.filter((Room.school_id == self.user.school_id) | (Room.school_id == None))
+        return query
+
+    def _scoped_timetables(self):
+        query = self.db.query(Timetable)
+        if self.user and getattr(self.user, "university_id", None):
+            query = query.filter(Timetable.university_id == self.user.university_id)
+        if self.user and is_school_operator(self.user) and getattr(self.user, "school_id", None) is not None and not is_tenant_admin(self.user):
+            query = query.filter((Timetable.school_id == self.user.school_id) | (Timetable.school_id == None))
+        return query
     
     def generate_lecturer_workload_report(
         self,
@@ -30,7 +61,7 @@ class ReportService:
         Generate detailed workload report for lecturers
         Shows hours taught, courses assigned, and workload distribution
         """
-        query = self.db.query(Lecturer)
+        query = self._scoped_lecturers()
         
         if department_id:
             query = query.filter(Lecturer.department_id == department_id)
@@ -55,7 +86,7 @@ class ReportService:
             total_slots = sum(c.slot_count for c in courses_taught)
             
             # Get department name
-            dept = self.db.query(Department).filter(Department.id == lecturer.department_id).first()
+            dept = self._scoped_departments().filter(Department.id == lecturer.department_id).first()
             
             # Workload status
             workload_status = 'optimal'
@@ -118,7 +149,7 @@ class ReportService:
         Generate room utilization report
         Shows usage statistics, capacity utilization, and availability
         """
-        query = self.db.query(Room)
+        query = self._scoped_rooms()
         
         if building:
             query = query.filter(Room.building == building)
@@ -218,7 +249,7 @@ class ReportService:
         Generate comparative report across all departments
         Shows resource distribution, timetable status, and metrics
         """
-        departments = self.db.query(Department).all()
+        departments = self._scoped_departments().all()
         report_data = []
         
         for dept in departments:
@@ -306,7 +337,7 @@ class ReportService:
         """
         Generate comprehensive summary report for a specific timetable
         """
-        timetable = self.db.query(Timetable).filter(Timetable.id == timetable_id).first()
+        timetable = self._scoped_timetables().filter(Timetable.id == timetable_id).first()
         
         if not timetable:
             return {'error': 'Timetable not found'}

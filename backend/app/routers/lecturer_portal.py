@@ -5,6 +5,7 @@ Provides endpoints for lecturer login and personal timetable viewing
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
@@ -12,7 +13,7 @@ from prometheus_client import Counter
 
 from pydantic import BaseModel
 from ..database import get_db
-from ..models import Lecturer, Timetable, TimetableSlot, Course, Room, LecturerAssignment, CourseAnnouncement
+from ..models import ActivityType, Department, Lecturer, Timetable, TimetableSlot, Course, Room, LecturerAssignment, CourseAnnouncement
 from ..config import settings
 
 router = APIRouter(prefix="/api/v1/lecturer", tags=["lecturer-portal"])
@@ -25,6 +26,24 @@ _LECTURER_LOGIN_COUNT = Counter('lecturer_logins_total', 'Total lecturer login a
 _LECTURER_TIMETABLE_VIEWS = Counter('lecturer_timetable_views_total', 'Total lecturer timetable views')
 
 DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+
+def _active_timetable_for_lecturer(db: Session, lecturer: Lecturer) -> tuple[Timetable | None, Department | None]:
+    """Resolve the one published timetable for this lecturer's university."""
+    department = db.query(Department).filter(Department.id == lecturer.department_id).first()
+    if not department:
+        return None, None
+    timetable = (
+        db.query(Timetable)
+        .filter(
+            Timetable.university_id == department.university_id,
+            Timetable.is_active == True,
+            or_(Timetable.school_id == department.school_id, Timetable.school_id == None) if department.school_id else True
+        )
+        .order_by(Timetable.school_id.isnot(None).desc(), Timetable.id.desc())
+        .first()
+    )
+    return timetable, department
 
 
 def _time_to_minutes(value) -> int:
@@ -81,6 +100,26 @@ def _minutes_until_session(day_name: str, start_time) -> int:
     return day_delta * 24 * 60 + (start_minutes - now_minutes if day_delta == 0 else start_minutes - now_minutes)
 
 
+def _activity_type_map(db: Session, university_id: int | None) -> Dict[str, Dict[str, str]]:
+    if not university_id:
+        return {}
+    rows = (
+        db.query(ActivityType)
+        .filter(
+            ActivityType.university_id == university_id,
+            ActivityType.is_active == True,
+        )
+        .all()
+    )
+    return {
+        str(row.key).strip().lower(): {
+            "display_name": row.display_name,
+            "color": row.color or "#3B82F6",
+        }
+        for row in rows
+    }
+
+
 def create_lecturer_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     if expires_delta:
@@ -128,13 +167,29 @@ async def login_lecturer(payload: Dict[str, str] = Body(...), db: Session = Depe
     if not staff_number:
         raise HTTPException(status_code=400, detail="staff_number is required")
 
-    lecturer = db.query(Lecturer).filter(Lecturer.staff_number == staff_number).first()
+    lecturer = db.query(Lecturer).filter(Lecturer.staff_number.ilike(staff_number.strip())).first()
     if not lecturer:
         _LECTURER_LOGIN_COUNT.inc()
         raise HTTPException(status_code=404, detail="Staff number not recognised. Contact your coordinator.")
 
-    access_token = create_lecturer_access_token({"sub": lecturer.staff_number, "lecturer_id": lecturer.id})
+    department = (
+        db.query(Department)
+        .filter(Department.id == lecturer.department_id)
+        .first()
+    )
+    access_token = create_lecturer_access_token(
+        {
+            "sub": lecturer.staff_number,
+            "lecturer_id": lecturer.id,
+            "university_id": department.university_id if department else None,
+        }
+    )
     _LECTURER_LOGIN_COUNT.inc()
+
+    # Record last login timestamp for dashboard active-user tracking
+    from datetime import datetime, timezone
+    lecturer.last_login_at = datetime.now(timezone.utc)
+    db.commit()
 
     return {"access_token": access_token, "token_type": "bearer", "lecturer": {
         "id": lecturer.id,
@@ -162,22 +217,36 @@ async def get_lecturer_timetable(
     current_lecturer: Lecturer = Depends(get_current_lecturer), db: Session = Depends(get_db)
 ):
     """Return timetable sessions assigned to the authenticated lecturer"""
-    # Find most recent generated timetable for the lecturer's department (fallback)
-    timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
-    # Get all slots where lecturer_id == current_lecturer.id
-    slots = db.query(TimetableSlot).filter(TimetableSlot.lecturer_id == current_lecturer.id).all()
+    timetable, department = _active_timetable_for_lecturer(db, current_lecturer)
+    slots = [] if not timetable else (
+        db.query(TimetableSlot)
+        .filter(
+            TimetableSlot.timetable_id == timetable.id,
+            TimetableSlot.lecturer_id == current_lecturer.id,
+        )
+        .all()
+    )
+    activity_types_by_key = _activity_type_map(
+        db,
+        department.university_id if department else None,
+    )
 
     _LECTURER_TIMETABLE_VIEWS.inc()
     formatted = []
     for slot in slots:
         course = db.query(Course).filter(Course.id == slot.course_id).first()
         room = db.query(Room).filter(Room.id == slot.room_id).first()
+        activity_key = str(slot.session_type or "").strip().lower()
+        activity_meta = activity_types_by_key.get(activity_key, {})
         formatted.append({
             "id": slot.id,
             "course_code": course.code if course else 'N/A',
             "course_name": course.name if course else 'N/A',
             "group_id": slot.group_id,
             "session_type": slot.session_type,
+            "activity_type_key": activity_key or None,
+            "activity_display_name": activity_meta.get("display_name"),
+            "activity_color": activity_meta.get("color"),
             "day_of_week": _day_int_to_name(slot.day_of_week),
             "start_time": _format_time(slot.start_time),
             "end_time": _format_time(slot.end_time),
@@ -229,9 +298,16 @@ async def get_lecturer_courses(current_lecturer: Lecturer = Depends(get_current_
 async def get_lecturer_dashboard(current_lecturer: Lecturer = Depends(get_current_lecturer), db: Session = Depends(get_db)):
     # Summary metrics
     total_courses = db.query(LecturerAssignment).filter(LecturerAssignment.lecturer_id == current_lecturer.id).count()
-    total_sessions = db.query(TimetableSlot).filter(TimetableSlot.lecturer_id == current_lecturer.id).count()
+    timetable, _ = _active_timetable_for_lecturer(db, current_lecturer)
+    active_slot_query = db.query(TimetableSlot).filter(TimetableSlot.lecturer_id == current_lecturer.id)
+    if timetable is None:
+        sessions = []
+        total_sessions = 0
+    else:
+        active_slot_query = active_slot_query.filter(TimetableSlot.timetable_id == timetable.id)
+        sessions = active_slot_query.all()
+        total_sessions = len(sessions)
     # Hours this week (rough estimate: sum of durations)
-    sessions = db.query(TimetableSlot).filter(TimetableSlot.lecturer_id == current_lecturer.id).all()
     session_rows: List[Tuple[TimetableSlot, int]] = [(slot, _session_duration_minutes(slot)) for slot in sessions]
     total_minutes = sum(duration for _, duration in session_rows)
 
@@ -439,7 +515,7 @@ async def get_available_venues(
     default_room_available: bool = False
 
     if course_id:
-        active_tt = db.query(Timetable).filter(Timetable.is_active == True).first()
+        active_tt, _ = _active_timetable_for_lecturer(db, current_lecturer)
         if active_tt:
             lslot = db.query(TimetableSlot).filter(
                 TimetableSlot.course_id == course_id,
@@ -489,9 +565,10 @@ async def schedule_test(
     current_lecturer: Lecturer = Depends(get_current_lecturer),
     db: Session = Depends(get_db)
 ):
+    active_timetable, department = _active_timetable_for_lecturer(db, current_lecturer)
     ExamModeService(db).ensure_non_exam_activity_allowed(
         target_date=req.date,
-        university_id=getattr(current_lecturer, "university_id", None),
+        university_id=department.university_id if department else None,
         activity_label="Test scheduling",
     )
 
@@ -510,7 +587,7 @@ async def schedule_test(
     if not room_id:
         using_default = True
         # Resolve the course's default lecture room
-        timetable = db.query(Timetable).filter(Timetable.is_active == True).first()
+        timetable = active_timetable
         if timetable:
             lecture_slot = db.query(TimetableSlot).filter(
                 TimetableSlot.course_id == req.course_id,
@@ -583,3 +660,71 @@ async def schedule_test(
 
     db.commit()
     return {"status": "success", "booking_id": booking.id, "announcement_id": announcement.id}
+
+@router.get("/exam-timetable", response_model=Dict[str, Any])
+async def get_lecturer_exam_timetable(
+    current_lecturer: Lecturer = Depends(get_current_lecturer),
+    db: Session = Depends(get_db)
+):
+    from ..models import ExamPeriod, ExamSlot, ExamSlotRoom, ExamPaper, Course
+    from sqlalchemy.orm import joinedload
+
+    department = db.query(Department).filter(Department.id == current_lecturer.department_id).first()
+    university_id = department.university_id if department else None
+
+    # Get active published exam period
+    period = (
+        db.query(ExamPeriod)
+        .filter(
+            ExamPeriod.university_id == university_id,
+            ExamPeriod.is_published == True
+        )
+        .order_by(ExamPeriod.start_date.desc())
+        .first()
+    )
+
+    if not period:
+        return {"period": None, "slots": []}
+
+    # Find all slots where this lecturer is the chief invigilator
+    slots = (
+        db.query(ExamSlot)
+        .join(ExamPaper, ExamSlot.exam_paper_id == ExamPaper.id)
+        .filter(
+            ExamSlot.exam_period_id == period.id,
+            ExamSlot.chief_invigilator_id == current_lecturer.id
+        )
+        .options(
+            joinedload(ExamSlot.paper).joinedload(ExamPaper.course),
+            joinedload(ExamSlot.room_allocations).joinedload(ExamSlotRoom.room),
+        )
+        .order_by(ExamSlot.exam_date, ExamSlot.start_time)
+        .all()
+    )
+
+    relevant_slots = []
+    for slot in slots:
+        allocated_rooms = [a.room.name for a in slot.room_allocations if a.room]
+        
+        relevant_slots.append({
+            "id": slot.id,
+            "exam_date": slot.exam_date.isoformat(),
+            "day_of_week": slot.exam_date.strftime("%A"),
+            "start_time": _format_time(slot.start_time),
+            "end_time": _format_time(slot.end_time),
+            "paper_code": slot.paper.paper_code,
+            "paper_name": slot.paper.paper_name,
+            "course_name": slot.paper.course.name if slot.paper.course else None,
+            "rooms": allocated_rooms or ["TBA"],
+            "duration_minutes": slot.paper.duration_minutes
+        })
+
+    return {
+        "period": {
+            "id": period.id,
+            "name": period.name,
+            "start_date": period.start_date.isoformat(),
+            "end_date": period.end_date.isoformat(),
+        },
+        "slots": relevant_slots
+    }

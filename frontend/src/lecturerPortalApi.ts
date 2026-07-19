@@ -77,6 +77,10 @@ export const lecturerPortalApi = {
     const response = await lecturerApi.post('/tests', data);
     return response.data;
   },
+  getExamTimetable: async () => {
+    const response = await lecturerApi.get('/exam-timetable');
+    return response.data;
+  },
   logout: () => {
     localStorage.removeItem(LECTURER_TOKEN_KEY);
     localStorage.removeItem('lecturer_meta');

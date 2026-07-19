@@ -55,7 +55,7 @@ const DepartmentsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const isCoordinatorOrAdmin = user?.role === 'coordinator' || user?.role === 'admin';
+  const isCoordinatorOrAdmin = ['coordinator', 'school_coordinator', 'tenant_admin'].includes(user?.role || '');
 
   useEffect(() => {
     fetchDepartments().finally(() => setPageLoading(false));
@@ -75,7 +75,7 @@ const DepartmentsPage: React.FC = () => {
 
   const getDepartmentColor = (id: number) => {
     const colors = [
-      '#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#f44336', '#607d8b',
+      '#1976d2', '#9c27b0', '#ff9800', '#7b1fa2', '#f44336', '#607d8b',
       '#009688', '#e91e63', '#673ab7', '#3f51b5', '#00bcd4', '#795548'
     ];
     return colors[id % colors.length];
@@ -358,7 +358,7 @@ const DepartmentsPage: React.FC = () => {
           TransitionProps={{ direction: 'up' } as any}
         >
           <DialogTitle sx={{ 
-            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            background: 'linear-gradient(135deg, #1976d2 0%, #115293 100%)',
             color: 'white',
             display: 'flex',
             justifyContent: 'space-between',
@@ -408,7 +408,7 @@ const DepartmentsPage: React.FC = () => {
               onClick={handleEditDepartment} 
               variant="contained"
               sx={{ 
-                background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                background: 'linear-gradient(135deg, #1976d2 0%, #115293 100%)',
                 transition: 'all 0.3s ease',
                 '&:hover': { 
                   transform: 'scale(1.05)',

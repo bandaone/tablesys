@@ -12,10 +12,28 @@ import axios from 'axios';
 
 const STUDENT_API_BASE_URL = '/api/v1';
 const GROUP_ID_KEY = 'student_selected_group_id';
+const VIEWER_ID_KEY = 'student_public_viewer_id';
+const LAB_SUBGROUPS_KEY = 'student_selected_lab_subgroups';
+const ACADEMIC_WEEK_KEY = 'student_academic_week';
 
 const studentApi = axios.create({
   baseURL: STUDENT_API_BASE_URL,
 });
+
+const ensureViewerId = (): string => {
+  const existing = localStorage.getItem(VIEWER_ID_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const generated =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `viewer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  localStorage.setItem(VIEWER_ID_KEY, generated);
+  return generated;
+};
 
 // ── ETag helpers ───────────────────────────────────────────────────────────
 
@@ -89,14 +107,19 @@ studentApi.interceptors.request.use(
     if (universityId) {
       config.headers['X-University-ID'] = universityId;
     }
+    config.headers['X-Viewer-ID'] = ensureViewerId();
     return config;
   },
   (error) => Promise.reject(error),
 );
 
-// ── Helper: read group_id from localStorage ───────────────────────────────
+// ── Helper: read config from localStorage ───────────────────────────────
 
 const getGroupId = (): string | null => localStorage.getItem(GROUP_ID_KEY);
+
+const readLabSubgroups = (): string | null => localStorage.getItem(LAB_SUBGROUPS_KEY);
+
+const getAcademicWeek = (): string | null => localStorage.getItem(ACADEMIC_WEEK_KEY);
 
 const requireGroupId = (): string => {
   const gid = getGroupId();
@@ -104,6 +127,15 @@ const requireGroupId = (): string => {
     throw new Error('No group selected. Please complete the onboarding wizard.');
   }
   return gid;
+};
+
+const getCommonParams = (): Record<string, string> => {
+  const params: Record<string, string> = { group_id: requireGroupId() };
+  const week = getAcademicWeek();
+  const labSubgroups = readLabSubgroups();
+  if (week) params.academic_week = week;
+  if (labSubgroups) params.lab_subgroup_ids = labSubgroups;
+  return params;
 };
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -123,10 +155,29 @@ export const studentPortalApi = {
   /** Clear the persisted group selection (used for "Change Group"). */
   clearGroupId: () => {
     localStorage.removeItem(GROUP_ID_KEY);
+    localStorage.removeItem(LAB_SUBGROUPS_KEY);
   },
 
   /** Check if a group has been selected. */
   hasGroup: (): boolean => !!getGroupId(),
+
+  setLabSubgroups: (subgroupIds: number[]) => {
+    localStorage.setItem(LAB_SUBGROUPS_KEY, subgroupIds.join(','));
+  },
+
+  getStoredLabSubgroups: (): number[] => {
+    const raw = readLabSubgroups();
+    return raw ? raw.split(',').map(Number) : [];
+  },
+
+  setAcademicWeek: (week: number) => {
+    localStorage.setItem(ACADEMIC_WEEK_KEY, String(week));
+  },
+
+  getAcademicWeek: (): number => {
+    const raw = getAcademicWeek();
+    return raw ? Number(raw) : 1;
+  },
 
   /** Fetch the onboarding wizard data (departments → levels → groups). */
   getOnboardingGroups: async (universityId?: number) => {
@@ -140,34 +191,22 @@ export const studentPortalApi = {
 
   /** Fetch the main dashboard (Now / Next / Today). */
   getDashboard: async () => {
-    const gid = requireGroupId();
-    return getWithEtag('/mobile/public/dashboard', 'student_portal_dashboard', {
-      group_id: gid,
-    });
+    return getWithEtag('/mobile/public/dashboard', 'student_portal_dashboard', getCommonParams());
   },
 
   /** Fetch the "Now" card. */
   getNow: async () => {
-    const gid = requireGroupId();
-    return getWithEtag('/mobile/public/now', 'student_portal_now', {
-      group_id: gid,
-    });
+    return getWithEtag('/mobile/public/now', 'student_portal_now', getCommonParams());
   },
 
   /** Fetch today's sessions. */
   getToday: async () => {
-    const gid = requireGroupId();
-    return getWithEtag('/mobile/public/today', 'student_portal_today', {
-      group_id: gid,
-    });
+    return getWithEtag('/mobile/public/today', 'student_portal_today', getCommonParams());
   },
 
   /** Fetch the full week view. */
   getWeek: async () => {
-    const gid = requireGroupId();
-    return getWithEtag('/mobile/public/week', 'student_portal_timetable', {
-      group_id: gid,
-    });
+    return getWithEtag('/mobile/public/week', 'student_portal_timetable', getCommonParams());
   },
 
   /** Fetch the list of courses for this group. */
@@ -175,6 +214,20 @@ export const studentPortalApi = {
     const gid = requireGroupId();
     const response = await studentApi.get('/mobile/public/courses', {
       params: { group_id: gid },
+    });
+    return response.data;
+  },
+
+  /** Fetch the available rotating lab subgroups for the selected group. */
+  getLabSubgroups: async (academicWeek?: number) => {
+    const gid = requireGroupId();
+    const params: Record<string, string> = { group_id: gid };
+    const week = academicWeek ?? getAcademicWeek();
+    if (week) {
+      params.academic_week = String(week);
+    }
+    const response = await studentApi.get('/mobile/public/lab-subgroups', {
+      params,
     });
     return response.data;
   },
@@ -218,6 +271,14 @@ export const studentPortalApi = {
   getAnnouncements: async () => {
     const gid = requireGroupId();
     return getWithEtag('/mobile/public/announcements', 'student_portal_announcements', {
+      group_id: gid,
+    });
+  },
+
+  /** Fetch published exam timetable for the student's group. */
+  getExamTimetable: async () => {
+    const gid = requireGroupId();
+    return getWithEtag('/mobile/public/exam-timetable', 'student_portal_exam_timetable', {
       group_id: gid,
     });
   },

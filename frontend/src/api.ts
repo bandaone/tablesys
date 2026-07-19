@@ -7,14 +7,83 @@ export interface User {
   email: string;
   username: string;
   full_name: string;
-  role: 'superadmin' | 'admin' | 'coordinator' | 'hod' | 'lecturer';
+  role: 'superadmin' | 'tenant_admin' | 'school_coordinator' | 'coordinator' | 'hod' | 'lab_coordinator' | 'lecturer' | 'student';
+  university_id?: number;
+  school_id?: number | null;
   department_id?: number;
   is_active: boolean;
+}
+
+export interface School {
+  id: number;
+  university_id: number;
+  name: string;
+  code: string;
+  description?: string | null;
+  academic_calendar_id?: number | null;
+  scheduling_policy?: Record<string, unknown> | null;
+  is_active: boolean;
+}
+
+export interface SchoolProfileUploadPreviewRow {
+  row_number: number;
+  school: string;
+  programme: string;
+  year_level: number;
+  course_code: string;
+  course_name: string;
+  lecturer_name?: string | null;
+  status: string;
+  can_apply: boolean;
+  department_name: string;
+  department_code?: string | null;
+  department_action: string;
+  course_action: string;
+  lecturer_action: string;
+  assignment_action: string;
+  issues: string[];
+}
+
+export interface SchoolProfileUploadPreviewSummary {
+  total_rows: number;
+  ready_rows: number;
+  conflicted_rows: number;
+  skipped_rows: number;
+  departments_to_create: number;
+  departments_reused: number;
+  courses_to_create: number;
+  courses_to_update: number;
+  courses_unchanged: number;
+  lecturers_to_create: number;
+  lecturers_reused: number;
+  assignments_to_create: number;
+  assignments_reused: number;
+}
+
+export interface SchoolProfileUploadPreviewResponse {
+  school_id: number;
+  fingerprint: string;
+  expires_at: string;
+  rows: SchoolProfileUploadPreviewRow[];
+  summary: SchoolProfileUploadPreviewSummary;
+}
+
+export interface SchoolProfileUploadApplyResponse {
+  school_id: number;
+  created_departments: number;
+  created_courses: number;
+  updated_courses: number;
+  created_lecturers: number;
+  reused_lecturers: number;
+  created_assignments: number;
+  skipped_rows: number;
+  issues: string[];
 }
 
 export interface LoginRequest {
   username: string;
   password: string;
+  university_id?: number;
 }
 
 export interface LoginResponse {
@@ -295,6 +364,93 @@ export const groupsAPI = {
   },
 };
 
+export const labCoordinatorAPI = {
+  getRooms: async () => {
+    const response = await api.get('/lab-coordinator/rooms');
+    return response.data;
+  },
+
+  getRoomAllocations: async () => {
+    const response = await api.get('/lab-coordinator/room-allocations');
+    return response.data;
+  },
+
+  setRoomAllocations: async (room_ids: number[]) => {
+    const response = await api.put('/lab-coordinator/room-allocations', { room_ids });
+    return response.data;
+  },
+
+  createRoom: async (data: any) => {
+    const response = await api.post('/lab-coordinator/rooms', data);
+    return response.data;
+  },
+
+  deleteRoom: async (id: number) => {
+    const response = await api.delete(`/lab-coordinator/rooms/${id}`);
+    return response.data;
+  },
+  
+  getGroups: async () => {
+    const response = await api.get('/lab-coordinator/groups');
+    return response.data;
+  },
+
+  getCourses: async () => {
+    const response = await api.get('/lab-coordinator/courses');
+    return response.data;
+  },
+  
+  getSessions: async () => {
+    const response = await api.get('/lab-coordinator/sessions');
+    return response.data;
+  },
+  
+  getSummary: async () => {
+    const response = await api.get('/lab-coordinator/summary');
+    return response.data;
+  },
+  
+  createSession: async (data: Record<string, any>) => {
+    const response = await api.post('/lab-coordinator/sessions', data);
+    return response.data;
+  },
+  
+  updateSession: async (id: number, data: Record<string, any>) => {
+    const response = await api.patch(`/lab-coordinator/sessions/${id}`, data);
+    return response.data;
+  },
+
+  publishSession: async (id: number) => {
+    const response = await api.post(`/lab-coordinator/sessions/${id}/publish`);
+    return response.data;
+  },
+
+  unpublishSession: async (id: number) => {
+    const response = await api.post(`/lab-coordinator/sessions/${id}/unpublish`);
+    return response.data;
+  },
+  
+  deleteSession: async (id: number) => {
+    await api.delete(`/lab-coordinator/sessions/${id}`);
+  },
+  
+  smartSchedule: async (data: {
+    course_id: number;
+    parent_group_id: number;
+    group_ids: number[];
+    room_ids: number[];
+    duration_minutes: number;
+    frequency_weeks: number;
+    subgroups_per_session: number;
+    session_type: string;
+    preferred_days?: number[];
+    start_hour?: number;
+    end_hour?: number;
+  }) => {
+    const response = await api.post('/lab-coordinator/smart-schedule', data);
+    return response.data;
+  },
+};
 
 export const departmentsAPI = {
   getAll: async () => {
@@ -349,6 +505,71 @@ export const timetablesAPI = {
 
   createManualSlot: async (timetableId: number, data: any) => {
     const response = await api.post(`/timetables/${timetableId}/slots/manual`, data);
+    return response.data;
+  },
+};
+
+export const schoolsAPI = {
+  getAll: async (): Promise<School[]> => {
+    const response = await api.get('/schools/');
+    return response.data;
+  },
+  create: async (data: Partial<School>) => {
+    const response = await api.post('/schools/', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<School>) => {
+    const response = await api.put(`/schools/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number) => {
+    await api.delete(`/schools/${id}`);
+  },
+  previewProfileUpload: async (schoolId: number, file: File): Promise<SchoolProfileUploadPreviewResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/schools/${schoolId}/profile-upload/preview`, formData);
+    return response.data;
+  },
+  applyProfileUpload: async (schoolId: number, data: {
+    fingerprint: string;
+    expires_at: string;
+    rows: SchoolProfileUploadPreviewRow[];
+  }): Promise<SchoolProfileUploadApplyResponse> => {
+    const response = await api.post(`/schools/${schoolId}/profile-upload/apply`, data);
+    return response.data;
+  },
+};
+
+export const activityTypesAPI = {
+  list: async () => {
+    const response = await api.get('/activity-types/');
+    return response.data;
+  },
+  create: async (data: Record<string, unknown>) => {
+    const response = await api.post('/activity-types/', data);
+    return response.data;
+  },
+  update: async (id: number, data: Record<string, unknown>) => {
+    const response = await api.put(`/activity-types/${id}`, data);
+    return response.data;
+  },
+  remove: async (id: number) => {
+    await api.delete(`/activity-types/${id}`);
+  },
+};
+
+export const institutionSetupAPI = {
+  getTemplates: async () => {
+    const response = await api.get('/institution-setup/templates');
+    return response.data;
+  },
+  getCurrent: async () => {
+    const response = await api.get('/institution-setup/');
+    return response.data;
+  },
+  save: async (data: Record<string, unknown>) => {
+    const response = await api.put('/institution-setup/', data);
     return response.data;
   },
 };
@@ -622,6 +843,11 @@ export const examTimetablesAPI = {
     });
     return response.data;
   },
+
+  unpublish: async (periodId: number): Promise<ExamPeriod> => {
+    const response = await api.post(`/exam-timetables/periods/${periodId}/unpublish`);
+    return response.data;
+  },
 };
 
 export const usersAPI = {
@@ -730,6 +956,39 @@ export const superadminAPI = {
 
   getAnalytics: async () => {
     const response = await api.get('/superadmin/analytics');
+    return response.data;
+  },
+
+  getTenantDashboardMetrics: async (id: number) => {
+    const response = await api.get(`/superadmin/universities/${id}/dashboard-metrics`);
+    return response.data;
+  },
+
+  getTenantObservability: async (tenantId: number, period?: string) => {
+    const response = await api.get('/usage/observability', {
+      params: { tenant_id: tenantId, period }
+    });
+    return response.data;
+  },
+
+  getPerformanceOverview: async (windowDays: number = 30) => {
+    const response = await api.get('/superadmin/performance', {
+      params: { window_days: windowDays }
+    });
+    return response.data;
+  },
+
+  getBusinessMetricsOverview: async (windowDays: number = 30) => {
+    const response = await api.get('/superadmin/business-metrics', {
+      params: { window_days: windowDays }
+    });
+    return response.data;
+  },
+
+  getOperationalMetricsOverview: async (windowDays: number = 30) => {
+    const response = await api.get('/superadmin/operational-metrics', {
+      params: { window_days: windowDays }
+    });
     return response.data;
   },
 

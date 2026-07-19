@@ -9,14 +9,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Dict, Any, Optional
 from ..models import Course, Lecturer, Room, StudentGroup, Department, User
+from ..utils.sanitization import sanitize_input
 
 
 class SearchService:
-    """Service for searching across entities"""
-    
-    def __init__(self, db: Session):
+    """Service for searching across entities — all queries are scoped to a university."""
+
+    def __init__(self, db: Session, university_id: Optional[int] = None):
         self.db = db
-    
+        self.university_id = university_id
+
     def global_search(
         self,
         query: str,
@@ -34,7 +36,8 @@ class SearchService:
         Returns:
             Dict with results categorized by entity type
         """
-        if not query or len(query.strip()) < 2:
+        safe_query = sanitize_input(query, max_length=100)
+        if not safe_query or len(safe_query.strip()) < 2:
             return {
                 "courses": [],
                 "lecturers": [],
@@ -43,7 +46,7 @@ class SearchService:
                 "total": 0
             }
         
-        search_term = f"%{query.lower()}%"
+        search_term = f"%{safe_query.lower()}%"
         results = {
             "courses": [],
             "lecturers": [],
@@ -58,10 +61,13 @@ class SearchService:
         
         # Search courses
         if "courses" in entity_types:
-            courses = self.db.query(Course).filter(
+            course_q = self.db.query(Course).join(Department, Course.department_id == Department.id)
+            if self.university_id:
+                course_q = course_q.filter(Department.university_id == self.university_id)
+            courses = course_q.filter(
                 or_(
                     Course.code.ilike(search_term),
-                    Course.title.ilike(search_term)
+                    Course.name.ilike(search_term)
                 )
             ).limit(limit).all()
             
@@ -69,10 +75,10 @@ class SearchService:
                 {
                     "id": c.id,
                     "code": c.code,
-                    "title": c.title,
-                    "year": c.year,
+                    "name": c.name,
+                    "level": c.level,
                     "credits": c.credits,
-                    "type": c.type
+                    "course_type": getattr(c.course_type, "value", str(c.course_type)) if c.course_type else None,
                 }
                 for c in courses
             ]
@@ -80,7 +86,10 @@ class SearchService:
         
         # Search lecturers
         if "lecturers" in entity_types:
-            lecturers = self.db.query(Lecturer).filter(
+            lec_q = self.db.query(Lecturer).join(Department, Lecturer.department_id == Department.id)
+            if self.university_id:
+                lec_q = lec_q.filter(Department.university_id == self.university_id)
+            lecturers = lec_q.filter(
                 or_(
                     Lecturer.staff_number.ilike(search_term),
                     Lecturer.full_name.ilike(search_term),
@@ -93,7 +102,7 @@ class SearchService:
                     "id": l.id,
                     "staff_number": l.staff_number,
                     "full_name": l.full_name,
-                    "email": l.email,
+                    # email intentionally omitted from global search results
                     "department_id": l.department_id,
                     "max_hours_per_week": l.max_hours_per_week
                 }
@@ -103,22 +112,23 @@ class SearchService:
         
         # Search rooms
         if "rooms" in entity_types:
-            rooms = self.db.query(Room).filter(
+            room_q = self.db.query(Room)
+            if self.university_id:
+                room_q = room_q.filter(Room.university_id == self.university_id)
+            rooms = room_q.filter(
                 or_(
-                    Room.room_number.ilike(search_term),
-                    Room.building.ilike(search_term),
-                    Room.category.ilike(search_term)
+                    Room.name.ilike(search_term),
+                    Room.building.ilike(search_term)
                 )
             ).limit(limit).all()
             
             results["rooms"] = [
                 {
                     "id": r.id,
-                    "room_number": r.room_number,
+                    "name": r.name,
                     "building": r.building,
                     "capacity": r.capacity,
-                    "category": r.category,
-                    "available_for_timetabling": r.available_for_timetabling
+                    "room_type": r.room_type,
                 }
                 for r in rooms
             ]
@@ -126,90 +136,77 @@ class SearchService:
         
         # Search student groups
         if "groups" in entity_types:
-            groups = self.db.query(StudentGroup).filter(
-                or_(
-                    StudentGroup.name.ilike(search_term),
-                    StudentGroup.type.ilike(search_term)
-                )
+            grp_q = self.db.query(StudentGroup)
+            if self.university_id:
+                grp_q = grp_q.filter(StudentGroup.university_id == self.university_id)
+            groups = grp_q.filter(
+                StudentGroup.name.ilike(search_term)
             ).limit(limit).all()
             
             results["groups"] = [
                 {
                     "id": g.id,
                     "name": g.name,
-                    "year": g.year,
-                    "program": g.program,
+                    "level": g.level,
                     "size": g.size,
-                    "type": g.type
+                    "group_type": getattr(g.group_type, "value", str(g.group_type)) if g.group_type else None,
                 }
                 for g in groups
             ]
             results["total"] += len(groups)
-        
+
         return results
     
     def search_courses(
         self,
         query: Optional[str] = None,
         year: Optional[int] = None,
-        program: Optional[str] = None,
         department_id: Optional[int] = None,
         course_type: Optional[str] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
-        Advanced course search with filters.
-        
-        Args:
-            query: Text search query
-            year: Filter by year level
-            program: Filter by program code
-            department_id: Filter by department
-            course_type: Filter by course type
-            limit: Maximum results
-            
-        Returns:
-            List of course dictionaries
+        Advanced course search with filters, scoped to self.university_id.
         """
         filters = []
-        
-        if query and len(query.strip()) >= 2:
-            search_term = f"%{query.lower()}%"
+
+        safe_query = sanitize_input(query, max_length=100) if query else None
+        if safe_query and len(safe_query.strip()) >= 2:
+            search_term = f"%{safe_query.lower()}%"
             filters.append(
                 or_(
                     Course.code.ilike(search_term),
-                    Course.title.ilike(search_term)
+                    Course.name.ilike(search_term)
                 )
             )
-        
+
         if year is not None:
-            filters.append(Course.year == year)
-        
-        if program:
-            filters.append(Course.program.ilike(f"%{program}%"))
-        
+            filters.append(Course.level == year)
+
         if department_id is not None:
             filters.append(Course.department_id == department_id)
-        
+
         if course_type:
-            filters.append(Course.type == course_type)
-        
-        query = self.db.query(Course)
-        
+            safe_course_type = sanitize_input(course_type, max_length=50)
+            filters.append(Course.course_type == safe_course_type)
+
+        q = self.db.query(Course).join(Department, Course.department_id == Department.id)
+        if self.university_id:
+            q = q.filter(Department.university_id == self.university_id)
+
         if filters:
-            query = query.filter(and_(*filters))
-        
-        courses = query.limit(limit).all()
-        
+            q = q.filter(and_(*filters))
+
+        courses = q.limit(limit).all()
+
         return [
             {
                 "id": c.id,
                 "code": c.code,
-                "title": c.title,
-                "year": c.year,
-                "program": c.program,
+                "name": c.name,
+                "level": c.level,
                 "credits": c.credits,
-                "type": c.type,
+                "course_type": getattr(c.course_type, "value", str(c.course_type)) if c.course_type else None,
                 "department_id": c.department_id
             }
             for c in courses
@@ -223,6 +220,7 @@ class SearchService:
         max_hours: Optional[int] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
+        # NOTE: university_id scoping is applied via self.university_id in __init__
         """
         Advanced lecturer search with filters.
         
@@ -237,39 +235,41 @@ class SearchService:
             List of lecturer dictionaries
         """
         filters = []
-        
-        if query and len(query.strip()) >= 2:
-            search_term = f"%{query.lower()}%"
+
+        safe_query = sanitize_input(query, max_length=100) if query else None
+        if safe_query and len(safe_query.strip()) >= 2:
+            search_term = f"%{safe_query.lower()}%"
             filters.append(
                 or_(
                     Lecturer.staff_number.ilike(search_term),
-                    Lecturer.full_name.ilike(search_term),
-                    Lecturer.email.ilike(search_term)
+                    Lecturer.full_name.ilike(search_term)
+                    # email intentionally excluded from search matching
                 )
             )
-        
+
         if department_id is not None:
             filters.append(Lecturer.department_id == department_id)
-        
+
         if min_hours is not None:
             filters.append(Lecturer.max_hours_per_week >= min_hours)
-        
+
         if max_hours is not None:
             filters.append(Lecturer.max_hours_per_week <= max_hours)
-        
-        query = self.db.query(Lecturer)
-        
+
+        q = self.db.query(Lecturer).join(Department, Lecturer.department_id == Department.id)
+        if self.university_id:
+            q = q.filter(Department.university_id == self.university_id)
+
         if filters:
-            query = query.filter(and_(*filters))
-        
-        lecturers = query.limit(limit).all()
-        
+            q = q.filter(and_(*filters))
+
+        lecturers = q.limit(limit).all()
+
         return [
             {
                 "id": l.id,
                 "staff_number": l.staff_number,
                 "full_name": l.full_name,
-                "email": l.email,
                 "department_id": l.department_id,
                 "max_hours_per_week": l.max_hours_per_week
             }
@@ -280,7 +280,7 @@ class SearchService:
         self,
         query: Optional[str] = None,
         building: Optional[str] = None,
-        category: Optional[str] = None,
+        room_type: Optional[str] = None,
         min_capacity: Optional[int] = None,
         max_capacity: Optional[int] = None,
         available_only: bool = False,
@@ -302,46 +302,50 @@ class SearchService:
             List of room dictionaries
         """
         filters = []
-        
-        if query and len(query.strip()) >= 2:
-            search_term = f"%{query.lower()}%"
+
+        safe_query = sanitize_input(query, max_length=100) if query else None
+        if safe_query and len(safe_query.strip()) >= 2:
+            search_term = f"%{safe_query.lower()}%"
             filters.append(
                 or_(
-                    Room.room_number.ilike(search_term),
+                    Room.name.ilike(search_term),
                     Room.building.ilike(search_term)
                 )
             )
-        
+
         if building:
-            filters.append(Room.building.ilike(f"%{building}%"))
-        
-        if category:
-            filters.append(Room.category == category)
-        
+            safe_building = sanitize_input(building, max_length=100)
+            filters.append(Room.building.ilike(f"%{safe_building}%"))
+
+        if room_type:
+            safe_room_type = sanitize_input(room_type, max_length=50)
+            filters.append(Room.room_type == safe_room_type)
+
         if min_capacity is not None:
             filters.append(Room.capacity >= min_capacity)
-        
+
         if max_capacity is not None:
             filters.append(Room.capacity <= max_capacity)
-        
+
         if available_only:
-            filters.append(Room.available_for_timetabling == True)
-        
-        query = self.db.query(Room)
-        
+            filters.append(Room.is_blocked == False)
+
+        q = self.db.query(Room)
+        if self.university_id:
+            q = q.filter(Room.university_id == self.university_id)
+
         if filters:
-            query = query.filter(and_(*filters))
-        
-        rooms = query.limit(limit).all()
-        
+            q = q.filter(and_(*filters))
+
+        rooms = q.limit(limit).all()
+
         return [
             {
                 "id": r.id,
-                "room_number": r.room_number,
+                "name": r.name,
                 "building": r.building,
                 "capacity": r.capacity,
-                "category": r.category,
-                "available_for_timetabling": r.available_for_timetabling
+                "room_type": r.room_type,
             }
             for r in rooms
         ]
@@ -349,54 +353,44 @@ class SearchService:
     def search_groups(
         self,
         query: Optional[str] = None,
-        year: Optional[int] = None,
-        program: Optional[str] = None,
+        level: Optional[int] = None,
         group_type: Optional[str] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
         Advanced student group search with filters.
-        
-        Args:
-            query: Text search query
-            year: Filter by year level
-            program: Filter by program code
-            group_type: Filter by group type
-            limit: Maximum results
-            
-        Returns:
-            List of group dictionaries
+        All results are scoped to self.university_id when set.
         """
         filters = []
-        
-        if query and len(query.strip()) >= 2:
-            search_term = f"%{query.lower()}%"
+
+        safe_query = sanitize_input(query, max_length=100) if query else None
+        if safe_query and len(safe_query.strip()) >= 2:
+            search_term = f"%{safe_query.lower()}%"
             filters.append(StudentGroup.name.ilike(search_term))
-        
-        if year is not None:
-            filters.append(StudentGroup.year == year)
-        
-        if program:
-            filters.append(StudentGroup.program.ilike(f"%{program}%"))
-        
+
+        if level is not None:
+            filters.append(StudentGroup.level == level)
+
         if group_type:
-            filters.append(StudentGroup.type == group_type)
-        
-        query = self.db.query(StudentGroup)
-        
+            safe_group_type = sanitize_input(group_type, max_length=50)
+            filters.append(StudentGroup.group_type == safe_group_type)
+
+        q = self.db.query(StudentGroup)
+        if self.university_id:
+            q = q.filter(StudentGroup.university_id == self.university_id)
+
         if filters:
-            query = query.filter(and_(*filters))
-        
-        groups = query.limit(limit).all()
-        
+            q = q.filter(and_(*filters))
+
+        groups = q.limit(limit).all()
+
         return [
             {
                 "id": g.id,
                 "name": g.name,
-                "year": g.year,
-                "program": g.program,
+                "level": g.level,
                 "size": g.size,
-                "type": g.type
+                "group_type": getattr(g.group_type, "value", str(g.group_type)) if g.group_type else None,
             }
             for g in groups
         ]

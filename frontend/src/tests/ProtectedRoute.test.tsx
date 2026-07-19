@@ -17,8 +17,11 @@ const createAuthValue = (overrides: Partial<ReturnType<typeof AuthContext.useAut
     logout: vi.fn(),
     isCoordinator: false,
     isHOD: false,
-    isAdmin: false,
     isSuperadmin: false,
+    isTenantAdmin: false,
+    isSchoolCoordinator: false,
+    isSchoolOperator: false,
+    isLabCoordinator: false,
     ...overrides,
 });
 
@@ -69,14 +72,14 @@ describe('ProtectedRoute', () => {
 
     it('renders children when user is authenticated with correct role', () => {
         vi.mocked(AuthContext.useAuth).mockReturnValue(createAuthValue({
-            user: { id: 1, email: 'test@unza.zm', role: 'admin', username: 'admin', full_name: 'Admin', is_active: true },
+            user: { id: 1, email: 'test@unza.zm', role: 'tenant_admin', username: 'admin', full_name: 'Admin', is_active: true },
             token: 'mock-token',
-            isAdmin: true,
+            isTenantAdmin: true,
         }));
 
         render(
             <MemoryRouter>
-                <ProtectedRoute requiredRole="admin">
+                <ProtectedRoute requiredRole="tenant_admin">
                     <div data-testid="protected-content">Content</div>
                 </ProtectedRoute>
             </MemoryRouter>
@@ -97,7 +100,7 @@ describe('ProtectedRoute', () => {
                     <Route 
                         path="/admin-only" 
                         element={
-                            <ProtectedRoute requiredRole="admin">
+                            <ProtectedRoute requiredRole="tenant_admin">
                                 <div data-testid="admin-content">Admin Content</div>
                             </ProtectedRoute>
                         } 

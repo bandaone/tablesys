@@ -14,7 +14,7 @@ Design principles:
      "sso::<provider>::<sub>" so the auth guard knows to skip bcrypt.
   4. Domain → Tenant matching: email domain is used to find the university;
      rejected if no match (prevents random Google accounts gaining access).
-  5. Auto-provisioning: first-time SSO users get role=COORDINATOR; an admin
+  5. Auto-provisioning: first-time SSO users get role=TENANT_ADMIN; an admin
      can change the role afterwards from the Users page.
 """
 
@@ -288,7 +288,7 @@ def get_or_create_sso_user(db: Session, profile: dict, university: University) -
             username        = username,
             full_name       = profile.get("full_name") or email.split("@")[0],
             hashed_password = marker,
-            role            = UserRole.COORDINATOR,    # Safe default; admin can change
+            role            = UserRole.TENANT_ADMIN,   # Safe default; admin can change
             is_active       = True,
         )
         db.add(user)

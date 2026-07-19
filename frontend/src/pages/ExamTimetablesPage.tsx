@@ -137,7 +137,6 @@ const initialPaperForm = {
   preferred_room_type: 'lecture_hall',
   preferred_seating_profile_id: '',
   max_rooms: 1,
-  allow_custom_window: false,
 };
 
 const formatDateLabel = (value?: string | null) => {
@@ -218,7 +217,6 @@ const ExamTimetablesPage: React.FC = () => {
     default_duration_minutes: 180,
     default_max_rooms: 2,
     preferred_seating_profile_id: '',
-    allow_custom_window: false,
   });
 
   const selectedSlots = selectedPeriod?.slots ?? [];
@@ -281,7 +279,9 @@ const ExamTimetablesPage: React.FC = () => {
 
   const canConfigurePeriod = isCoordinator;
   const canGenerateOrPublish = isCoordinator;
-  const canMarkPapers = isHOD;
+  const canMarkPapers = isCoordinator || isHOD;
+  const canAccessWorkspace = isCoordinator || isHOD;
+  const publishBlockedByUnscheduled = unscheduledPapers.length > 0;
 
   const selectedCandidateCount = useMemo(
     () => selectedCourseIds.reduce((sum, courseId) => sum + (candidateLookup.get(courseId)?.candidate_count ?? 0), 0),
@@ -385,9 +385,7 @@ const ExamTimetablesPage: React.FC = () => {
         const includedIds = candidates
           .filter((candidate) => candidate.already_included && candidate.can_manage)
           .map((candidate) => candidate.course_id);
-        return includedIds.length > 0
-          ? includedIds
-          : candidates.filter((candidate) => candidate.can_manage).map((candidate) => candidate.course_id);
+        return includedIds;
       });
     } finally {
       setCandidateLoading(false);
@@ -561,7 +559,7 @@ const ExamTimetablesPage: React.FC = () => {
         preferred_room_type: paperForm.preferred_room_type,
         preferred_seating_profile_id: paperForm.preferred_seating_profile_id ? Number(paperForm.preferred_seating_profile_id) : null,
         max_rooms: Number(paperForm.max_rooms),
-        allow_custom_window: paperForm.allow_custom_window,
+        allow_custom_window: false,
       });
       setPaperDialogOpen(false);
       setPaperForm(initialPaperForm);
@@ -572,6 +570,19 @@ const ExamTimetablesPage: React.FC = () => {
 
   const handleSyncPapers = async () => {
     if (!selectedPeriod) return;
+    const manageableIncludedCount = paperCandidates.filter((candidate) => candidate.already_included && candidate.can_manage).length;
+    if (selectedCourseIds.length === 0 && manageableIncludedCount > 0) {
+      const confirmed = window.confirm(
+        'No papers are selected. Continuing will remove the papers you currently manage from this exam period. Do you want to continue?',
+      );
+      if (!confirmed) return;
+    }
+    if (selectedCourseIds.length >= 20 && manageableIncludedCount === 0) {
+      const confirmed = window.confirm(
+        `You are about to sync ${selectedCourseIds.length} papers into this exam period. Do you want to continue?`,
+      );
+      if (!confirmed) return;
+    }
     await withAction('sync-papers', async () => {
       const result = await examTimetablesAPI.syncPapers(selectedPeriod.id, {
         course_ids: selectedCourseIds,
@@ -580,7 +591,7 @@ const ExamTimetablesPage: React.FC = () => {
         preferred_seating_profile_id: syncDefaults.preferred_seating_profile_id
           ? Number(syncDefaults.preferred_seating_profile_id)
           : null,
-        allow_custom_window: syncDefaults.allow_custom_window,
+        allow_custom_window: false,
       });
       await selectPeriod(selectedPeriod.id);
       setPageSuccess(
@@ -623,6 +634,17 @@ const ExamTimetablesPage: React.FC = () => {
     });
   };
 
+  const handleUnpublish = async () => {
+    if (!selectedPeriod) return;
+    if (!window.confirm(`Unpublish "${selectedPeriod.name}"? Students will immediately lose access to this exam timetable.`)) return;
+    await withAction('unpublish', async () => {
+      const period = await examTimetablesAPI.unpublish(selectedPeriod.id);
+      setSelectedPeriod(period);
+      await refreshPeriods();
+      setPageSuccess(`"${period.name}" has been unpublished and reverted to draft.`);
+    });
+  };
+
   const toggleCourseSelection = (courseId: number) => {
     const candidate = candidateLookup.get(courseId);
     if (!candidate?.can_manage) return;
@@ -647,7 +669,7 @@ const ExamTimetablesPage: React.FC = () => {
     }));
   };
 
-  if (!isHOD) {
+  if (!canAccessWorkspace) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -875,29 +897,12 @@ const ExamTimetablesPage: React.FC = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <Stack spacing={3}>
-                  {/* Quick-action strip */}
-                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, bgcolor: alpha('#fff', 0.85) }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between" flexWrap="wrap">
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        <Chip size="small" icon={<WindowIcon />} label={`${selectedWindows.length} Windows`} variant="outlined" />
-                        <Chip size="small" icon={<CatalogIcon />} label={`${selectedPapers.length} Papers`} variant="outlined" />
-                        <Chip size="small" icon={<RoomIcon />} label={`${roomUtilizationSummary.effectiveCapacity} Seats`} variant="outlined" />
-                        <Chip size="small" icon={selectedSlots.length > 0 ? <HealthyIcon /> : <DiagnosticsIcon />} label={`${selectedSlots.length} Slots`} color={draftHealthTone === 'success' ? 'success' : 'default'} variant="outlined" />
-                      </Stack>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
-                        <Button size="small" variant="outlined" startIcon={<WindowIcon />} onClick={() => setWindowDialogOpen(true)} disabled={selectedPeriod.is_locked || !canConfigurePeriod}>Window</Button>
-                        <Button size="small" variant="outlined" startIcon={<SeatingIcon />} onClick={() => setProfileDialogOpen(true)} disabled={!canConfigurePeriod}>Profile</Button>
-                        <Button size="small" variant="outlined" startIcon={<ExamIcon />} onClick={() => setPaperDialogOpen(true)} disabled={selectedPeriod.is_locked || !canConfigurePeriod}>Manual Paper</Button>
-                      </Stack>
-                    </Stack>
-                  </Paper>
-
-
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} xl={4.1} sx={{ display: activeTab !== 'overview' ? 'none' : undefined }}>
-                      <Stack spacing={3}>
-                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98) }}>
+                <Box>
+                  {/* ── OVERVIEW TAB ── */}
+                  {activeTab === 'overview' && (
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} xl={6}>
+                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98), height: '100%' }}>
                           <CardContent>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2.25 }}>
                               <Box>
@@ -978,8 +983,10 @@ const ExamTimetablesPage: React.FC = () => {
                             </Stack>
                           </CardContent>
                         </Card>
+                      </Grid>
 
-                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98) }}>
+                      <Grid item xs={12} xl={6}>
+                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98), height: '100%' }}>
                           <CardContent>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                               <Box>
@@ -1091,772 +1098,489 @@ const ExamTimetablesPage: React.FC = () => {
                             </Stack>
                           </CardContent>
                         </Card>
-                      </Stack>
-                    </Grid>
-
-                    <Grid item xs={12} xl={activeTab === 'overview' ? 0 : 12} sx={{ display: activeTab === 'overview' ? 'none' : undefined }}>
-                      <Stack spacing={3}>
-                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98), display: activeTab !== 'papers' ? 'none' : undefined }}>
-                          <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-                            <Stack
-                              direction={{ xs: 'column', lg: 'row' }}
-                              justifyContent="space-between"
-                              spacing={2}
-                              sx={{ mb: 2.5 }}
-                            >
-                              <Box>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <CatalogIcon color="action" />
-                                  <Typography variant="h6" fontWeight={800}>Paper Selection</Typography>
-                                </Stack>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 760 }}>
-                                  Pull mapped courses, keep only examinable ones, then synchronize the approved paper list into this cycle.
-                                </Typography>
-                              </Box>
-                              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
-                                <Button
-                                  variant="outlined"
-                                  startIcon={<SyncIcon />}
-                                  onClick={() => selectedPeriod && void loadPaperCandidates(selectedPeriod.id)}
-                                  disabled={candidateLoading}
-                                >
-                                  Refresh Pull
-                                </Button>
-                                <Button
-                                  variant="contained"
-                                  startIcon={<SyncIcon />}
-                                  onClick={() => void handleSyncPapers()}
-                                  disabled={!canMarkPapers || selectedPeriod.is_locked || busyAction === 'sync-papers' || candidateLoading}
-                                >
-                                  {busyAction === 'sync-papers' ? 'Synchronizing...' : 'Sync Selected Papers'}
-                                </Button>
-                              </Stack>
-                            </Stack>
-
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ xs: 'stretch', md: 'center' }} sx={{ mb: 2 }}>
-                              <Chip label={`${selectedCourseIds.length} selected`} color="primary" variant="outlined" />
-                              <Chip
-                                label={`${selectedCandidateCount} students`}
-                                color={selectedCandidateCount > roomUtilizationSummary.effectiveCapacity ? 'warning' : 'success'}
-                                variant="outlined"
-                              />
-                              <Chip label={`${alreadyIncludedCount} already synced`} variant="outlined" />
-                              <Chip label={`${manageableCandidates.length} manageable by you`} variant="outlined" />
-                            </Stack>
-
-                            <Paper
-                              variant="outlined"
-                              sx={{
-                                p: 1.5,
-                                mb: 2,
-                                borderRadius: 3,
-                                bgcolor: '#fff',
-                                borderColor: alpha(primaryColor, 0.08),
-                              }}
-                            >
-                              <Grid container spacing={1.5} alignItems="center">
-                              <Grid item xs={12} md={4.1}>
-                                <TextField
-                                  fullWidth
-                                  label="Search course, group, or year"
-                                  value={candidateSearch}
-                                  onChange={(event) => setCandidateSearch(event.target.value)}
-                                  InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={6} md={2.1}>
-                                <FormControl fullWidth>
-                                  <InputLabel id="candidate-filter-label">View</InputLabel>
-                                  <Select
-                                    labelId="candidate-filter-label"
-                                    label="View"
-                                    value={candidateFilter}
-                                    onChange={(event) => setCandidateFilter(event.target.value as typeof candidateFilter)}
-                                  >
-                                    <MenuItem value="all">All mapped</MenuItem>
-                                    <MenuItem value="selected">Selected only</MenuItem>
-                                    <MenuItem value="included">Already included</MenuItem>
-                                    <MenuItem value="notIncluded">Not yet included</MenuItem>
-                                  </Select>
-                                </FormControl>
-                              </Grid>
-                              <Grid item xs={12} sm={6} md={1.7}>
-                                <TextField
-                                  fullWidth
-                                  label="Duration"
-                                  type="number"
-                                  value={syncDefaults.default_duration_minutes}
-                                  onChange={(event) => setSyncDefaults((current) => ({
-                                    ...current,
-                                    default_duration_minutes: Number(event.target.value),
-                                  }))}
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={6} md={1.6}>
-                                <TextField
-                                  fullWidth
-                                  label="Max rooms"
-                                  type="number"
-                                  value={syncDefaults.default_max_rooms}
-                                  onChange={(event) => setSyncDefaults((current) => ({
-                                    ...current,
-                                    default_max_rooms: Number(event.target.value),
-                                  }))}
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={6} md={2.5}>
-                                <FormControl fullWidth>
-                                  <InputLabel id="sync-profile-label">Seating profile</InputLabel>
-                                  <Select
-                                    labelId="sync-profile-label"
-                                    label="Seating profile"
-                                    value={syncDefaults.preferred_seating_profile_id}
-                                    onChange={(event) => setSyncDefaults((current) => ({
-                                      ...current,
-                                      preferred_seating_profile_id: event.target.value,
-                                    }))}
-                                  >
-                                    <MenuItem value="">Use paper/default profile</MenuItem>
-                                    {seatingProfiles.map((profile) => (
-                                      <MenuItem key={profile.id} value={profile.id}>
-                                        {profile.name}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                              </Grid>
-                              </Grid>
-                            </Paper>
-
-                            <Stack
-                              direction={{ xs: 'column', lg: 'row' }}
-                              spacing={1.25}
-                              alignItems={{ xs: 'stretch', lg: 'center' }}
-                              justifyContent="space-between"
-                              sx={{ mb: 1.75 }}
-                            >
-                              <FormControlLabel
-                                control={(
-                                  <Switch
-                                    checked={syncDefaults.allow_custom_window}
-                                    onChange={(event) => setSyncDefaults((current) => ({
-                                      ...current,
-                                      allow_custom_window: event.target.checked,
-                                    }))}
-                                  />
-                                )}
-                                label="Allow custom session window overrides on synced papers"
-                              />
-
-                              <Stack direction="row" spacing={1} flexWrap="wrap">
-                                <Button
-                                  size="small"
-                                  variant="text"
-                                  onClick={() => setSelectedCourseIds(manageableCandidateIds)}
-                                >
-                                  Select all
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="text"
-                                  onClick={() => setSelectedCourseIds(
-                                    paperCandidates
-                                      .filter((candidate) => candidate.already_included && candidate.can_manage)
-                                      .map((candidate) => candidate.course_id),
-                                  )}
-                                >
-                                  Included only
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="text"
-                                  startIcon={<ClearIcon />}
-                                  onClick={() => setSelectedCourseIds([])}
-                                >
-                                  Clear
-                                </Button>
-                              </Stack>
-                            </Stack>
-
-                            {candidateLoading ? (
-                              <Typography color="text.secondary">Loading mapped course audiences...</Typography>
-                            ) : filteredCandidates.length === 0 ? (
-                              <Alert severity="info">
-                                No mapped courses matched this filter. Check course enrolment mapping if you expected papers here.
-                              </Alert>
-                            ) : (
-                              <Box sx={{ overflowX: 'auto', borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.08) }}>
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell padding="checkbox" />
-                                      <TableCell>Course</TableCell>
-                                      <TableCell>Audience</TableCell>
-                                      <TableCell>Exam Setup</TableCell>
-                                      <TableCell>Status</TableCell>
-                                      <TableCell align="right">Candidates</TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {filteredCandidates.map((candidate) => (
-                                      <TableRow key={candidate.course_id} hover selected={selectedCourseIds.includes(candidate.course_id)}>
-                                        <TableCell padding="checkbox">
-                                          <Checkbox
-                                            checked={selectedCourseIds.includes(candidate.course_id)}
-                                            onChange={() => toggleCourseSelection(candidate.course_id)}
-                                            disabled={selectedPeriod.is_locked || !candidate.can_manage}
-                                          />
-                                        </TableCell>
-                                        <TableCell>
-                                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                            <Typography fontWeight={800}>{candidate.course_code}</Typography>
-                                            <Chip
-                                              size="small"
-                                              label={candidate.ownership_kind === 'owner' ? 'Your department' : 'Shared view'}
-                                              color={candidate.ownership_kind === 'owner' ? 'primary' : 'default'}
-                                              variant="outlined"
-                                            />
-                                          </Stack>
-                                          <Typography variant="body2">{candidate.course_name}</Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {normalizeLevelLabel(candidate.course_level)}
-                                            {candidate.department_name ? ` | ${candidate.department_name}` : ''}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Typography variant="body2">
-                                            {candidate.groups.map((group) => group.name).join(', ')}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {candidate.groups.length} group(s)
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Typography variant="body2">
-                                            {(candidate.preferred_room_type || 'any').replace(/_/g, ' ')}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {selectedSyncProfile ? `${selectedSyncProfile.name} seating` : 'Default seating'}
-                                          </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                          {candidate.already_included ? (
-                                            <Stack spacing={0.25}>
-                                              <Chip size="small" color="success" label="Included" sx={{ width: 'fit-content' }} />
-                                              <Typography variant="caption" color="text.secondary">
-                                                {candidate.existing_paper_code || candidate.course_code}
-                                                {candidate.existing_duration_minutes ? ` | ${candidate.existing_duration_minutes} mins` : ''}
-                                              </Typography>
-                                            </Stack>
-                                          ) : (
-                                            <Chip size="small" variant="outlined" label="Not yet included" />
-                                          )}
-                                          {!candidate.can_manage && (
-                                            <Typography variant="caption" color="text.secondary" display="block">
-                                              View only
-                                            </Typography>
-                                          )}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                          <Typography fontWeight={800}>{candidate.candidate_count}</Typography>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </Box>
-                            )}
-                          </CardContent>
-                        </Card>
-
-                        <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98), display: activeTab !== 'timetable' ? 'none' : undefined }}>
-                          <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-                            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
-                              <Box>
-                                <Typography variant="h6" fontWeight={800}>Generate And Review</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  Generate the draft, then review how papers were placed across dates, sessions, and rooms.
-                                </Typography>
-                              </Box>
-                              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
-                                <Button
-                                  variant="outlined"
-                                  color="warning"
-                                  startIcon={<ClearDraftIcon />}
-                                  onClick={() => void handleClearDraft()}
-                                  disabled={!canGenerateOrPublish || busyAction === 'clear-draft' || selectedPeriod.is_locked || selectedPeriod.is_published || selectedSlots.length === 0}
-                                >
-                                  {busyAction === 'clear-draft' ? 'Clearing...' : 'Clear Draft'}
-                                </Button>
-                                <Button
-                                  variant="contained"
-                                  startIcon={<GenerateIcon />}
-                                  onClick={() => void handleGenerate()}
-                                  disabled={!canGenerateOrPublish || busyAction === 'generate' || selectedPeriod.is_locked || selectedPapers.length === 0 || selectedWindows.length === 0}
-                                >
-                                  {busyAction === 'generate' ? 'Generating...' : 'Generate Draft'}
-                                </Button>
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  startIcon={<PublishIcon />}
-                                  onClick={() => void handlePublish()}
-                                  disabled={!canGenerateOrPublish || busyAction === 'publish' || selectedSlots.length === 0 || selectedPeriod.is_published}
-                                >
-                                  {busyAction === 'publish' ? 'Publishing...' : 'Publish'}
-                                </Button>
-                              </Stack>
-                            </Stack>
-
-                            <Paper
-                              variant="outlined"
-                              sx={{
-                                p: { xs: 1.8, md: 2.1 },
-                                mb: 2,
-                                borderRadius: 3.5,
-                                bgcolor:
-                                  draftHealthTone === 'success'
-                                    ? alpha('#eff9f2', 0.92)
-                                    : draftHealthTone === 'warning'
-                                      ? alpha('#fff4e5', 0.92)
-                                      : alpha(primaryColor, 0.045),
-                                borderColor:
-                                  draftHealthTone === 'success'
-                                    ? alpha(theme.palette.success.main, 0.18)
-                                    : draftHealthTone === 'warning'
-                                      ? alpha(theme.palette.warning.main, 0.2)
-                                      : alpha(primaryColor, 0.12),
-                              }}
-                            >
-                              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
-                                <Stack direction="row" spacing={1.4} alignItems="flex-start">
-                                  <Box
-                                    sx={{
-                                      width: 44,
-                                      height: 44,
-                                      borderRadius: 2.5,
-                                      display: 'grid',
-                                      placeItems: 'center',
-                                      bgcolor:
-                                        draftHealthTone === 'success'
-                                          ? alpha(theme.palette.success.main, 0.12)
-                                          : draftHealthTone === 'warning'
-                                            ? alpha(theme.palette.warning.main, 0.14)
-                                            : alpha(primaryColor, 0.12),
-                                      color:
-                                        draftHealthTone === 'success'
-                                          ? theme.palette.success.dark
-                                          : draftHealthTone === 'warning'
-                                            ? theme.palette.warning.dark
-                                            : primaryColor,
-                                    }}
-                                  >
-                                    {draftHealthTone === 'success' ? <HealthyIcon /> : draftHealthTone === 'warning' ? <WarningIcon /> : <DiagnosticsIcon />}
-                                  </Box>
-                                  <Box>
-                                    <Typography variant="overline" sx={{ letterSpacing: '0.12em', color: 'text.secondary', fontWeight: 700 }}>
-                                      Draft Quality
-                                    </Typography>
-                                    <Typography variant="h6" fontWeight={800} sx={{ mt: 0.3 }}>
-                                      {draftHealthLabel}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.65, maxWidth: 780 }}>
-                                      {generationMetadata?.strategy || 'The generator prioritizes constrained papers first, fits the smallest viable room bundle, and highlights spacing or load pressure for review.'}
-                                    </Typography>
-                                  </Box>
-                                </Stack>
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" alignItems={{ xs: 'stretch', sm: 'center' }}>
-                                  <Chip icon={<GenerateIcon />} label={`${selectedSlots.length} placed`} color={selectedSlots.length > 0 ? 'primary' : 'default'} variant="outlined" />
-                                  <Chip icon={<FlagIcon />} label={`${scheduledFlags.length} flagged`} color={scheduledFlags.length > 0 ? 'warning' : 'success'} variant="outlined" />
-                                  <Chip icon={<WarningIcon />} label={`${unscheduledPapers.length} unscheduled`} color={unscheduledPapers.length > 0 ? 'warning' : 'success'} variant="outlined" />
-                                </Stack>
-                              </Stack>
-                            </Paper>
-
-                            <Grid container spacing={1.25} sx={{ mb: 2 }}>
-                              {[
-                                { label: 'Draft slots', value: selectedSlots.length, note: 'Placed exam papers' },
-                                { label: 'Allocated seats', value: allocatedDraftSeats, note: 'Seats committed in the draft' },
-                                { label: 'Avg rooms / slot', value: diagnosticsSummary?.average_rooms_per_slot ?? 0, note: 'How dense the room bundles are' },
-                              ].map((item) => (
-                                <Grid item xs={12} sm={4} key={item.label}>
-                                  <Paper variant="outlined" sx={{ p: 1.45, borderRadius: 2.8, bgcolor: '#fff' }}>
-                                    <Typography variant="caption" color="text.secondary">{item.label}</Typography>
-                                    <Typography fontWeight={800} sx={{ mt: 0.35 }}>{item.value}</Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.35 }}>
-                                      {item.note}
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              ))}
-                            </Grid>
-
-                            <Grid container spacing={1.25} sx={{ mb: 2.4 }}>
-                              {draftDiagnosticsCards.map((item) => (
-                                <Grid item xs={12} md={4} key={item.label}>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{
-                                      p: 1.55,
-                                      borderRadius: 3,
-                                      bgcolor: '#fff',
-                                      borderColor:
-                                        item.tone === 'warning'
-                                          ? alpha(theme.palette.warning.main, 0.22)
-                                          : alpha(theme.palette.success.main, 0.18),
-                                    }}
-                                  >
-                                    <Stack direction="row" justifyContent="space-between" spacing={1}>
-                                      <Box>
-                                        <Typography variant="caption" color="text.secondary">{item.label}</Typography>
-                                        <Typography variant="h6" fontWeight={800} sx={{ mt: 0.2 }}>{item.value}</Typography>
-                                      </Box>
-                                      {item.tone === 'warning' ? <WarningIcon color="warning" /> : <HealthyIcon color="success" />}
-                                    </Stack>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.7 }}>
-                                      {item.note}
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              ))}
-                            </Grid>
-
-                            {selectedPeriod.is_published ? (
-                              <Alert severity="success" sx={{ mb: 2 }}>
-                                This exam period is published and locked. The current draft is now the live operating timetable.
-                              </Alert>
-                            ) : (
-                              <Alert severity="info" sx={{ mb: 2 }}>
-                                This period is still in draft mode. You can still adjust session windows, seating rules, and included papers.
-                              </Alert>
-                            )}
-
-                            {(scheduledFlags.length > 0 || unscheduledPapers.length > 0 || diagnosticsSummary?.unscheduled_reasons) && (
-                              <Grid container spacing={1.5} sx={{ mb: 2.4 }}>
-                                <Grid item xs={12} lg={7}>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{
-                                      p: 1.7,
-                                      borderRadius: 3,
-                                      bgcolor: '#fff',
-                                      borderColor: alpha(primaryColor, 0.08),
-                                      height: '100%',
-                                    }}
-                                  >
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.4 }}>
-                                      <FlagIcon color="action" />
-                                      <Typography fontWeight={800}>Placement Review Notes</Typography>
-                                    </Stack>
-                                    {scheduledFlags.length === 0 ? (
-                                      <Typography variant="body2" color="text.secondary">
-                                        No draft placements are currently flagged for review.
-                                      </Typography>
-                                    ) : (
-                                      <Stack spacing={1}>
-                                        {scheduledFlags.slice(0, 6).map((flag) => (
-                                          <Paper
-                                            key={`${flag.slot_id}-${flag.paper_id}`}
-                                            variant="outlined"
-                                            sx={{
-                                              p: 1.25,
-                                              borderRadius: 2.5,
-                                              bgcolor:
-                                                flag.severity === 'warning'
-                                                  ? alpha('#fff7ea', 0.95)
-                                                  : alpha(primaryColor, 0.03),
-                                              borderColor:
-                                                flag.severity === 'warning'
-                                                  ? alpha(theme.palette.warning.main, 0.2)
-                                                  : alpha(primaryColor, 0.08),
-                                            }}
-                                          >
-                                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
-                                              <Box>
-                                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                                  <Typography fontWeight={800}>{flag.paper_code}</Typography>
-                                                  <Chip
-                                                    size="small"
-                                                    label={flag.severity === 'warning' ? 'Review' : 'Info'}
-                                                    color={flag.severity === 'warning' ? 'warning' : 'default'}
-                                                    variant="outlined"
-                                                  />
-                                                </Stack>
-                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.45 }}>
-                                                  {flag.summary}
-                                                </Typography>
-                                              </Box>
-                                              <Stack direction="row" spacing={0.75} flexWrap="wrap">
-                                                {flag.flags.map((flagCode) => (
-                                                  <Chip
-                                                    key={flagCode}
-                                                    size="small"
-                                                    label={startCaseFlag(flagCode)}
-                                                    variant="outlined"
-                                                  />
-                                                ))}
-                                              </Stack>
-                                            </Stack>
-                                          </Paper>
-                                        ))}
-                                      </Stack>
-                                    )}
-                                  </Paper>
-                                </Grid>
-                                <Grid item xs={12} lg={5}>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{
-                                      p: 1.7,
-                                      borderRadius: 3,
-                                      bgcolor: '#fff',
-                                      borderColor: alpha(primaryColor, 0.08),
-                                      height: '100%',
-                                    }}
-                                  >
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.4 }}>
-                                      <DiagnosticsIcon color="action" />
-                                      <Typography fontWeight={800}>Constraint Diagnostics</Typography>
-                                    </Stack>
-                                    <Stack spacing={1}>
-                                      {Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).length === 0 ? (
-                                        <Typography variant="body2" color="text.secondary">
-                                          No dominant blocking pattern has been recorded for this draft yet.
-                                        </Typography>
-                                      ) : (
-                                        Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).map(([reason, count]) => (
-                                          <Box
-                                            key={reason}
-                                            sx={{
-                                              px: 1.2,
-                                              py: 1,
-                                              borderRadius: 2.5,
-                                              bgcolor: alpha(primaryColor, 0.035),
-                                            }}
-                                          >
-                                            <Stack direction="row" justifyContent="space-between" spacing={1}>
-                                              <Typography variant="body2" fontWeight={700}>{formatDiagnosticReason(reason)}</Typography>
-                                              <Chip size="small" label={count} variant="outlined" />
-                                            </Stack>
-                                          </Box>
-                                        ))
-                                      )}
-                                    </Stack>
-                                  </Paper>
-                                </Grid>
-                              </Grid>
-                            )}
-
-                            {unscheduledPapers.length > 0 && (
-                              <Paper
-                                variant="outlined"
-                                sx={{
-                                  p: 1.7,
-                                  mb: 2.2,
-                                  borderRadius: 3,
-                                  bgcolor: alpha('#fff6ea', 0.94),
-                                  borderColor: alpha(theme.palette.warning.main, 0.18),
-                                }}
-                              >
-                                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.35 }}>
-                                  <WarningIcon color="warning" />
-                                  <Typography fontWeight={800}>Unscheduled Papers</Typography>
-                                </Stack>
-                                <Grid container spacing={1.2}>
-                                  {unscheduledPapers.map((paper) => (
-                                    <Grid item xs={12} md={6} key={paper.paper_id}>
-                                      <Paper variant="outlined" sx={{ p: 1.3, borderRadius: 2.5, bgcolor: '#fff' }}>
-                                        <Stack direction="row" justifyContent="space-between" spacing={1}>
-                                          <Box>
-                                            <Typography fontWeight={800}>{paper.paper_code}</Typography>
-                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-                                              {paper.reason}
-                                            </Typography>
-                                          </Box>
-                                          <Chip size="small" color="warning" label={`${paper.candidate_count ?? 0} seats`} />
-                                        </Stack>
-                                        <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 1 }}>
-                                          {Object.entries(paper.diagnostics || {}).slice(0, 3).map(([reason, count]) => (
-                                            <Chip
-                                              key={reason}
-                                              size="small"
-                                              variant="outlined"
-                                              label={`${formatDiagnosticReason(reason)} (${count})`}
-                                            />
-                                          ))}
-                                        </Stack>
-                                      </Paper>
-                                    </Grid>
-                                  ))}
-                                </Grid>
-                              </Paper>
-                            )}
-
-                            {selectedSlots.length === 0 ? (
-                              <Paper
-                                variant="outlined"
-                                sx={{
-                                  p: 2,
-                                  borderRadius: 3,
-                                  bgcolor: alpha(primaryColor, 0.02),
-                                  borderColor: alpha(primaryColor, 0.1),
-                                }}
-                              >
-                                <Typography fontWeight={700}>No exam slots generated yet.</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                  Once session windows and papers are ready, generate a draft to review room allocations here.
-                                </Typography>
-                              </Paper>
-                            ) : (
-                              <Box sx={{ overflowX: 'auto', borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.08) }}>
-                                <Table size="small">
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell>Date</TableCell>
-                                      <TableCell>Session</TableCell>
-                                      <TableCell>Paper</TableCell>
-                                      <TableCell>Groups</TableCell>
-                                      <TableCell>Rooms</TableCell>
-                                      <TableCell align="right">Allocated Seats</TableCell>
-                                      <TableCell>Review</TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {selectedSlots
-                                      .slice()
-                                      .sort((left, right) => `${left.exam_date}${left.start_time}`.localeCompare(`${right.exam_date}${right.start_time}`))
-                                      .map((slot) => (
-                                        <TableRow key={slot.id} hover>
-                                          <TableCell>{formatDateLabel(slot.exam_date)}</TableCell>
-                                          <TableCell>
-                                            <Typography fontWeight={800}>{slot.session_window?.name || 'Session'}</Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                              {formatTimeLabel(slot.start_time)} - {formatTimeLabel(slot.end_time)}
-                                            </Typography>
-                                          </TableCell>
-                                          <TableCell>
-                                            <Typography fontWeight={800}>{slot.paper?.paper_code || `Paper #${slot.exam_paper_id}`}</Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                              {slot.paper?.paper_name || 'Unnamed paper'}
-                                            </Typography>
-                                          </TableCell>
-                                          <TableCell>
-                                            {(slot.paper?.group_ids || []).map((groupId) => groupLookup.get(groupId)?.name || `Group ${groupId}`).join(', ')}
-                                          </TableCell>
-                                          <TableCell>
-                                            <Stack spacing={0.4}>
-                                              {slot.room_allocations.map((allocation) => (
-                                                <Typography key={allocation.id} variant="caption">
-                                                  {(allocation.room?.name || `Room ${allocation.room_id}`)} | {allocation.allocated_capacity} seats
-                                                </Typography>
-                                              ))}
-                                            </Stack>
-                                          </TableCell>
-                                          <TableCell align="right">{slot.total_allocated_capacity ?? 0}</TableCell>
-                                          <TableCell>
-                                            <Stack spacing={0.7} alignItems="flex-start">
-                                              <Chip
-                                                size="small"
-                                                label={slot.status === 'published' ? 'Published' : 'Draft'}
-                                                color={slot.status === 'published' ? 'success' : 'default'}
-                                                variant={slot.status === 'published' ? 'filled' : 'outlined'}
-                                              />
-                                              {slot.notes ? (
-                                                <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 240 }}>
-                                                  {slot.notes}
-                                                </Typography>
-                                              ) : (
-                                                <Typography variant="caption" color="text.secondary">
-                                                  Clean placement
-                                                </Typography>
-                                              )}
-                                            </Stack>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                  </TableBody>
-                                </Table>
-                              </Box>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Stack>
-                    </Grid>
-                   {/* ── Diagnostics Tab ── */}
-                   {activeTab === 'diagnostics' && selectedPeriod && (
-                    <Grid item xs={12}>
-                      <Stack spacing={2.5}>
-                        <Grid container spacing={2}>
-                          {draftDiagnosticsCards.map((card) => (
-                            <Grid item xs={12} sm={4} key={card.label}>
-                              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, textAlign: 'center', borderColor: card.tone === 'warning' ? alpha(theme.palette.warning.main, 0.3) : alpha(theme.palette.success.main, 0.22), bgcolor: card.tone === 'warning' ? alpha('#fff7ea', 0.8) : alpha('#f0faf4', 0.8) }}>
-                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{card.label}</Typography>
-                                <Typography variant="h3" fontWeight={800} sx={{ mt: 0.5, color: card.tone === 'warning' ? theme.palette.warning.dark : theme.palette.success.dark }}>{card.value}</Typography>
-                                <Typography variant="caption" color="text.secondary">{card.note}</Typography>
-                              </Paper>
-                            </Grid>
-                          ))}
-                        </Grid>
-                        {scheduledFlags.length > 0 && (
-                          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.warning.main, 0.2) }}>
-                            <CardContent>
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                                <FlagIcon color="warning" />
-                                <Typography variant="h6" fontWeight={800}>Placement Review Notes ({scheduledFlags.length})</Typography>
-                              </Stack>
-                              <Stack spacing={1}>
-                                {scheduledFlags.map((flag) => (
-                                  <Paper key={`${flag.slot_id}-${flag.paper_id}`} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha('#fff7ea', 0.9), borderColor: alpha(theme.palette.warning.main, 0.2) }}>
-                                    <Stack direction="row" justifyContent="space-between" spacing={1}>
-                                      <Box><Typography fontWeight={800}>{flag.paper_code}</Typography><Typography variant="body2" color="text.secondary">{flag.summary}</Typography></Box>
-                                      <Stack direction="row" spacing={0.5} flexWrap="wrap">{flag.flags.map((f) => <Chip key={f} size="small" label={startCaseFlag(f)} variant="outlined" />)}</Stack>
-                                    </Stack>
-                                  </Paper>
-                                ))}
-                              </Stack>
-                            </CardContent>
-                          </Card>
-                        )}
-                        {unscheduledPapers.length > 0 && (
-                          <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.warning.main, 0.22) }}>
-                            <CardContent>
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}><WarningIcon color="warning" /><Typography variant="h6" fontWeight={800}>Unscheduled Papers ({unscheduledPapers.length})</Typography></Stack>
-                              <Grid container spacing={1.5}>
-                                {unscheduledPapers.map((paper) => (
-                                  <Grid item xs={12} sm={6} key={paper.paper_id}>
-                                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
-                                      <Stack direction="row" justifyContent="space-between">
-                                        <Box><Typography fontWeight={800}>{paper.paper_code}</Typography><Typography variant="body2" color="text.secondary">{paper.reason}</Typography></Box>
-                                        <Chip size="small" color="warning" label={`${paper.candidate_count ?? 0} seats`} />
-                                      </Stack>
-                                    </Paper>
-                                  </Grid>
-                                ))}
-                              </Grid>
-                            </CardContent>
-                          </Card>
-                        )}
-                        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.1) }}>
-                          <CardContent>
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}><DiagnosticsIcon color="action" /><Typography variant="h6" fontWeight={800}>Constraint Diagnostics</Typography></Stack>
-                            {Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).length === 0 ? (
-                              <Alert severity="info">No constraint violations recorded yet. Run generation first.</Alert>
-                            ) : (
-                              <Stack spacing={1}>
-                                {Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).map(([reason, count]) => (
-                                  <Box key={reason} sx={{ px: 1.5, py: 1, borderRadius: 2.5, bgcolor: alpha(primaryColor, 0.04) }}>
-                                    <Stack direction="row" justifyContent="space-between"><Typography variant="body2" fontWeight={700}>{formatDiagnosticReason(reason)}</Typography><Chip size="small" label={count} variant="outlined" /></Stack>
-                                  </Box>
-                                ))}
-                              </Stack>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Stack>
+                      </Grid>
                     </Grid>
                   )}
-                  </Grid>
-                </Stack>
+
+                  {/* ── PAPERS TAB ── */}
+                  {activeTab === 'papers' && (
+                    <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98) }}>
+                      <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 2.5 }}>
+                          <Box>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <CatalogIcon color="action" />
+                              <Typography variant="h6" fontWeight={800}>Paper Selection</Typography>
+                            </Stack>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 760 }}>
+                              Pull mapped courses, keep only examinable ones, then synchronize the approved paper list into this cycle.
+                            </Typography>
+                          </Box>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.2}>
+                            <Button
+                              variant="outlined"
+                              startIcon={<ExamIcon />}
+                              onClick={() => setPaperDialogOpen(true)}
+                              disabled={selectedPeriod.is_locked || !canConfigurePeriod}
+                            >
+                              Add Manual Paper
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              startIcon={<SyncIcon />}
+                              onClick={() => selectedPeriod && void loadPaperCandidates(selectedPeriod.id)}
+                              disabled={candidateLoading}
+                            >
+                              Refresh Pull
+                            </Button>
+                            <Button
+                              variant="contained"
+                              startIcon={<SyncIcon />}
+                              onClick={() => void handleSyncPapers()}
+                              disabled={!canMarkPapers || selectedPeriod.is_locked || busyAction === 'sync-papers' || candidateLoading}
+                            >
+                              {busyAction === 'sync-papers' ? 'Synchronizing...' : 'Sync Selected Papers'}
+                            </Button>
+                          </Stack>
+                        </Stack>
+
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ xs: 'stretch', md: 'center' }} sx={{ mb: 2 }}>
+                          <Chip label={`${selectedCourseIds.length} selected`} color="primary" variant="outlined" />
+                          <Chip
+                            label={`${selectedCandidateCount} students`}
+                            color={selectedCandidateCount > roomUtilizationSummary.effectiveCapacity ? 'warning' : 'success'}
+                            variant="outlined"
+                          />
+                          <Chip label={`${alreadyIncludedCount} already synced`} variant="outlined" />
+                          <Chip label={`${manageableCandidates.length} manageable by you`} variant="outlined" />
+                        </Stack>
+
+                        <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 3, bgcolor: '#fff', borderColor: alpha(primaryColor, 0.08) }}>
+                          <Grid container spacing={1.5} alignItems="center">
+                            <Grid item xs={12} md={4.1}>
+                              <TextField
+                                fullWidth
+                                label="Search course, group, or year"
+                                value={candidateSearch}
+                                onChange={(event) => setCandidateSearch(event.target.value)}
+                                InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={2.1}>
+                              <FormControl fullWidth>
+                                <InputLabel id="candidate-filter-label">View</InputLabel>
+                                <Select
+                                  labelId="candidate-filter-label"
+                                  label="View"
+                                  value={candidateFilter}
+                                  onChange={(event) => setCandidateFilter(event.target.value as typeof candidateFilter)}
+                                >
+                                  <MenuItem value="all">All mapped</MenuItem>
+                                  <MenuItem value="selected">Selected only</MenuItem>
+                                  <MenuItem value="included">Already included</MenuItem>
+                                  <MenuItem value="notIncluded">Not yet included</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={1.7}>
+                              <TextField
+                                fullWidth
+                                label="Duration (mins)"
+                                type="number"
+                                value={syncDefaults.default_duration_minutes}
+                                onChange={(event) => setSyncDefaults((current) => ({
+                                  ...current,
+                                  default_duration_minutes: Number(event.target.value),
+                                }))}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={1.6}>
+                              <TextField
+                                fullWidth
+                                label="Max rooms"
+                                type="number"
+                                value={syncDefaults.default_max_rooms}
+                                onChange={(event) => setSyncDefaults((current) => ({
+                                  ...current,
+                                  default_max_rooms: Number(event.target.value),
+                                }))}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={2.5}>
+                              <FormControl fullWidth>
+                                <InputLabel id="sync-profile-label">Seating profile</InputLabel>
+                                <Select
+                                  labelId="sync-profile-label"
+                                  label="Seating profile"
+                                  value={syncDefaults.preferred_seating_profile_id}
+                                  onChange={(event) => setSyncDefaults((current) => ({
+                                    ...current,
+                                    preferred_seating_profile_id: event.target.value,
+                                  }))}
+                                >
+                                  <MenuItem value="">Use default profile</MenuItem>
+                                  {seatingProfiles.map((profile) => (
+                                    <MenuItem key={profile.id} value={profile.id}>{profile.name}</MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+
+                        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', lg: 'center' }} justifyContent="space-between" sx={{ mb: 1.75 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            New periods start with no automatic paper selection. Choose only the papers you want to bring into this cycle, then sync them intentionally.
+                          </Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            <Button size="small" variant="text" onClick={() => setSelectedCourseIds(manageableCandidateIds)}>Select all</Button>
+                            <Button size="small" variant="text" onClick={() => setSelectedCourseIds(paperCandidates.filter((c) => c.already_included && c.can_manage).map((c) => c.course_id))}>Included only</Button>
+                            <Button size="small" variant="text" startIcon={<ClearIcon />} onClick={() => setSelectedCourseIds([])}>Clear</Button>
+                          </Stack>
+                        </Stack>
+
+                        {candidateLoading ? (
+                          <Typography color="text.secondary">Loading mapped course audiences...</Typography>
+                        ) : filteredCandidates.length === 0 ? (
+                          <Alert severity="info">No mapped courses matched this filter.</Alert>
+                        ) : (
+                          <Box sx={{ overflowX: 'auto', borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.08) }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell padding="checkbox" />
+                                  <TableCell>Course</TableCell>
+                                  <TableCell>Audience</TableCell>
+                                  <TableCell>Exam Setup</TableCell>
+                                  <TableCell>Status</TableCell>
+                                  <TableCell align="right">Candidates</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {filteredCandidates.map((candidate) => (
+                                  <TableRow key={candidate.course_id} hover selected={selectedCourseIds.includes(candidate.course_id)}>
+                                    <TableCell padding="checkbox">
+                                      <Checkbox checked={selectedCourseIds.includes(candidate.course_id)} onChange={() => toggleCourseSelection(candidate.course_id)} disabled={selectedPeriod.is_locked || !candidate.can_manage} />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                        <Typography fontWeight={800}>{candidate.course_code}</Typography>
+                                        <Chip size="small" label={candidate.ownership_kind === 'owner' ? 'Your dept' : 'Shared'} color={candidate.ownership_kind === 'owner' ? 'primary' : 'default'} variant="outlined" />
+                                      </Stack>
+                                      <Typography variant="body2">{candidate.course_name}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{normalizeLevelLabel(candidate.course_level)}{candidate.department_name ? ` | ${candidate.department_name}` : ''}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="body2">{candidate.groups.map((group) => group.name).join(', ')}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{candidate.groups.length} group(s)</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="body2">{(candidate.preferred_room_type || 'any').replace(/_/g, ' ')}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{selectedSyncProfile ? `${selectedSyncProfile.name} seating` : 'Default seating'}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      {candidate.already_included ? (
+                                        <Stack spacing={0.25}>
+                                          <Chip size="small" color="success" label="Included" sx={{ width: 'fit-content' }} />
+                                          <Typography variant="caption" color="text.secondary">{candidate.existing_paper_code || candidate.course_code}{candidate.existing_duration_minutes ? ` | ${candidate.existing_duration_minutes}m` : ''}</Typography>
+                                        </Stack>
+                                      ) : (
+                                        <Chip size="small" variant="outlined" label="Not included" />
+                                      )}
+                                      {!candidate.can_manage && <Typography variant="caption" color="text.secondary" display="block">View only</Typography>}
+                                    </TableCell>
+                                    <TableCell align="right"><Typography fontWeight={800}>{candidate.candidate_count}</Typography></TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* ── TIMETABLE TAB ── */}
+                  {activeTab === 'timetable' && (
+                    <Card sx={{ borderRadius: 4, border: '1px solid', borderColor: alpha(primaryColor, 0.1), bgcolor: alpha('#fffdf8', 0.98) }}>
+                      <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
+                          <Box>
+                            <Typography variant="h6" fontWeight={800}>Generate And Review</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                              Generate the draft, then review how papers were placed across dates, sessions, and rooms.
+                            </Typography>
+                          </Box>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                            <Button
+                              variant="outlined"
+                              color="warning"
+                              startIcon={<ClearDraftIcon />}
+                              onClick={() => void handleClearDraft()}
+                              disabled={!canGenerateOrPublish || busyAction === 'clear-draft' || selectedPeriod.is_locked || selectedPeriod.is_published || selectedSlots.length === 0}
+                            >
+                              {busyAction === 'clear-draft' ? 'Clearing...' : 'Clear Draft'}
+                            </Button>
+                            <Button
+                              variant="contained"
+                              startIcon={<GenerateIcon />}
+                              onClick={() => void handleGenerate()}
+                              disabled={!canGenerateOrPublish || busyAction === 'generate' || selectedPeriod.is_locked || selectedPapers.length === 0 || selectedWindows.length === 0}
+                            >
+                              {busyAction === 'generate' ? 'Generating...' : 'Generate Draft'}
+                            </Button>
+                            <Button
+                              variant="contained"
+                              color="success"
+                              startIcon={<PublishIcon />}
+                              onClick={() => void handlePublish()}
+                              disabled={!canGenerateOrPublish || busyAction === 'publish' || selectedSlots.length === 0 || selectedPeriod.is_published || publishBlockedByUnscheduled}
+                            >
+                              {busyAction === 'publish' ? 'Publishing...' : 'Publish'}
+                            </Button>
+                            {selectedPeriod.is_published && (
+                              <Button
+                                variant="outlined"
+                                color="warning"
+                                onClick={() => void handleUnpublish()}
+                                disabled={!canGenerateOrPublish || busyAction === 'unpublish'}
+                              >
+                                {busyAction === 'unpublish' ? 'Unpublishing...' : 'Unpublish'}
+                              </Button>
+                            )}
+                          </Stack>
+                        </Stack>
+
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: { xs: 1.8, md: 2.1 },
+                            mb: 2,
+                            borderRadius: 3.5,
+                            bgcolor:
+                              draftHealthTone === 'success'
+                                ? alpha('#eff9f2', 0.92)
+                                : draftHealthTone === 'warning'
+                                  ? alpha('#fff4e5', 0.92)
+                                  : alpha(primaryColor, 0.045),
+                            borderColor:
+                              draftHealthTone === 'success'
+                                ? alpha(theme.palette.success.main, 0.18)
+                                : draftHealthTone === 'warning'
+                                  ? alpha(theme.palette.warning.main, 0.2)
+                                  : alpha(primaryColor, 0.12),
+                          }}
+                        >
+                          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+                            <Stack direction="row" spacing={1.4} alignItems="flex-start">
+                              <Box
+                                sx={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 2.5,
+                                  display: 'grid',
+                                  placeItems: 'center',
+                                  bgcolor:
+                                    draftHealthTone === 'success'
+                                      ? alpha(theme.palette.success.main, 0.12)
+                                      : draftHealthTone === 'warning'
+                                        ? alpha(theme.palette.warning.main, 0.14)
+                                        : alpha(primaryColor, 0.12),
+                                  color:
+                                    draftHealthTone === 'success'
+                                      ? theme.palette.success.dark
+                                      : draftHealthTone === 'warning'
+                                        ? theme.palette.warning.dark
+                                        : primaryColor,
+                                }}
+                              >
+                                {draftHealthTone === 'success' ? <HealthyIcon /> : draftHealthTone === 'warning' ? <WarningIcon /> : <DiagnosticsIcon />}
+                              </Box>
+                              <Box>
+                                <Typography variant="overline" sx={{ letterSpacing: '0.12em', color: 'text.secondary', fontWeight: 700 }}>
+                                  Draft Quality
+                                </Typography>
+                                <Typography variant="h6" fontWeight={800} sx={{ mt: 0.3 }}>
+                                  {draftHealthLabel}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.65, maxWidth: 780 }}>
+                                  {generationMetadata?.strategy || 'The generator prioritizes constrained papers first, fits the smallest viable room bundle, and highlights spacing or load pressure for review.'}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" alignItems={{ xs: 'stretch', sm: 'center' }}>
+                              <Chip icon={<GenerateIcon />} label={`${selectedSlots.length} placed`} color={selectedSlots.length > 0 ? 'primary' : 'default'} variant="outlined" />
+                              <Chip icon={<FlagIcon />} label={`${scheduledFlags.length} flagged`} color={scheduledFlags.length > 0 ? 'warning' : 'success'} variant="outlined" />
+                              <Chip icon={<WarningIcon />} label={`${unscheduledPapers.length} unscheduled`} color={unscheduledPapers.length > 0 ? 'warning' : 'success'} variant="outlined" />
+                            </Stack>
+                          </Stack>
+                        </Paper>
+                        {publishBlockedByUnscheduled && (
+                          <Alert severity="warning" sx={{ mb: 2 }}>
+                            Publish stays disabled until every paper in this exam period has a scheduled slot.
+                          </Alert>
+                        )}
+
+                        {selectedPeriod.is_published ? (
+                          <Alert
+                            severity="success"
+                            sx={{ mb: 2 }}
+                            action={
+                              canGenerateOrPublish ? (
+                                <Button
+                                  color="warning"
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => void handleUnpublish()}
+                                  disabled={busyAction === 'unpublish'}
+                                >
+                                  {busyAction === 'unpublish' ? 'Unpublishing...' : 'Unpublish'}
+                                </Button>
+                              ) : undefined
+                            }
+                          >
+                            This exam period is published and locked. The current draft is now the live operating timetable.
+                          </Alert>
+                        ) : (
+                          <Alert severity="info" sx={{ mb: 2 }}>This period is still in draft mode. You can still adjust session windows, seating rules, and included papers.</Alert>
+                        )}
+
+                        {selectedSlots.length === 0 ? (
+                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: alpha(primaryColor, 0.02), borderColor: alpha(primaryColor, 0.1) }}>
+                            <Typography fontWeight={700}>No exam slots generated yet.</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Once session windows and papers are ready, generate a draft to review room allocations here.</Typography>
+                          </Paper>
+                        ) : (
+                          <Box sx={{ overflowX: 'auto', borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.08) }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Date</TableCell>
+                                  <TableCell>Session</TableCell>
+                                  <TableCell>Paper</TableCell>
+                                  <TableCell>Groups</TableCell>
+                                  <TableCell>Rooms</TableCell>
+                                  <TableCell align="right">Allocated Seats</TableCell>
+                                  <TableCell>Review</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {selectedSlots.slice().sort((left, right) => `${left.exam_date}${left.start_time}`.localeCompare(`${right.exam_date}${right.start_time}`)).map((slot) => (
+                                  <TableRow key={slot.id} hover>
+                                    <TableCell>{formatDateLabel(slot.exam_date)}</TableCell>
+                                    <TableCell>
+                                      <Typography fontWeight={800}>{slot.session_window?.name || 'Session'}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{formatTimeLabel(slot.start_time)} - {formatTimeLabel(slot.end_time)}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography fontWeight={800}>{slot.paper?.paper_code || `Paper #${slot.exam_paper_id}`}</Typography>
+                                      <Typography variant="caption" color="text.secondary">{slot.paper?.paper_name || 'Unnamed paper'}</Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      {(slot.paper?.group_ids || []).map((groupId) => groupLookup.get(groupId)?.name || `Group ${groupId}`).join(', ')}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Stack spacing={0.4}>
+                                        {slot.room_allocations.map((allocation) => (
+                                          <Typography key={allocation.id} variant="caption">
+                                            {(allocation.room?.name || `Room ${allocation.room_id}`)} | {allocation.allocated_capacity} seats
+                                          </Typography>
+                                        ))}
+                                      </Stack>
+                                    </TableCell>
+                                    <TableCell align="right">{slot.total_allocated_capacity ?? 0}</TableCell>
+                                    <TableCell>
+                                      <Stack spacing={0.7} alignItems="flex-start">
+                                        <Chip size="small" label={slot.status === 'published' ? 'Published' : 'Draft'} color={slot.status === 'published' ? 'success' : 'default'} variant={slot.status === 'published' ? 'filled' : 'outlined'} />
+                                        {slot.notes ? (
+                                          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 240 }}>{slot.notes}</Typography>
+                                        ) : (
+                                          <Typography variant="caption" color="text.secondary">Clean placement</Typography>
+                                        )}
+                                      </Stack>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* ── DIAGNOSTICS TAB ── */}
+                  {activeTab === 'diagnostics' && (
+                    <Stack spacing={2.5}>
+                      <Grid container spacing={2}>
+                        {draftDiagnosticsCards.map((card) => (
+                          <Grid item xs={12} sm={4} key={card.label}>
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, textAlign: 'center', borderColor: card.tone === 'warning' ? alpha(theme.palette.warning.main, 0.3) : alpha(theme.palette.success.main, 0.22), bgcolor: card.tone === 'warning' ? alpha('#fff7ea', 0.8) : alpha('#f0faf4', 0.8) }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{card.label}</Typography>
+                              <Typography variant="h3" fontWeight={800} sx={{ mt: 0.5, color: card.tone === 'warning' ? theme.palette.warning.dark : theme.palette.success.dark }}>{card.value}</Typography>
+                              <Typography variant="caption" color="text.secondary">{card.note}</Typography>
+                            </Paper>
+                          </Grid>
+                        ))}
+                      </Grid>
+                      {scheduledFlags.length > 0 && (
+                        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.warning.main, 0.2) }}>
+                          <CardContent>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                              <FlagIcon color="warning" />
+                              <Typography variant="h6" fontWeight={800}>Placement Review Notes ({scheduledFlags.length})</Typography>
+                            </Stack>
+                            <Stack spacing={1}>
+                              {scheduledFlags.map((flag) => (
+                                <Paper key={`${flag.slot_id}-${flag.paper_id}`} variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: alpha('#fff7ea', 0.9), borderColor: alpha(theme.palette.warning.main, 0.2) }}>
+                                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                                    <Box><Typography fontWeight={800}>{flag.paper_code}</Typography><Typography variant="body2" color="text.secondary">{flag.summary}</Typography></Box>
+                                    <Stack direction="row" spacing={0.5} flexWrap="wrap">{flag.flags.map((f) => <Chip key={f} size="small" label={startCaseFlag(f)} variant="outlined" />)}</Stack>
+                                  </Stack>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {unscheduledPapers.length > 0 && (
+                        <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.warning.main, 0.22) }}>
+                          <CardContent>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}><WarningIcon color="warning" /><Typography variant="h6" fontWeight={800}>Unscheduled Papers ({unscheduledPapers.length})</Typography></Stack>
+                            <Grid container spacing={1.5}>
+                              {unscheduledPapers.map((paper) => (
+                                <Grid item xs={12} sm={6} key={paper.paper_id}>
+                                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+                                    <Stack direction="row" justifyContent="space-between">
+                                      <Box><Typography fontWeight={800}>{paper.paper_code}</Typography><Typography variant="body2" color="text.secondary">{paper.reason}</Typography></Box>
+                                      <Chip size="small" color="warning" label={`${paper.candidate_count ?? 0} seats`} />
+                                    </Stack>
+                                  </Paper>
+                                </Grid>
+                              ))}
+                            </Grid>
+                          </CardContent>
+                        </Card>
+                      )}
+                      <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(primaryColor, 0.1) }}>
+                        <CardContent>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}><DiagnosticsIcon color="action" /><Typography variant="h6" fontWeight={800}>Constraint Diagnostics</Typography></Stack>
+                          {Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).length === 0 ? (
+                            <Alert severity="info">No constraint violations recorded yet. Run generation first.</Alert>
+                          ) : (
+                            <Stack spacing={1}>
+                              {Object.entries(diagnosticsSummary?.unscheduled_reasons || {}).map(([reason, count]) => (
+                                <Box key={reason} sx={{ px: 1.5, py: 1, borderRadius: 2.5, bgcolor: alpha(primaryColor, 0.04) }}>
+                                  <Stack direction="row" justifyContent="space-between"><Typography variant="body2" fontWeight={700}>{formatDiagnosticReason(reason)}</Typography><Chip size="small" label={count} variant="outlined" /></Stack>
+                                </Box>
+                              ))}
+                            </Stack>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                  )}
+                </Box>
               )}
             </Grid>
           </Grid>
@@ -2072,10 +1796,9 @@ const ExamTimetablesPage: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
-            <FormControlLabel
-              control={<Switch checked={paperForm.allow_custom_window} onChange={(e) => setPaperForm((current) => ({ ...current, allow_custom_window: e.target.checked }))} />}
-              label="Allow custom session window placement later"
-            />
+            <Alert severity="info">
+              Custom session-window overrides are intentionally held back until the override workflow is ready, so manual papers still follow the shared session plan.
+            </Alert>
           </Stack>
         </DialogContent>
         <DialogActions>

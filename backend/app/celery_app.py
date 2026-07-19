@@ -11,7 +11,7 @@ celery_app = Celery(
     "tablesys",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.generation", "app.tasks.registration_tasks"],
+    include=["app.tasks.generation", "app.tasks.registration_tasks", "app.tasks.usage", "app.tasks.alerts"],
 )
 
 celery_app.conf.update(
@@ -26,3 +26,10 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,     # Fair dispatch — one task per worker at a time
     task_acks_late=True,              # Only ack after task completes (safe retry on crash)
 )
+
+celery_app.conf.beat_schedule = {
+    "check-platform-alerts-every-2-minutes": {
+        "task": "app.tasks.alerts.check_platform_alerts",
+        "schedule": 120.0,  # seconds
+    },
+}

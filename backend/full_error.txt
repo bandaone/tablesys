@@ -1,0 +1,1555 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.3, pluggy-1.6.0 -- /home/on3/.pyenv/versions/3.12.3/bin/python3
+cachedir: .pytest_cache
+metadata: {'Python': '3.12.3', 'Platform': 'Linux-6.17.0-22-generic-x86_64-with-glibc2.39', 'Packages': {'pytest': '7.4.3', 'pluggy': '1.6.0'}, 'Plugins': {'metadata': '3.1.1', 'anyio': '4.13.0', 'langsmith': '0.7.24', 'asyncio': '0.23.8', 'cov': '4.1.0', 'hypothesis': '6.98.6', 'html': '4.1.1'}}
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase(PosixPath('/home/on3/DENNIS/TABLESYS/backend/.hypothesis/examples'))
+rootdir: /home/on3/DENNIS/TABLESYS/backend
+configfile: pytest.ini
+plugins: metadata-3.1.1, anyio-4.13.0, langsmith-0.7.24, asyncio-0.23.8, cov-4.1.0, hypothesis-6.98.6, html-4.1.1
+asyncio: mode=Mode.AUTO
+collecting ... collected 33 items
+
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_first_request_is_always_allowed PASSED [  3%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_requests_within_quota_are_allowed PASSED [  6%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_request_at_quota_boundary_is_blocked PASSED [  9%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_blocked_ip_receives_positive_retry_after PASSED [ 12%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_block_expires_after_duration PASSED [ 15%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_different_ips_are_tracked_independently PASSED [ 18%]
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_window_slides_old_hits_expire PASSED [ 21%]
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_first_requests_to_public_route_succeed ERROR [ 24%]
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_request_after_quota_exhausted_returns_429 PASSED [ 27%]
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_429_response_includes_retry_after_header PASSED [ 30%]
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_authenticated_routes_are_not_rate_limited PASSED [ 33%]
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_public_registration_route_is_also_rate_limited PASSED [ 36%]
+tests/test_saas_workstreams.py::TestSeedingUtils::test_create_quota_placeholders_creates_rows PASSED [ 39%]
+tests/test_saas_workstreams.py::TestSeedingUtils::test_create_quota_placeholders_is_idempotent PASSED [ 42%]
+tests/test_saas_workstreams.py::TestSeedingUtils::test_quota_covers_all_three_plan_tiers PASSED [ 45%]
+tests/test_saas_workstreams.py::TestSeedingUtils::test_emit_onboarding_events_writes_usage_events PASSED [ 48%]
+tests/test_saas_workstreams.py::TestSeedingUtils::test_emit_onboarding_events_sets_source_to_provisioning PASSED [ 51%]
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_creates_university_and_user PASSED [ 54%]
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_marks_pending_as_verified FAILED [ 57%]
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_completes_all_six_stages FAILED [ 60%]
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_raises_on_duplicate_domain FAILED [ 63%]
+tests/test_saas_workstreams.py::TestProvisioningService::test_provisioning_failure_marks_pending_as_failed PASSED [ 66%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_unauthenticated_request_returns_401 PASSED [ 69%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_coordinator_can_access_export PASSED [ 72%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_response_is_json_attachment PASSED [ 75%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_contains_required_top_level_keys PASSED [ 78%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_metadata_includes_timestamp_and_user PASSED [ 81%]
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_lecturer_email_is_not_in_export PASSED [ 84%]
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_deactivate_requires_superadmin PASSED [ 87%]
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_deactivate_unknown_university_returns_404 SKIPPED [ 90%]
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_purge_without_confirmation_token_returns_400 SKIPPED [ 93%]
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_purge_of_active_tenant_returns_409 SKIPPED [ 96%]
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_purge_unauthenticated_returns_401 PASSED [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestPublicRateLimitMiddlewareIntegration.test_first_requests_to_public_route_succeed _
+
+fixturedef = <FixtureDef argname='event_loop' scope='session' baseid='tests'>
+
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_fixture_setup(
+        fixturedef: FixtureDef,
+    ) -> Generator[None, Any, None]:
+        """Adjust the event loop policy when an event loop is produced."""
+        if fixturedef.argname == "event_loop":
+            # The use of a fixture finalizer is preferred over the
+            # pytest_fixture_post_finalizer hook. The fixture finalizer is invoked once
+            # for each fixture, whereas the hook may be invoked multiple times for
+            # any specific fixture.
+            # see https://github.com/pytest-dev/pytest/issues/5848
+            _add_finalizers(
+                fixturedef,
+                _close_event_loop,
+                _restore_event_loop_policy(asyncio.get_event_loop_policy()),
+                _provide_clean_event_loop,
+            )
+            outcome = yield
+            loop: asyncio.AbstractEventLoop = outcome.get_result()
+            # Weird behavior was observed when checking for an attribute of FixtureDef.func
+            # Instead, we now check for a special attribute of the returned event loop
+            fixture_filename = inspect.getsourcefile(fixturedef.func)
+            if not getattr(loop, "__original_fixture_loop", False):
+>               _, fixture_line_number = inspect.getsourcelines(fixturedef.func)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/pytest_asyncio/plugin.py:760: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/inspect.py:1260: in getsourcelines
+    lines, lnum = findsource(object)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+object = <function event_loop at 0x71cf11550680>
+
+    def findsource(object):
+        """Return the entire source file and starting line number for an object.
+    
+        The argument may be a module, class, method, function, traceback, frame,
+        or code object.  The source code is returned as a list of all the lines
+        in the file and the line number indexes a line in that list.  An OSError
+        is raised if the source code cannot be retrieved."""
+    
+        file = getsourcefile(object)
+        if file:
+            # Invalidate cache if needed.
+            linecache.checkcache(file)
+        else:
+            file = getfile(object)
+            # Allow filenames in form of "<something>" to pass through.
+            # `doctest` monkeypatches `linecache` module to enable
+            # inspection, so let `linecache.getlines` to be called.
+            if not (file.startswith('<') and file.endswith('>')):
+                raise OSError('source code not available')
+    
+        module = getmodule(object, file)
+        if module:
+            lines = linecache.getlines(file, module.__dict__)
+        else:
+            lines = linecache.getlines(file)
+        if not lines:
+>           raise OSError('could not get source code')
+E           OSError: could not get source code
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/inspect.py:1089: OSError
+---------------------------- Captured stderr setup -----------------------------
+2026-05-06 00:15:58 - asyncio - DEBUG - Using selector: EpollSelector
+------------------------------ Captured log setup ------------------------------
+DEBUG    asyncio:selector_events.py:64 Using selector: EpollSelector
+=================================== FAILURES ===================================
+___ TestProvisioningService.test_provision_tenant_marks_pending_as_verified ____
+
+self = <sqlalchemy.engine.base.Connection object at 0x71cf10baef00>
+dialect = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10bace00>
+statement = <sqlalchemy.dialects.postgresql.base.PGCompiler object at 0x71cf11ac81a0>
+parameters = [{'domain': 'prov-uni-2', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10bfed40; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'prov-uni-2', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10bace00>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: UniqueViolation
+
+The above exception was the direct cause of the following exception:
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10b60b30>
+pending = <app.models.PendingRegistration object at 0x71cf10d25730>
+
+    def provision_tenant(db: Session, pending: PendingRegistration) -> ProvisioningResult:
+        """
+        Execute the full 6-stage tenant provisioning lifecycle.
+    
+        Parameters
+        ----------
+        db : Session
+            The active database session. The caller should NOT commit before this
+            function returns — provisioning owns the transaction.
+        pending : PendingRegistration
+            A validated PendingRegistration row (token checked, not expired, not yet verified).
+    
+        Returns
+        -------
+        ProvisioningResult with a ready-to-return access token.
+    
+        Raises
+        ------
+        ProvisioningError on any stage failure after partial state has been written.
+        """
+        now = datetime.now(timezone.utc)
+        uni: Optional[University] = None
+        stages_completed = []
+    
+        try:
+            # ── Stage 1: tenant_record_created ───────────────────────────────────
+            plan_tier = getattr(pending, "plan_tier", None) or "free"
+            uni = University(
+                name=pending.org_name,
+                domain=pending.subdomain,
+                timezone="Africa/Lusaka",
+                is_active=True,
+                registered_at=now,
+                plan_tier=plan_tier,
+                max_users=0,  # Unlimited (enforced by quota layer instead)
+            )
+            db.add(uni)
+>           db.flush()  # Obtain uni.id before dependent rows
+
+app/services/provisioning.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4331: in flush
+    self._flush(objects)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4466: in _flush
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4427: in _flush
+    flush_context.execute()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:466: in execute
+    rec.execute(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:93: in save_obj
+    _emit_insert_statements(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1419: in execute
+    return meth(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:527: in _execute_on_connection
+    return connection._execute_clauseelement(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2363: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10bfed40; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'prov-uni-2', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10bace00>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: IntegrityError
+
+The above exception was the direct cause of the following exception:
+
+self = <test_saas_workstreams.TestProvisioningService object at 0x71cf11144740>
+db_session = <sqlalchemy.orm.session.Session object at 0x71cf10b60b30>
+
+    def test_provision_tenant_marks_pending_as_verified(self, db_session):
+        """Successful provisioning must set PendingRegistration.status = 'verified'."""
+        from app.services.provisioning import provision_tenant
+    
+        pending = self._make_pending(db_session, "prov-uni-2", "prov2@prov-uni-2.test")
+>       provision_tenant(db_session, pending)
+
+tests/test_saas_workstreams.py:327: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/provisioning.py:174: in provision_tenant
+    _handle_provisioning_failure(db, pending, stages_completed, exc)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10b60b30>
+pending = <app.models.PendingRegistration object at 0x71cf10d25730>
+stages_completed = []
+exc = IntegrityError('(psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"\nDETAIL:  Key (name)=(New University) already exists.\n')
+
+    def _handle_provisioning_failure(
+        db: Session,
+        pending: PendingRegistration,
+        stages_completed: list,
+        exc: Exception,
+    ) -> None:
+        """
+        Apply rollback policy:
+        - Roll back the in-flight transaction so partial tenant rows do not persist.
+        - Persist PendingRegistration as failed_provisioning for manual retry.
+        - Re-raise as ProvisioningError.
+        """
+        failed_at_stage = len(stages_completed)
+        logger.error(
+            "[!] Provisioning failed after stage %d (%s): %s",
+            failed_at_stage,
+            stages_completed[-1] if stages_completed else "none",
+            exc,
+            exc_info=True,
+        )
+    
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    
+        try:
+            # Persist the terminal failure state so a Superadmin can retry manually.
+            pending.status = "failed_provisioning"
+            db.add(pending)
+            db.commit()
+        except Exception:
+            db.rollback()
+    
+>       raise ProvisioningError(
+            f"Tenant provisioning failed at stage {failed_at_stage}. "
+            f"Completed: {stages_completed}. Cause: {exc}"
+        ) from exc
+E       app.services.provisioning.ProvisioningError: Tenant provisioning failed at stage 0. Completed: []. Cause: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+app/services/provisioning.py:211: ProvisioningError
+----------------------------- Captured stderr call -----------------------------
+2026-05-06 00:16:00 - app.provisioning - ERROR - [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+------------------------------ Captured log call -------------------------------
+ERROR    app.provisioning:provisioning.py:190 [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-2', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 0, 455777, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+____ TestProvisioningService.test_provision_tenant_completes_all_six_stages ____
+
+self = <sqlalchemy.engine.base.Connection object at 0x71cf10abf560>
+dialect = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abd730>
+statement = <sqlalchemy.dialects.postgresql.base.PGCompiler object at 0x71cf11ac81a0>
+parameters = [{'domain': 'prov-uni-3', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10e10b80; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'prov-uni-3', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abd730>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: UniqueViolation
+
+The above exception was the direct cause of the following exception:
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10cfd940>
+pending = <app.models.PendingRegistration object at 0x71cf10abd070>
+
+    def provision_tenant(db: Session, pending: PendingRegistration) -> ProvisioningResult:
+        """
+        Execute the full 6-stage tenant provisioning lifecycle.
+    
+        Parameters
+        ----------
+        db : Session
+            The active database session. The caller should NOT commit before this
+            function returns — provisioning owns the transaction.
+        pending : PendingRegistration
+            A validated PendingRegistration row (token checked, not expired, not yet verified).
+    
+        Returns
+        -------
+        ProvisioningResult with a ready-to-return access token.
+    
+        Raises
+        ------
+        ProvisioningError on any stage failure after partial state has been written.
+        """
+        now = datetime.now(timezone.utc)
+        uni: Optional[University] = None
+        stages_completed = []
+    
+        try:
+            # ── Stage 1: tenant_record_created ───────────────────────────────────
+            plan_tier = getattr(pending, "plan_tier", None) or "free"
+            uni = University(
+                name=pending.org_name,
+                domain=pending.subdomain,
+                timezone="Africa/Lusaka",
+                is_active=True,
+                registered_at=now,
+                plan_tier=plan_tier,
+                max_users=0,  # Unlimited (enforced by quota layer instead)
+            )
+            db.add(uni)
+>           db.flush()  # Obtain uni.id before dependent rows
+
+app/services/provisioning.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4331: in flush
+    self._flush(objects)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4466: in _flush
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4427: in _flush
+    flush_context.execute()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:466: in execute
+    rec.execute(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:93: in save_obj
+    _emit_insert_statements(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1419: in execute
+    return meth(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:527: in _execute_on_connection
+    return connection._execute_clauseelement(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2363: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10e10b80; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'prov-uni-3', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abd730>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: IntegrityError
+
+The above exception was the direct cause of the following exception:
+
+self = <test_saas_workstreams.TestProvisioningService object at 0x71cf11147cb0>
+db_session = <sqlalchemy.orm.session.Session object at 0x71cf10cfd940>
+
+    def test_provision_tenant_completes_all_six_stages(self, db_session):
+        """The result must list all 6 stage markers as completed."""
+        from app.services.provisioning import provision_tenant
+    
+        pending = self._make_pending(db_session, "prov-uni-3", "prov3@prov-uni-3.test")
+>       result = provision_tenant(db_session, pending)
+
+tests/test_saas_workstreams.py:337: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/provisioning.py:174: in provision_tenant
+    _handle_provisioning_failure(db, pending, stages_completed, exc)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10cfd940>
+pending = <app.models.PendingRegistration object at 0x71cf10abd070>
+stages_completed = []
+exc = IntegrityError('(psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"\nDETAIL:  Key (name)=(New University) already exists.\n')
+
+    def _handle_provisioning_failure(
+        db: Session,
+        pending: PendingRegistration,
+        stages_completed: list,
+        exc: Exception,
+    ) -> None:
+        """
+        Apply rollback policy:
+        - Roll back the in-flight transaction so partial tenant rows do not persist.
+        - Persist PendingRegistration as failed_provisioning for manual retry.
+        - Re-raise as ProvisioningError.
+        """
+        failed_at_stage = len(stages_completed)
+        logger.error(
+            "[!] Provisioning failed after stage %d (%s): %s",
+            failed_at_stage,
+            stages_completed[-1] if stages_completed else "none",
+            exc,
+            exc_info=True,
+        )
+    
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    
+        try:
+            # Persist the terminal failure state so a Superadmin can retry manually.
+            pending.status = "failed_provisioning"
+            db.add(pending)
+            db.commit()
+        except Exception:
+            db.rollback()
+    
+>       raise ProvisioningError(
+            f"Tenant provisioning failed at stage {failed_at_stage}. "
+            f"Completed: {stages_completed}. Cause: {exc}"
+        ) from exc
+E       app.services.provisioning.ProvisioningError: Tenant provisioning failed at stage 0. Completed: []. Cause: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+app/services/provisioning.py:211: ProvisioningError
+----------------------------- Captured stderr call -----------------------------
+2026-05-06 00:16:01 - app.provisioning - ERROR - [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+------------------------------ Captured log call -------------------------------
+ERROR    app.provisioning:provisioning.py:190 [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'prov-uni-3', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 1, 575576, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+___ TestProvisioningService.test_provision_tenant_raises_on_duplicate_domain ___
+
+self = <sqlalchemy.engine.base.Connection object at 0x71cf10abd6a0>
+dialect = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abc320>
+statement = <sqlalchemy.dialects.postgresql.base.PGCompiler object at 0x71cf11ac81a0>
+parameters = [{'domain': 'dup-uni', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10bfcb80; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'dup-uni', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abc320>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: UniqueViolation
+
+The above exception was the direct cause of the following exception:
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10abc470>
+pending = <app.models.PendingRegistration object at 0x71cf10abdc70>
+
+    def provision_tenant(db: Session, pending: PendingRegistration) -> ProvisioningResult:
+        """
+        Execute the full 6-stage tenant provisioning lifecycle.
+    
+        Parameters
+        ----------
+        db : Session
+            The active database session. The caller should NOT commit before this
+            function returns — provisioning owns the transaction.
+        pending : PendingRegistration
+            A validated PendingRegistration row (token checked, not expired, not yet verified).
+    
+        Returns
+        -------
+        ProvisioningResult with a ready-to-return access token.
+    
+        Raises
+        ------
+        ProvisioningError on any stage failure after partial state has been written.
+        """
+        now = datetime.now(timezone.utc)
+        uni: Optional[University] = None
+        stages_completed = []
+    
+        try:
+            # ── Stage 1: tenant_record_created ───────────────────────────────────
+            plan_tier = getattr(pending, "plan_tier", None) or "free"
+            uni = University(
+                name=pending.org_name,
+                domain=pending.subdomain,
+                timezone="Africa/Lusaka",
+                is_active=True,
+                registered_at=now,
+                plan_tier=plan_tier,
+                max_users=0,  # Unlimited (enforced by quota layer instead)
+            )
+            db.add(uni)
+>           db.flush()  # Obtain uni.id before dependent rows
+
+app/services/provisioning.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4331: in flush
+    self._flush(objects)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4466: in _flush
+    with util.safe_reraise():
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py:121: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py:4427: in _flush
+    flush_context.execute()
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:466: in execute
+    rec.execute(self)
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:93: in save_obj
+    _emit_insert_statements(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1419: in execute
+    return meth(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:527: in _execute_on_connection
+    return connection._execute_clauseelement(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2363: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <sqlalchemy.dialects.postgresql.psycopg2.PGDialect_psycopg2 object at 0x71cf10f7e150>
+cursor = <cursor object at 0x71cf10bfcb80; closed: -1>
+statement = 'INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, seco...go_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id'
+parameters = {'domain': 'dup-uni', 'is_active': True, 'logo_url': None, 'max_users': 0, ...}
+context = <sqlalchemy.dialects.postgresql.psycopg2.PGExecutionContext_psycopg2 object at 0x71cf10abc320>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py:952: IntegrityError
+
+The above exception was the direct cause of the following exception:
+
+self = <test_saas_workstreams.TestProvisioningService object at 0x71cf11147e90>
+db_session = <sqlalchemy.orm.session.Session object at 0x71cf10abc470>
+
+    def test_provision_tenant_raises_on_duplicate_domain(self, db_session):
+        """Attempting to provision the same domain twice must raise ProvisioningError."""
+        from app.services.provisioning import provision_tenant, ProvisioningError
+    
+        pending1 = self._make_pending(db_session, "dup-uni", "first@dup-uni.test")
+>       provision_tenant(db_session, pending1)
+
+tests/test_saas_workstreams.py:357: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/provisioning.py:174: in provision_tenant
+    _handle_provisioning_failure(db, pending, stages_completed, exc)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+db = <sqlalchemy.orm.session.Session object at 0x71cf10abc470>
+pending = <app.models.PendingRegistration object at 0x71cf10abdc70>
+stages_completed = []
+exc = IntegrityError('(psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"\nDETAIL:  Key (name)=(New University) already exists.\n')
+
+    def _handle_provisioning_failure(
+        db: Session,
+        pending: PendingRegistration,
+        stages_completed: list,
+        exc: Exception,
+    ) -> None:
+        """
+        Apply rollback policy:
+        - Roll back the in-flight transaction so partial tenant rows do not persist.
+        - Persist PendingRegistration as failed_provisioning for manual retry.
+        - Re-raise as ProvisioningError.
+        """
+        failed_at_stage = len(stages_completed)
+        logger.error(
+            "[!] Provisioning failed after stage %d (%s): %s",
+            failed_at_stage,
+            stages_completed[-1] if stages_completed else "none",
+            exc,
+            exc_info=True,
+        )
+    
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    
+        try:
+            # Persist the terminal failure state so a Superadmin can retry manually.
+            pending.status = "failed_provisioning"
+            db.add(pending)
+            db.commit()
+        except Exception:
+            db.rollback()
+    
+>       raise ProvisioningError(
+            f"Tenant provisioning failed at stage {failed_at_stage}. "
+            f"Completed: {stages_completed}. Cause: {exc}"
+        ) from exc
+E       app.services.provisioning.ProvisioningError: Tenant provisioning failed at stage 0. Completed: []. Cause: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+E       DETAIL:  Key (name)=(New University) already exists.
+E       
+E       [SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+E       [parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+app/services/provisioning.py:211: ProvisioningError
+----------------------------- Captured stderr call -----------------------------
+2026-05-06 00:16:02 - app.provisioning - ERROR - [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+------------------------------ Captured log call -------------------------------
+ERROR    app.provisioning:provisioning.py:190 [!] Provisioning failed after stage 0 (none): (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/on3/DENNIS/TABLESYS/backend/app/services/provisioning.py", line 92, in provision_tenant
+    db.flush()  # Obtain uni.id before dependent rows
+    ^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "universities_name_key"
+DETAIL:  Key (name)=(New University) already exists.
+
+[SQL: INSERT INTO universities (name, short_name, domain, timezone, is_active, registered_at, logo_url, primary_color, secondary_color, tagline, plan_tier, max_users) VALUES (%(name)s, %(short_name)s, %(domain)s, %(timezone)s, %(is_active)s, %(registered_at)s, %(logo_url)s, %(primary_color)s, %(secondary_color)s, %(tagline)s, %(plan_tier)s, %(max_users)s) RETURNING universities.id]
+[parameters: {'name': 'New University', 'short_name': None, 'domain': 'dup-uni', 'timezone': 'Africa/Lusaka', 'is_active': True, 'registered_at': datetime.datetime(2026, 5, 5, 22, 16, 2, 688499, tzinfo=datetime.timezone.utc), 'logo_url': None, 'primary_color': '#1976d2', 'secondary_color': '#9c27b0', 'tagline': None, 'plan_tier': 'free', 'max_users': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+=============================== warnings summary ===============================
+app/database.py:48
+  /home/on3/DENNIS/TABLESYS/backend/app/database.py:48: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/formparsers.py:10: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: 29 warnings
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/pydantic/_internal/_config.py:271: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/dateutil/tz/tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11: DeprecationWarning: ast.NameConstant is deprecated and will be removed in Python 3.14; use ast.Constant instead
+    haveNameConstant = hasattr(ast,'NameConstant')
+
+app/main.py:310
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:310: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+../../../.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app/main.py:319
+  /home/on3/DENNIS/TABLESYS/backend/app/main.py:319: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_saas_workstreams.py: 34 warnings
+  /home/on3/DENNIS/TABLESYS/backend/app/middleware/rate_limiter.py:215: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_block_expires_after_duration
+  /home/on3/DENNIS/TABLESYS/backend/tests/test_saas_workstreams.py:72: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    limiter._blocked[ip] = datetime.utcnow() - timedelta(seconds=1)
+
+tests/test_saas_workstreams.py::TestPublicRouteRateLimiter::test_window_slides_old_hits_expire
+  /home/on3/DENNIS/TABLESYS/backend/tests/test_saas_workstreams.py:93: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    old_ts = datetime.utcnow() - timedelta(seconds=120)
+
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_first_requests_to_public_route_succeed
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/_pytest/fixtures.py:1069: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+  Plugin: asyncio, Hook: pytest_fixture_setup
+  OSError: could not get source code
+  For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+    result = ihook.pytest_fixture_setup(fixturedef=self, request=request)
+
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_authenticated_routes_are_not_rate_limited
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_coordinator_can_access_export
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_response_is_json_attachment
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_contains_required_top_level_keys
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_metadata_includes_timestamp_and_user
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_lecturer_email_is_not_in_export
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_deactivate_requires_superadmin
+  /home/on3/DENNIS/TABLESYS/backend/app/utils/audit_logger.py:82: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat() + "Z",
+
+tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_authenticated_routes_are_not_rate_limited
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_creates_university_and_user
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_coordinator_can_access_export
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_response_is_json_attachment
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_contains_required_top_level_keys
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_export_metadata_includes_timestamp_and_user
+tests/test_saas_workstreams.py::TestDataExportEndpoint::test_lecturer_email_is_not_in_export
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_deactivate_requires_superadmin
+  /home/on3/DENNIS/TABLESYS/backend/app/auth.py:26: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + expires_delta
+
+tests/test_saas_workstreams.py: 12 warnings
+  /home/on3/DENNIS/TABLESYS/backend/app/services/usage.py:24: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=occurred_at or datetime.utcnow(),
+
+tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_creates_university_and_user
+  /home/on3/DENNIS/TABLESYS/backend/app/services/usage_service.py:32: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_saas_workstreams.py::TestTenantOffboarding::test_purge_unauthenticated_returns_401
+  /home/on3/.pyenv/versions/3.12.3/lib/python3.12/site-packages/pytest_asyncio/plugin.py:818: DeprecationWarning: pytest-asyncio detected an unclosed event loop when tearing down the event_loop
+  fixture: <_UnixSelectorEventLoop running=False closed=False debug=False>
+  pytest-asyncio will close the event loop for you, but future versions of the
+  library will no longer do so. In order to ensure compatibility with future
+  versions, please make sure that:
+      1. Any custom "event_loop" fixture properly closes the loop after yielding it
+      2. The scopes of your custom "event_loop" fixtures do not overlap
+      3. Your code does not modify the event loop in async fixtures or tests
+  
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_marks_pending_as_verified
+FAILED tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_completes_all_six_stages
+FAILED tests/test_saas_workstreams.py::TestProvisioningService::test_provision_tenant_raises_on_duplicate_domain
+ERROR tests/test_saas_workstreams.py::TestPublicRateLimitMiddlewareIntegration::test_first_requests_to_public_route_succeed
+======= 3 failed, 26 passed, 3 skipped, 104 warnings, 1 error in 11.65s ========

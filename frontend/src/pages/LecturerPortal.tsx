@@ -49,6 +49,7 @@ import {
   LecturerWeekPanel,
   LecturerSearchPanel,
   LecturerCoursesPanel,
+  LecturerExamsPanel,
 } from '../components/lecturer/LecturerPortalPanels';
 import {
   DAY_ORDER,
@@ -59,14 +60,15 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const PORTAL_TABS: LecturerPortalTab[] = ['home', 'today', 'week', 'search', 'courses'];
+const PORTAL_TABS: LecturerPortalTab[] = ['home', 'today', 'week', 'search', 'courses', 'exams'];
 
 const TAB_META: Record<LecturerPortalTab, { label: string; icon: React.ReactElement }> = {
   home: { label: 'Home', icon: <DashboardIcon /> },
   today: { label: 'Today', icon: <CalendarTodayIcon /> },
   week: { label: 'Week', icon: <DateRangeIcon /> },
   search: { label: 'Search', icon: <SearchIcon /> },
-  courses: { label: 'Courses', icon: <AutoStoriesIcon /> },
+  courses: { label: 'Courses', icon: <WorkIcon /> },
+  exams: { label: 'Exams', icon: <AutoStoriesIcon /> },
 };
 
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -149,6 +151,8 @@ const LecturerPortal: React.FC = () => {
   const [dashboard, setDashboard] = useState<LecturerDashboardResponse | null>(null);
   const [sessions, setSessions] = useState<LecturerTimetableSlot[]>([]);
   const [courses, setCourses] = useState<LecturerCourse[]>([]);
+  const [examData, setExamData] = useState<{ period: any; slots: any[] } | null>(null);
+  const [examsLoading, setExamsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,16 +196,18 @@ const LecturerPortal: React.FC = () => {
       lecturerPortalApi.getTimetable(),
       lecturerPortalApi.getCourses(),
       lecturerPortalApi.getDashboard(),
+      lecturerPortalApi.getExamTimetable().catch(() => ({ period: null, slots: [] })),
     ]);
 
-    const [meResult, ttResult, courseResult, dashResult] = results;
+    const [meResult, ttResult, courseResult, dashResult, examResult] = results;
 
     if (meResult.status === 'fulfilled') setProfile(meResult.value);
     if (ttResult.status === 'fulfilled') setSessions(ttResult.value.sessions || []);
     if (courseResult.status === 'fulfilled') setCourses(courseResult.value || []);
     if (dashResult.status === 'fulfilled') setDashboard(dashResult.value);
+    if (examResult.status === 'fulfilled') setExamData(examResult.value);
 
-    const allFailed = results.every((r) => r.status === 'rejected');
+    const allFailed = results.slice(0, 4).every((r) => r.status === 'rejected');
     if (allFailed) {
       console.error('All lecturer API calls failed:', results);
       setError('Failed to load your timetable data. Please try refreshing.');
@@ -617,6 +623,14 @@ const LecturerPortal: React.FC = () => {
               exportTimetable={exportTimetable}
             />
           )}
+
+          {activeTab === 'exams' && (
+            <LecturerExamsPanel
+              loading={examsLoading}
+              exams={examData?.slots || []}
+              period={examData?.period}
+            />
+          )}
         </Stack>
       </Container>
 
@@ -675,8 +689,15 @@ const LecturerPortal: React.FC = () => {
             primaryColor={primaryColor}
           />
           <DockButton
-            active={activeTab === 'courses'}
+            active={activeTab === 'exams'}
             icon={<AutoStoriesIcon />}
+            label="Exams"
+            onClick={() => setActiveTab('exams')}
+            primaryColor={primaryColor}
+          />
+          <DockButton
+            active={activeTab === 'courses'}
+            icon={<WorkIcon />}
             label="Courses"
             onClick={() => setActiveTab('courses')}
             primaryColor={primaryColor}

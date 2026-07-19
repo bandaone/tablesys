@@ -4,8 +4,9 @@ from typing import List, Optional
 from ..database import get_db
 from ..schemas import Department, DepartmentCreate
 from ..models import Department as DepartmentModel, User
-from ..auth import get_current_user, get_current_active_coordinator
+from ..auth import get_current_user, get_current_active_school_operator
 from ..utils.sanitization import sanitize_input
+from ..utils.school_scope import ensure_user_can_manage_school, filter_department_query_for_user
 
 router = APIRouter(prefix="/api/v1/departments", tags=["departments"])
 
@@ -30,13 +31,14 @@ async def get_departments(
     db: Session = Depends(get_db)
 ):
     """Get all departments."""
-    departments = db.query(DepartmentModel).offset(skip).limit(limit).all()
+    query = filter_department_query_for_user(db.query(DepartmentModel), current_user)
+    departments = query.offset(skip).limit(limit).all()
     return departments
 
 @router.post("/", response_model=Department, status_code=status.HTTP_201_CREATED)
 async def create_department(
     department: DepartmentCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Create a new department. Coordinator only."""
@@ -46,9 +48,13 @@ async def create_department(
         raise HTTPException(status_code=422, detail=validation_error["detail"])
     
     # Check for duplicate name or code
+    ensure_user_can_manage_school(db, current_user, department.school_id)
     existing = db.query(DepartmentModel).filter(
-        (DepartmentModel.name == department.name) |
-        (DepartmentModel.code == department.code)
+        DepartmentModel.university_id == current_user.university_id,
+        (
+            (DepartmentModel.name == department.name) |
+            (DepartmentModel.code == department.code)
+        )
     ).first()
     
     if existing:
@@ -72,11 +78,14 @@ async def create_department(
 async def update_department(
     department_id: int,
     department: DepartmentCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Update a department. Coordinator only."""
-    db_department = db.query(DepartmentModel).filter(DepartmentModel.id == department_id).first()
+    db_department = db.query(DepartmentModel).filter(
+        DepartmentModel.id == department_id,
+        DepartmentModel.university_id == current_user.university_id,
+    ).first()
     
     if not db_department:
         raise HTTPException(status_code=404, detail="Department not found")
@@ -85,7 +94,9 @@ async def update_department(
     if validation_error:
         raise HTTPException(status_code=422, detail=validation_error["detail"])
 
+    ensure_user_can_manage_school(db, current_user, department.school_id or db_department.school_id)
     existing = db.query(DepartmentModel).filter(
+        DepartmentModel.university_id == current_user.university_id,
         (DepartmentModel.id != department_id) &
         ((DepartmentModel.name == department.name) |
         (DepartmentModel.code == department.code))
@@ -99,6 +110,7 @@ async def update_department(
 
     db_department.name = sanitize_input(department.name, max_length=200)
     db_department.code = sanitize_input(department.code, max_length=10)
+    db_department.school_id = department.school_id
     
     db.commit()
     db.refresh(db_department)
@@ -107,15 +119,19 @@ async def update_department(
 @router.delete("/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_department(
     department_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db)
 ):
     """Delete a department. Coordinator only."""
-    db_department = db.query(DepartmentModel).filter(DepartmentModel.id == department_id).first()
+    db_department = db.query(DepartmentModel).filter(
+        DepartmentModel.id == department_id,
+        DepartmentModel.university_id == current_user.university_id,
+    ).first()
     
     if not db_department:
         raise HTTPException(status_code=404, detail="Department not found")
     
+    ensure_user_can_manage_school(db, current_user, db_department.school_id)
     db.delete(db_department)
     db.commit()
     return None

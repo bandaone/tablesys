@@ -11,9 +11,12 @@ interface AuthContextType {
   logout: () => void;
   loading: boolean;
   isCoordinator: boolean;
+  isTenantAdmin: boolean;
+  isSchoolCoordinator: boolean;
+  isSchoolOperator: boolean;
   isHOD: boolean;
-  isAdmin: boolean;
   isSuperadmin: boolean;
+  isLabCoordinator: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,13 +48,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     try {
       setLoading(true);
+      
+      const currentUniId = localStorage.getItem('university_id');
+      const university_id = currentUniId ? parseInt(currentUniId, 10) : undefined;
+
       // 1. Clear existing session data first (Prevent Overwrapping)
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('superadmin_impersonator');
+      // Do NOT clear university_id yet - if login fails we still need it for branding
       setToken(null);
       setUser(null);
 
-      const response = await authAPI.login({ username, password });
+      const response = await authAPI.login({ username, password, university_id });
       const { access_token } = response;
 
       // 2. Fetch user details with NEW token
@@ -66,10 +75,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 3. Persist new session
       sessionStorage.setItem('token', access_token);
       sessionStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('university_id', String(userData.university_id));
 
       setToken(access_token);
       setUser(userData);
-      
+
       return userData;
     } catch (error) {
       console.error('Login error:', error);
@@ -89,6 +99,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
+      sessionStorage.removeItem('superadmin_impersonator');
+      // Do NOT clear university_id
       setToken(null);
       setUser(null);
 
@@ -99,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       sessionStorage.setItem('token', accessToken);
       sessionStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('university_id', String(userData.university_id));
       setToken(accessToken);
       setUser(userData);
       return userData;
@@ -113,18 +126,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    sessionStorage.removeItem('superadmin_impersonator');
+    localStorage.removeItem('university_id');
     setToken(null);
     setUser(null);
   };
 
   const safeRole = user?.role?.toUpperCase() || '';
-  const isCoordinator = safeRole === 'COORDINATOR';
-  const isHOD = safeRole === 'HOD' || safeRole === 'COORDINATOR';
-  const isAdmin = safeRole === 'ADMIN';
+  const isTenantAdmin = safeRole === 'TENANT_ADMIN';
+  const isSchoolCoordinator = safeRole === 'SCHOOL_COORDINATOR';
+  const isCoordinator = safeRole === 'COORDINATOR' || isSchoolCoordinator;
+  const isSchoolOperator = isCoordinator;
+  const isHOD = safeRole === 'HOD' || isSchoolOperator;
   const isSuperadmin = safeRole === 'SUPERADMIN';
+  const isLabCoordinator = safeRole === 'LAB_COORDINATOR' || (isCoordinator && !isSchoolCoordinator) || (isHOD && !isSchoolCoordinator);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, loginWithToken, logout, loading, isCoordinator, isHOD, isAdmin, isSuperadmin }}>
+    <AuthContext.Provider value={{ user, token, login, loginWithToken, logout, loading, isCoordinator, isTenantAdmin, isSchoolCoordinator, isSchoolOperator, isHOD, isSuperadmin, isLabCoordinator }}>
       {children}
     </AuthContext.Provider>
   );

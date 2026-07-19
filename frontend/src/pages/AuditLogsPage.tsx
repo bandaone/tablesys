@@ -1,43 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
-  Paper,
-  Typography,
+  Button,
+  CircularProgress,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Grid,
+  IconButton,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
-  TableRow,
   TablePagination,
+  TableRow,
   TextField,
-  MenuItem,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  IconButton,
-  Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  CircularProgress,
-  Alert,
-  Stack
+  Typography,
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Download as DownloadIcon,
+  Assessment as AssessmentIcon,
   Delete as DeleteIcon,
+  Download as DownloadIcon,
+  ExpandLess as ExpandLessIcon,
+  ExpandMore as ExpandMoreIcon,
   History as HistoryIcon,
-  Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import {
+  DataTableShell,
+  GlassFilterBar,
+  HeroButton,
+  HeroGhostButton,
+  InsightCard,
+  lightGlassFieldSx,
+  lightGlassSelectMenuProps,
+  StatusBadge,
+  TenantPageHero,
+} from '../components/tenant/TenantAdminUI';
+import { useBranding } from '../contexts/BrandingContext';
 
 interface AuditLog {
   id: number;
@@ -64,31 +70,29 @@ interface Statistics {
 }
 
 const AuditLogsPage: React.FC = () => {
+  const { branding } = useBranding();
+  const primaryColor = branding.primary_color || '#1976d2';
+  const secondaryColor = branding.secondary_color || '#9c27b0';
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  
-  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalLogs, setTotalLogs] = useState(0);
-  
-  // Filters
   const [actionFilter, setActionFilter] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
-  // Dialog
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [cleanupDays, setCleanupDays] = useState(90);
 
   useEffect(() => {
-    fetchLogs();
-    fetchStatistics();
+    void fetchLogs();
+    void fetchStatistics();
   }, [page, rowsPerPage, actionFilter, entityFilter, statusFilter, startDate, endDate]);
 
   const fetchLogs = async () => {
@@ -97,15 +101,14 @@ const AuditLogsPage: React.FC = () => {
     try {
       const params: any = {
         limit: rowsPerPage,
-        offset: page * rowsPerPage
+        offset: page * rowsPerPage,
       };
-      
       if (actionFilter) params.action = actionFilter;
       if (entityFilter) params.entity_type = entityFilter;
       if (statusFilter) params.status = statusFilter;
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      
+
       const response = await axios.get('/api/v1/audit/', { params });
       setLogs(response.data.logs);
       setTotalLogs(response.data.total);
@@ -121,7 +124,6 @@ const AuditLogsPage: React.FC = () => {
       const params: any = {};
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      
       const response = await axios.get('/api/v1/audit/statistics', { params });
       setStatistics(response.data);
     } catch (err) {
@@ -137,12 +139,12 @@ const AuditLogsPage: React.FC = () => {
       if (statusFilter) params.status = statusFilter;
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      
+
       const response = await axios.get('/api/v1/audit/export/json', {
         params,
-        responseType: 'blob'
+        responseType: 'blob',
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -150,7 +152,7 @@ const AuditLogsPage: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err: any) {
+    } catch {
       setError('Failed to export logs');
     }
   };
@@ -160,280 +162,200 @@ const AuditLogsPage: React.FC = () => {
       setError('Minimum retention period is 30 days');
       return;
     }
-    
     try {
       await axios.delete(`/api/v1/audit/cleanup?days=${cleanupDays}`);
       setCleanupDialogOpen(false);
-      fetchLogs();
-      fetchStatistics();
+      void fetchLogs();
+      void fetchStatistics();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to cleanup logs');
     }
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const toggleRowExpansion = (logId: number) => {
-    setExpandedRow(expandedRow === logId ? null : logId);
-  };
-
-  const getStatusColor = (status: string) => {
+  const getStatusTone = (status: string) => {
     switch (status.toLowerCase()) {
       case 'success':
-        return 'success';
+        return 'success' as const;
       case 'failure':
-        return 'error';
       case 'error':
-        return 'error';
+        return 'danger' as const;
       default:
-        return 'default';
+        return 'default' as const;
     }
   };
 
-  const getActionColor = (action: string) => {
+  const getActionTone = (action: string) => {
     switch (action.toUpperCase()) {
       case 'CREATE':
-        return 'success';
+        return 'success' as const;
       case 'UPDATE':
-        return 'info';
+        return 'info' as const;
       case 'DELETE':
-        return 'error';
-      case 'LOGIN':
-        return 'primary';
-      case 'LOGOUT':
-        return 'default';
+        return 'danger' as const;
       case 'GENERATE':
-        return 'secondary';
+        return 'warning' as const;
       default:
-        return 'default';
+        return 'default' as const;
     }
   };
 
   return (
     <Box>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <HistoryIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-          <Typography variant="h4">Audit Logs</Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleExport}
-          >
-            Export
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => setCleanupDialogOpen(true)}
-          >
-            Cleanup
-          </Button>
-        </Stack>
-      </Box>
+      <TenantPageHero
+        title="Audit Logs"
+        description="Trace changes, login activity, and operational events in a denser surface that still speaks the same blue-purple glass language as the rest of the tenant-admin suite."
+        eyebrow="Operations Trace"
+        icon={<HistoryIcon />}
+        primaryColor={primaryColor}
+        secondaryColor={secondaryColor}
+        meta={statistics ? <Typography variant="body2" sx={{ color: '#fff' }}>{statistics.total_logs} events tracked</Typography> : undefined}
+        actions={(
+          <>
+            <HeroButton startIcon={<DownloadIcon />} onClick={handleExport}>Export</HeroButton>
+            <HeroGhostButton startIcon={<DeleteIcon />} onClick={() => setCleanupDialogOpen(true)}>Cleanup</HeroGhostButton>
+          </>
+        )}
+      />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2.5 }} onClose={() => setError('')}>{error}</Alert>}
 
-      {/* Statistics Cards */}
       {statistics && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid container spacing={2.5} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AssessmentIcon color="primary" />
-                  <Typography variant="h6">{statistics.total_logs}</Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Total Logs
-                </Typography>
-              </CardContent>
-            </Card>
+            <InsightCard title="Total Logs" icon={<AssessmentIcon />} primaryColor={primaryColor} secondaryColor={secondaryColor}>
+              <Typography variant="h4" fontWeight={900}>{statistics.total_logs}</Typography>
+            </InsightCard>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <HistoryIcon color="success" />
-                  <Typography variant="h6">{statistics.unique_users}</Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Unique Users
-                </Typography>
-              </CardContent>
-            </Card>
+            <InsightCard title="Unique Users" icon={<HistoryIcon />} primaryColor={primaryColor} secondaryColor={secondaryColor}>
+              <Typography variant="h4" fontWeight={900}>{statistics.unique_users}</Typography>
+            </InsightCard>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  By Action
-                </Typography>
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ gap: 0.5 }}>
-                  {Object.entries(statistics.by_action).slice(0, 3).map(([action, count]) => (
-                    <Chip
-                      key={action}
-                      label={`${action}: ${count}`}
-                      size="small"
-                      color={getActionColor(action)}
-                    />
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
+            <InsightCard title="Action Mix" primaryColor={primaryColor} secondaryColor={secondaryColor}>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {Object.entries(statistics.by_action).slice(0, 3).map(([action, count]) => (
+                  <StatusBadge key={action} label={`${action}: ${count}`} tone={getActionTone(action)} subtle />
+                ))}
+              </Box>
+            </InsightCard>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  By Status
-                </Typography>
-                <Stack direction="row" spacing={0.5}>
-                  {Object.entries(statistics.by_status).map(([status, count]) => (
-                    <Chip
-                      key={status}
-                      label={`${status}: ${count}`}
-                      size="small"
-                      color={getStatusColor(status)}
-                    />
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
+            <InsightCard title="Status Mix" primaryColor={primaryColor} secondaryColor={secondaryColor}>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {Object.entries(statistics.by_status).map(([status, count]) => (
+                  <StatusBadge key={status} label={`${status}: ${count}`} tone={getStatusTone(status)} subtle />
+                ))}
+              </Box>
+            </InsightCard>
           </Grid>
         </Grid>
       )}
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Filters
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Action"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              size="small"
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="CREATE">CREATE</MenuItem>
-              <MenuItem value="UPDATE">UPDATE</MenuItem>
-              <MenuItem value="DELETE">DELETE</MenuItem>
-              <MenuItem value="LOGIN">LOGIN</MenuItem>
-              <MenuItem value="LOGOUT">LOGOUT</MenuItem>
-              <MenuItem value="GENERATE">GENERATE</MenuItem>
-            </TextField>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Entity Type"
-              value={entityFilter}
-              onChange={(e) => setEntityFilter(e.target.value)}
-              size="small"
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="course">Course</MenuItem>
-              <MenuItem value="timetable">Timetable</MenuItem>
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="lecturer">Lecturer</MenuItem>
-              <MenuItem value="room">Room</MenuItem>
-              <MenuItem value="department">Department</MenuItem>
-              <MenuItem value="group">Group</MenuItem>
-            </TextField>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              size="small"
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="success">Success</MenuItem>
-              <MenuItem value="failure">Failure</MenuItem>
-              <MenuItem value="error">Error</MenuItem>
-            </TextField>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              fullWidth
-              type="date"
-              label="Start Date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              fullWidth
-              type="date"
-              label="End Date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          </Grid>
-        </Grid>
-      </Paper>
+      <GlassFilterBar primaryColor={primaryColor} secondaryColor={secondaryColor}>
+        <TextField
+          select
+          fullWidth
+          label="Action"
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          size="small"
+          sx={lightGlassFieldSx}
+          SelectProps={{ MenuProps: lightGlassSelectMenuProps }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="CREATE">CREATE</MenuItem>
+          <MenuItem value="UPDATE">UPDATE</MenuItem>
+          <MenuItem value="DELETE">DELETE</MenuItem>
+          <MenuItem value="LOGIN">LOGIN</MenuItem>
+          <MenuItem value="LOGOUT">LOGOUT</MenuItem>
+          <MenuItem value="GENERATE">GENERATE</MenuItem>
+        </TextField>
+        <TextField
+          select
+          fullWidth
+          label="Entity Type"
+          value={entityFilter}
+          onChange={(e) => setEntityFilter(e.target.value)}
+          size="small"
+          sx={lightGlassFieldSx}
+          SelectProps={{ MenuProps: lightGlassSelectMenuProps }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="course">Course</MenuItem>
+          <MenuItem value="timetable">Timetable</MenuItem>
+          <MenuItem value="user">User</MenuItem>
+          <MenuItem value="lecturer">Lecturer</MenuItem>
+          <MenuItem value="room">Room</MenuItem>
+          <MenuItem value="department">Department</MenuItem>
+          <MenuItem value="group">Group</MenuItem>
+        </TextField>
+        <TextField
+          select
+          fullWidth
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          size="small"
+          sx={lightGlassFieldSx}
+          SelectProps={{ MenuProps: lightGlassSelectMenuProps }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="success">Success</MenuItem>
+          <MenuItem value="failure">Failure</MenuItem>
+          <MenuItem value="error">Error</MenuItem>
+        </TextField>
+        <TextField
+          fullWidth
+          type="date"
+          label="Start Date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={lightGlassFieldSx}
+        />
+        <TextField
+          fullWidth
+          type="date"
+          label="End Date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={lightGlassFieldSx}
+        />
+      </GlassFilterBar>
 
-      {/* Logs Table */}
-      <TableContainer component={Paper}>
+      <DataTableShell
+        title="Audit Event Stream"
+        description="Expand a row for request context, user agent, and change payload."
+        primaryColor={primaryColor}
+        secondaryColor={secondaryColor}
+      >
         <Table>
           <TableHead>
-            <TableRow>
-              <TableCell width={50}></TableCell>
-              <TableCell>Timestamp</TableCell>
-              <TableCell>User</TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>Entity Type</TableCell>
-              <TableCell>Entity</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>IP Address</TableCell>
+            <TableRow sx={{ bgcolor: 'rgba(15,23,42,0.03)' }}>
+              <TableCell width={56} />
+              <TableCell sx={{ fontWeight: 800 }}>Timestamp</TableCell>
+              <TableCell sx={{ fontWeight: 800 }}>User</TableCell>
+              <TableCell sx={{ fontWeight: 800 }}>Action</TableCell>
+              <TableCell sx={{ fontWeight: 800 }}>Entity</TableCell>
+              <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 800 }}>IP Address</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : logs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
-                  No audit logs found
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                  <Typography color="text.secondary">No audit logs found.</Typography>
                 </TableCell>
               </TableRow>
             ) : (
@@ -441,62 +363,35 @@ const AuditLogsPage: React.FC = () => {
                 <React.Fragment key={log.id}>
                   <TableRow hover>
                     <TableCell>
-                      <IconButton size="small" onClick={() => toggleRowExpansion(log.id)}>
+                      <IconButton size="small" onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}>
                         {expandedRow === log.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
                     </TableCell>
-                    <TableCell>
-                      {dayjs(log.timestamp).format('YYYY-MM-DD HH:mm:ss')}
-                    </TableCell>
+                    <TableCell>{dayjs(log.timestamp).format('YYYY-MM-DD HH:mm:ss')}</TableCell>
                     <TableCell>{log.user_email}</TableCell>
-                    <TableCell>
-                      <Chip label={log.action} size="small" color={getActionColor(log.action)} />
-                    </TableCell>
-                    <TableCell>{log.entity_type}</TableCell>
-                    <TableCell>
-                      {log.entity_name || `ID: ${log.entity_id || 'N/A'}`}
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={log.status} size="small" color={getStatusColor(log.status)} />
-                    </TableCell>
+                    <TableCell><StatusBadge label={log.action} tone={getActionTone(log.action)} subtle /></TableCell>
+                    <TableCell>{log.entity_name || `${log.entity_type} #${log.entity_id || 'N/A'}`}</TableCell>
+                    <TableCell><StatusBadge label={log.status} tone={getStatusTone(log.status)} subtle /></TableCell>
                     <TableCell>{log.ip_address || 'N/A'}</TableCell>
                   </TableRow>
-                  
                   <TableRow>
-                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                    <TableCell colSpan={7} sx={{ p: 0, borderBottom: expandedRow === log.id ? undefined : 'none' }}>
                       <Collapse in={expandedRow === log.id} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 2 }}>
-                          <Typography variant="h6" gutterBottom>
-                            Details
-                          </Typography>
-                          <Grid container spacing={2}>
-                            {log.user_agent && (
-                              <Grid item xs={12}>
-                                <Typography variant="body2" color="text.secondary">
-                                  User Agent: {log.user_agent}
-                                </Typography>
-                              </Grid>
-                            )}
-                            {log.error_message && (
-                              <Grid item xs={12}>
-                                <Alert severity="error">
-                                  {log.error_message}
-                                </Alert>
-                              </Grid>
-                            )}
-                            {log.changes && (
-                              <Grid item xs={12}>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                  Changes:
-                                </Typography>
-                                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                                  <pre style={{ margin: 0, fontSize: '0.85rem', overflow: 'auto' }}>
-                                    {JSON.stringify(log.changes, null, 2)}
-                                  </pre>
-                                </Paper>
-                              </Grid>
-                            )}
-                          </Grid>
+                        <Box sx={{ p: 2.5, bgcolor: 'rgba(15,23,42,0.02)' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5 }}>Details</Typography>
+                          {log.user_agent && (
+                            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                              User Agent: {log.user_agent}
+                            </Typography>
+                          )}
+                          {log.error_message && <Alert severity="error" sx={{ mb: 1.5 }}>{log.error_message}</Alert>}
+                          {log.changes && (
+                            <Box sx={{ p: 2, borderRadius: 3, bgcolor: '#0f172a', color: '#e2e8f0', overflowX: 'auto' }}>
+                              <pre style={{ margin: 0, fontSize: '0.82rem' }}>
+                                {JSON.stringify(log.changes, null, 2)}
+                              </pre>
+                            </Box>
+                          )}
                         </Box>
                       </Collapse>
                     </TableCell>
@@ -512,31 +407,32 @@ const AuditLogsPage: React.FC = () => {
           count={totalLogs}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
+          onPageChange={(_, nextPage) => setPage(nextPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
         />
-      </TableContainer>
+      </DataTableShell>
 
-      {/* Cleanup Dialog */}
-      <Dialog open={cleanupDialogOpen} onClose={() => setCleanupDialogOpen(false)}>
-        <DialogTitle>Cleanup Old Audit Logs</DialogTitle>
+      <Dialog open={cleanupDialogOpen} onClose={() => setCleanupDialogOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Cleanup Audit Logs</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            Delete audit logs older than the specified number of days. Minimum retention period is 30 days.
+            Delete audit logs older than the selected retention period.
           </DialogContentText>
           <TextField
             fullWidth
             type="number"
-            label="Days to keep"
+            label="Retention Period (days)"
             value={cleanupDays}
-            onChange={(e) => setCleanupDays(parseInt(e.target.value))}
-            inputProps={{ min: 30 }}
+            onChange={(e) => setCleanupDays(Number(e.target.value))}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCleanupDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleCleanup} color="error" variant="contained">
-            Delete
+          <Button color="error" variant="contained" onClick={() => { void handleCleanup(); }}>
+            Delete Old Logs
           </Button>
         </DialogActions>
       </Dialog>

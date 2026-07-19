@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Button, Chip, IconButton, Drawer, Grid, CircularProgress,
+  TableHead, TableRow, Button, Chip, IconButton, Drawer, Grid, CircularProgress, LinearProgress,
   Alert, Tooltip, Stack, Divider, TextField, MenuItem, Switch, FormControlLabel,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
   InputAdornment, TablePagination, Tabs, Tab, List, ListItem,
@@ -16,12 +16,17 @@ import {
   Search as SearchIcon, Delete as DeleteIcon,
   Warning as WarningIcon, Visibility as VisibilityIcon,
   VpnKey as VpnKeyIcon, ContentCopy as ContentCopyIcon,
-  CheckCircleOutline as CopiedIcon
+  CheckCircleOutline as CopiedIcon,
+  MonitorHeart as MonitorHeartIcon,
+  Insights as InsightsIcon,
+  Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { superadminAPI } from '../api';
 import { sisAPI, SisApiKey, SisApiKeyCreated } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import SystemMonitorPage from './SystemMonitorPage';
+import AlertCenter from '../components/AlertCenter';
 
 type TenantRegistrationForm = {
   name: string;
@@ -84,9 +89,44 @@ export default function SuperAdminPage() {
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<any>(null);
+  const [tenantObservability, setTenantObservability] = useState<any>(null);
+  const [tenantObservabilityLoading, setTenantObservabilityLoading] = useState(false);
+  const [performanceOverview, setPerformanceOverview] = useState<any>(null);
+  const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [performanceWindowDays, setPerformanceWindowDays] = useState(30);
+  const [businessMetrics, setBusinessMetrics] = useState<any>(null);
+  const [businessMetricsLoading, setBusinessMetricsLoading] = useState(false);
+  const [businessMetricsWindowDays, setBusinessMetricsWindowDays] = useState(30);
+  const [operationalMetrics, setOperationalMetrics] = useState<any>(null);
+  const [operationalMetricsLoading, setOperationalMetricsLoading] = useState(false);
+  const [operationalMetricsWindowDays, setOperationalMetricsWindowDays] = useState(30);
 
   // ── tab state ────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState(0);
+
+  // ── Dashboard Metrics Tab State ──────────────────────────────────────────
+  const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
+  const [dashboardMetricsLoading, setDashboardMetricsLoading] = useState(false);
+  const [dashboardMetricsTenantId, setDashboardMetricsTenantId] = useState<number | ''>('');
+
+  const loadDashboardMetrics = async (tenantId: number) => {
+    if (!tenantId) return;
+    try {
+      setDashboardMetricsLoading(true);
+      const data = await superadminAPI.getTenantDashboardMetrics(tenantId);
+      setDashboardMetrics(data);
+    } catch (err) {
+      console.error('Failed to load dashboard metrics', err);
+    } finally {
+      setDashboardMetricsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 6 && dashboardMetricsTenantId) {
+      loadDashboardMetrics(dashboardMetricsTenantId as number);
+    }
+  }, [activeTab, dashboardMetricsTenantId]);
 
   // ── Agent Gamma: SIS API key state ───────────────────────────────────────
   const [sisKeys, setSisKeys] = useState<SisApiKey[]>([]);
@@ -145,9 +185,21 @@ export default function SuperAdminPage() {
     setCopySnack(true);
   };
 
-  const viewTenantDetails = (tenant: any) => {
-    setSelectedTenant(tenant);
+  const viewTenantDetails = async (tenant: any) => {
+    const resolvedTenant = universities.find((u) => u.id === (tenant.id ?? tenant.tenant_id)) || tenant;
+    setSelectedTenant(resolvedTenant);
     setDetailsOpen(true);
+    setTenantObservability(null);
+    try {
+      setTenantObservabilityLoading(true);
+      const tenantId = resolvedTenant.id ?? resolvedTenant.tenant_id;
+      const observability = await superadminAPI.getTenantObservability(tenantId);
+      setTenantObservability(observability);
+    } catch {
+      setTenantObservability(null);
+    } finally {
+      setTenantObservabilityLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -159,6 +211,27 @@ export default function SuperAdminPage() {
   useEffect(() => {
     if (activeTab === 1) loadSisKeys();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 2) return;
+    loadPerformanceOverview(performanceWindowDays);
+    const interval = setInterval(() => loadPerformanceOverview(performanceWindowDays), 30000);
+    return () => clearInterval(interval);
+  }, [activeTab, performanceWindowDays]);
+
+  useEffect(() => {
+    if (activeTab !== 3) return;
+    loadBusinessMetricsOverview(businessMetricsWindowDays);
+    const interval = setInterval(() => loadBusinessMetricsOverview(businessMetricsWindowDays), 45000);
+    return () => clearInterval(interval);
+  }, [activeTab, businessMetricsWindowDays]);
+
+  useEffect(() => {
+    if (activeTab !== 4) return;
+    loadOperationalMetricsOverview(operationalMetricsWindowDays);
+    const interval = setInterval(() => loadOperationalMetricsOverview(operationalMetricsWindowDays), 45000);
+    return () => clearInterval(interval);
+  }, [activeTab, operationalMetricsWindowDays]);
 
   useEffect(() => {
     const timer = setTimeout(loadData, 350);
@@ -186,6 +259,42 @@ export default function SuperAdminPage() {
       setAnalytics(analyticsRes);
     } catch {
       // silent
+    }
+  };
+
+  const loadPerformanceOverview = async (windowDays: number) => {
+    try {
+      setPerformanceLoading(true);
+      const res = await superadminAPI.getPerformanceOverview(windowDays);
+      setPerformanceOverview(res);
+    } catch {
+      setError('Failed to load tenant performance analytics.');
+    } finally {
+      setPerformanceLoading(false);
+    }
+  };
+
+  const loadBusinessMetricsOverview = async (windowDays: number) => {
+    try {
+      setBusinessMetricsLoading(true);
+      const res = await superadminAPI.getBusinessMetricsOverview(windowDays);
+      setBusinessMetrics(res);
+    } catch {
+      setError('Failed to load business metrics analytics.');
+    } finally {
+      setBusinessMetricsLoading(false);
+    }
+  };
+
+  const loadOperationalMetricsOverview = async (windowDays: number) => {
+    try {
+      setOperationalMetricsLoading(true);
+      const res = await superadminAPI.getOperationalMetricsOverview(windowDays);
+      setOperationalMetrics(res);
+    } catch {
+      setError('Failed to load operational metrics analytics.');
+    } finally {
+      setOperationalMetricsLoading(false);
     }
   };
 
@@ -274,6 +383,33 @@ export default function SuperAdminPage() {
     }
   };
 
+  const formatDurationMinutes = (value?: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    if (value < 60) return `${value.toFixed(0)} min`;
+    return `${(value / 60).toFixed(1)} hrs`;
+  };
+
+  const formatPercent = (value?: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    return `${value.toFixed(1)}%`;
+  };
+
+  const formatBytes = (value?: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = value;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    return `${size.toFixed(size >= 100 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  };
+
+  const currentTenantPerformance = selectedTenant
+    ? performanceOverview?.tenants?.find((tenant: any) => tenant.tenant_id === selectedTenant.id)
+    : null;
+
   if (loading && !telemetry) {
     return (
       <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -296,6 +432,7 @@ export default function SuperAdminPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center">
+          <AlertCenter />
           <Chip
             icon={<SecurityIcon sx={{ fontSize: 16 }} />}
             label="Super Admin"
@@ -324,6 +461,41 @@ export default function SuperAdminPage() {
             id="sa-tab-1"
             aria-controls="sa-panel-1"
             icon={<VpnKeyIcon sx={{ fontSize: 16 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Tenant Performance"
+            id="sa-tab-2"
+            aria-controls="sa-panel-2"
+            icon={<BoltIcon sx={{ fontSize: 16 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Business Metrics"
+            id="sa-tab-3"
+            aria-controls="sa-panel-3"
+            icon={<InsightsIcon sx={{ fontSize: 16 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Operational Metrics"
+            id="sa-tab-4"
+            aria-controls="sa-panel-4"
+            icon={<StorageIcon sx={{ fontSize: 16 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="System Monitor"
+            id="sa-tab-5"
+            aria-controls="sa-panel-5"
+            icon={<MonitorHeartIcon sx={{ fontSize: 16 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            label="Dashboard Metrics"
+            id="sa-tab-6"
+            aria-controls="sa-panel-6"
+            icon={<DashboardIcon sx={{ fontSize: 16 }} />}
             iconPosition="start"
           />
         </Tabs>
@@ -757,6 +929,871 @@ export default function SuperAdminPage() {
         </Grid>
       </Box> {/* end tabpanel 1 */}
 
+      <Box role="tabpanel" id="sa-panel-2" hidden={activeTab !== 2}>
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>Tenant Performance & SLA</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Platform-owner view of per-tenant response times, error rates, and timetable generation health.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Window"
+                value={performanceWindowDays}
+                onChange={(e) => setPerformanceWindowDays(Number(e.target.value))}
+                sx={{ minWidth: 140 }}
+              >
+                {[7, 14, 30, 60, 90].map((days) => (
+                  <MenuItem key={days} value={days}>Last {days} days</MenuItem>
+                ))}
+              </TextField>
+              <Button variant="outlined" size="small" onClick={() => loadPerformanceOverview(performanceWindowDays)}>
+                Refresh
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {performanceLoading && !performanceOverview ? (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </Box>
+        ) : performanceOverview && (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Active Tenants', value: performanceOverview.summary.active_tenants, helper: `of ${performanceOverview.summary.tenant_count} total`, color: '#1976d2' },
+                { label: 'Meeting SLA', value: performanceOverview.summary.tenants_meeting_sla, helper: `${performanceOverview.summary.at_risk_tenants} at risk`, color: '#2e7d32' },
+                { label: 'Platform Avg API Time', value: `${performanceOverview.summary.platform_avg_response_ms.toFixed(0)} ms`, helper: `${performanceWindowDays}-day window`, color: '#ed6c02' },
+                { label: 'Platform Error Rate', value: `${performanceOverview.summary.platform_error_rate_percent.toFixed(2)}%`, helper: 'client + server', color: '#d32f2f' },
+                { label: 'Generation Success', value: `${performanceOverview.summary.platform_generation_success_rate_percent.toFixed(1)}%`, helper: 'all tenant runs', color: '#6a1b9a' },
+              ].map((item) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={item.label}>
+                  <Paper variant="outlined" sx={{ p: 2.25, height: '100%' }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {item.label}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={800} sx={{ mt: 0.75, color: item.color }}>
+                      {item.value}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {item.helper}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={7}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    Tenants Requiring Attention
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {performanceOverview.tenants.filter((tenant: any) => tenant.health_status !== 'healthy' && tenant.health_status !== 'quiet').slice(0, 5).map((tenant: any) => (
+                      <Paper key={tenant.tenant_id} variant="outlined" sx={{ p: 1.75, borderColor: tenant.health_status === 'critical' ? 'error.light' : 'warning.light' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {tenant.plan_tier} plan • {tenant.avg_response_ms.toFixed(0)} ms avg • {tenant.error_rate_percent.toFixed(2)}% errors
+                            </Typography>
+                          </Box>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip
+                              label={tenant.health_status}
+                              size="small"
+                              color={tenant.health_status === 'critical' ? 'error' : 'warning'}
+                              variant="outlined"
+                              sx={{ textTransform: 'capitalize' }}
+                            />
+                            <Button size="small" onClick={() => viewTenantDetails({
+                              id: tenant.tenant_id,
+                              name: tenant.tenant_name,
+                              domain: tenant.domain,
+                              plan_tier: tenant.plan_tier,
+                              user_count: 0,
+                              max_users: 0,
+                              timezone: '',
+                              is_active: true,
+                            })}>
+                              Open
+                            </Button>
+                          </Stack>
+                        </Box>
+                      </Paper>
+                    ))}
+                    {performanceOverview.tenants.filter((tenant: any) => tenant.health_status !== 'healthy' && tenant.health_status !== 'quiet').length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No tenants are currently breaching your warning thresholds.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} md={5}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    Top Failure Endpoints
+                  </Typography>
+                  <Stack spacing={1.25}>
+                    {performanceOverview.top_failure_endpoints.map((item: any) => (
+                      <Box key={item.endpoint}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, gap: 2 }}>
+                          <Typography variant="body2" fontWeight={600} sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                            {item.endpoint}
+                          </Typography>
+                          <Chip label={`${item.count}`} size="small" color="error" variant="outlined" />
+                        </Box>
+                        <LinearProgress variant="determinate" value={Math.min(100, item.count * 5)} color="error" sx={{ height: 7, borderRadius: 999 }} />
+                      </Box>
+                    ))}
+                    {performanceOverview.top_failure_endpoints.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No API failure hotspots captured in this window.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+              <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" fontWeight={700}>Per-Tenant Performance Matrix</Typography>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Health</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>API Avg</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Error Rate</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>SLA Compliance</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Generation Success</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Generation Avg</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Fallbacks</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {performanceOverview.tenants.map((tenant: any) => (
+                      <TableRow key={tenant.tenant_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {tenant.domain} • {tenant.plan_tier}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={tenant.health_status}
+                            size="small"
+                            color={tenant.health_status === 'critical' ? 'error' : tenant.health_status === 'warning' ? 'warning' : tenant.health_status === 'healthy' ? 'success' : 'default'}
+                            variant="outlined"
+                            sx={{ textTransform: 'capitalize' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{tenant.avg_response_ms.toFixed(0)} ms</Typography>
+                          <Typography variant="caption" color="text.secondary">target {tenant.sla_target_ms} ms</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{tenant.error_rate_percent.toFixed(2)}%</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {tenant.server_errors} server / {tenant.client_errors} client
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{tenant.sla_compliance_percent.toFixed(1)}%</Typography>
+                          <Typography variant="caption" color="text.secondary">{tenant.sla_breaches} breaches</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {tenant.generation_success_rate_percent === null ? 'N/A' : `${tenant.generation_success_rate_percent.toFixed(1)}%`}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">{tenant.generation_attempts} runs</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {tenant.generation_avg_duration_ms === null ? 'N/A' : `${(tenant.generation_avg_duration_ms / 1000).toFixed(1)} sec`}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{tenant.generation_fallback_runs}</Typography>
+                          <Typography variant="caption" color="text.secondary">{tenant.generation_timeout_runs} timeout-like</Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button size="small" onClick={() => viewTenantDetails({
+                            id: tenant.tenant_id,
+                            name: tenant.tenant_name,
+                            domain: tenant.domain,
+                            plan_tier: tenant.plan_tier,
+                            user_count: 0,
+                            max_users: 0,
+                            timezone: '',
+                            is_active: true,
+                          })}>
+                            Inspect
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </>
+        )}
+      </Box>
+
+      <Box role="tabpanel" id="sa-panel-3" hidden={activeTab !== 3}>
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>Business Metrics</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Tenant adoption, engagement patterns, and plan-tier usage correlation for platform owners.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Window"
+                value={businessMetricsWindowDays}
+                onChange={(e) => setBusinessMetricsWindowDays(Number(e.target.value))}
+                sx={{ minWidth: 140 }}
+              >
+                {[7, 14, 30, 60, 90].map((days) => (
+                  <MenuItem key={days} value={days}>Last {days} days</MenuItem>
+                ))}
+              </TextField>
+              <Button variant="outlined" size="small" onClick={() => loadBusinessMetricsOverview(businessMetricsWindowDays)}>
+                Refresh
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {businessMetricsLoading && !businessMetrics ? (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </Box>
+        ) : businessMetrics && (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Active Tenants', value: businessMetrics.summary.active_tenants, helper: `of ${businessMetrics.summary.tenant_count} total`, color: '#1976d2' },
+                { label: 'Adopted Features', value: businessMetrics.summary.adopted_feature_count, helper: 'tracked modules in use', color: '#2e7d32' },
+                { label: 'Avg Features / Tenant', value: businessMetrics.summary.avg_features_per_tenant.toFixed(1), helper: `${businessMetricsWindowDays}-day window`, color: '#ed6c02' },
+                { label: 'Avg Logins / Tenant', value: businessMetrics.summary.avg_logins_per_tenant.toFixed(1), helper: businessMetrics.summary.login_data_available ? 'audit-backed' : 'login telemetry unavailable', color: '#6a1b9a' },
+                { label: 'Avg Session Duration', value: formatDurationMinutes(businessMetrics.summary.avg_session_duration_minutes), helper: businessMetrics.summary.login_data_available ? 'matched login/logout sessions' : 'not enough login events', color: '#00838f' },
+              ].map((item) => (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={item.label}>
+                  <Paper variant="outlined" sx={{ p: 2.25, height: '100%' }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {item.label}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={800} sx={{ mt: 0.75, color: item.color }}>
+                      {item.value}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {item.helper}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={7}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    Feature Adoption
+                  </Typography>
+                  <Stack spacing={1.75}>
+                    {businessMetrics.feature_adoption.map((feature: any) => (
+                      <Box key={feature.feature_key}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 0.75 }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={700}>{feature.feature_name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {feature.tenant_count} tenants • {feature.usage_events.toLocaleString()} tracked events
+                              {feature.top_tenants.length > 0 ? ` • Top: ${feature.top_tenants.map((tenant: any) => tenant.tenant_name).join(', ')}` : ''}
+                            </Typography>
+                          </Box>
+                          <Chip label={`${feature.adoption_percent.toFixed(0)}%`} size="small" color="primary" variant="outlined" />
+                        </Box>
+                        <LinearProgress variant="determinate" value={Math.min(100, feature.adoption_percent)} sx={{ height: 8, borderRadius: 999 }} />
+                      </Box>
+                    ))}
+                    {businessMetrics.feature_adoption.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No feature adoption telemetry has been captured in this reporting window yet.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} md={5}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    Plan Tier Correlation
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {businessMetrics.plan_correlation.map((plan: any) => (
+                      <Paper key={plan.plan_tier} variant="outlined" sx={{ p: 1.75 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Chip
+                            label={plan.plan_tier}
+                            size="small"
+                            color={getTierColor(plan.plan_tier) as any}
+                            variant="outlined"
+                            sx={{ fontWeight: 600, textTransform: 'capitalize' }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {plan.tenant_count} tenants
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Avg features: <strong>{plan.avg_features_adopted.toFixed(1)}</strong> • Avg requests: <strong>{plan.avg_api_requests.toFixed(0)}</strong>
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Avg logins: <strong>{plan.avg_login_count.toFixed(1)}</strong> • Avg session: <strong>{formatDurationMinutes(plan.avg_session_duration_minutes)}</strong>
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Most adopted feature: {plan.most_adopted_feature || 'N/A'} • Avg generation runs: {plan.avg_generation_runs.toFixed(1)}
+                        </Typography>
+                      </Paper>
+                    ))}
+                    {businessMetrics.plan_correlation.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        No plan-tier usage correlation is available yet.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Paper variant="outlined" sx={{ overflow: 'hidden', mb: 3 }}>
+              <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" fontWeight={700}>Tenant Feature Matrix</Typography>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Plan</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Features Used</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Top Feature</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Feature Events</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {businessMetrics.tenant_feature_matrix.map((tenant: any) => (
+                      <TableRow key={tenant.tenant_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={tenant.plan_tier}
+                            size="small"
+                            color={getTierColor(tenant.plan_tier) as any}
+                            variant="outlined"
+                            sx={{ textTransform: 'capitalize' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{tenant.feature_count}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {tenant.features_used.length > 0 ? tenant.features_used.join(', ') : 'No tracked features yet'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{tenant.top_feature || 'N/A'}</TableCell>
+                        <TableCell>{tenant.total_feature_events.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+              <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" fontWeight={700}>Engagement Patterns</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Session duration is derived from matched login/logout audit events when available.
+                </Typography>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Logins</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Active Days</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Avg Logins / Week</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Avg Session</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>API Requests</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Requests / Active Day</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Peak Hour (UTC)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {businessMetrics.engagement.map((tenant: any) => (
+                      <TableRow key={tenant.tenant_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{tenant.plan_tier}</Typography>
+                        </TableCell>
+                        <TableCell>{tenant.login_count}</TableCell>
+                        <TableCell>{tenant.active_days}</TableCell>
+                        <TableCell>{tenant.avg_logins_per_week.toFixed(1)}</TableCell>
+                        <TableCell>{formatDurationMinutes(tenant.avg_session_duration_minutes)}</TableCell>
+                        <TableCell>{tenant.api_requests.toLocaleString()}</TableCell>
+                        <TableCell>{tenant.avg_api_requests_per_active_day.toFixed(1)}</TableCell>
+                        <TableCell>{tenant.peak_hour_utc === null || tenant.peak_hour_utc === undefined ? 'N/A' : `${tenant.peak_hour_utc.toString().padStart(2, '0')}:00`}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </>
+        )}
+      </Box>
+
+      <Box role="tabpanel" id="sa-panel-4" hidden={activeTab !== 4}>
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>Operational Metrics</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Solver reliability, conflict-free outcomes, storage growth, and tenant rate-limit pressure.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Window"
+                value={operationalMetricsWindowDays}
+                onChange={(e) => setOperationalMetricsWindowDays(Number(e.target.value))}
+                sx={{ minWidth: 140 }}
+              >
+                {[7, 14, 30, 60, 90].map((days) => (
+                  <MenuItem key={days} value={days}>Last {days} days</MenuItem>
+                ))}
+              </TextField>
+              <Button variant="outlined" size="small" onClick={() => loadOperationalMetricsOverview(operationalMetricsWindowDays)}>
+                Refresh
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {operationalMetricsLoading && !operationalMetrics ? (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </Box>
+        ) : operationalMetrics && (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Solver Runs', value: operationalMetrics.summary.total_solver_runs.toLocaleString(), helper: `${operationalMetrics.summary.active_tenants} active tenants`, color: '#1976d2' },
+                { label: 'Fallback Frequency', value: formatPercent(operationalMetrics.summary.avg_fallback_rate_percent), helper: 'share of solver runs using fallback', color: '#ed6c02' },
+                { label: 'Timeout Frequency', value: formatPercent(operationalMetrics.summary.avg_timeout_rate_percent), helper: 'timeout-like solver outcomes', color: '#d32f2f' },
+                { label: 'Conflict-Free Success', value: formatPercent(operationalMetrics.summary.conflict_free_rate_percent), helper: 'successful runs with zero detected conflicts', color: '#2e7d32' },
+                { label: 'Storage Added', value: formatBytes(operationalMetrics.summary.storage_growth_bytes_window), helper: `${operationalMetricsWindowDays}-day tracked artifact growth`, color: '#6a1b9a' },
+                { label: 'Rate Limit Hits', value: operationalMetrics.summary.rate_limit_hits.toLocaleString(), helper: 'audit-observed tenant lockouts', color: '#00838f' },
+              ].map((item) => (
+                <Grid item xs={12} sm={6} md={4} lg={2} key={item.label}>
+                  <Paper variant="outlined" sx={{ p: 2.25, height: '100%' }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {item.label}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={800} sx={{ mt: 0.75, color: item.color }}>
+                      {item.value}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {item.helper}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} lg={8}>
+                <Paper variant="outlined" sx={{ overflow: 'hidden', height: '100%' }}>
+                  <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="subtitle1" fontWeight={700}>Solver Timeout / Fallback Frequency</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Frequency view only, to avoid repeating the raw generation counts already shown in Tenant Performance.
+                    </Typography>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Runs</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Fallbacks</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Fallback Rate</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Timeouts</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Timeout Rate</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {operationalMetrics.solver_reliability.map((tenant: any) => (
+                          <TableRow key={tenant.tenant_id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {tenant.domain} • {tenant.plan_tier}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{tenant.attempts}</TableCell>
+                            <TableCell>{tenant.fallback_runs}</TableCell>
+                            <TableCell>{formatPercent(tenant.fallback_rate_percent)}</TableCell>
+                            <TableCell>{tenant.timeout_runs}</TableCell>
+                            <TableCell>{formatPercent(tenant.timeout_rate_percent)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} lg={4}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    API Rate Limit Hits
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {operationalMetrics.rate_limits.filter((tenant: any) => tenant.hit_count > 0).slice(0, 8).map((tenant: any) => (
+                      <Paper key={tenant.tenant_id} variant="outlined" sx={{ p: 1.75 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                          <Chip label={`${tenant.hit_count} hits`} size="small" color="warning" variant="outlined" />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" component="div">
+                          {tenant.distinct_user_count} users affected
+                          {tenant.last_hit_at ? ` • Last hit ${new Date(tenant.last_hit_at).toLocaleString()}` : ''}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" component="div">
+                          {tenant.top_endpoints.length > 0
+                            ? `Top endpoints: ${tenant.top_endpoints.map((endpoint: any) => `${endpoint.endpoint} (${endpoint.count})`).join(', ')}`
+                            : 'No endpoint detail available'}
+                        </Typography>
+                      </Paper>
+                    ))}
+                    {operationalMetrics.rate_limits.every((tenant: any) => tenant.hit_count === 0) && (
+                      <Typography variant="body2" color="text.secondary">
+                        No tenant-attributed rate-limit blocks were found in the selected window.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={5}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+                    Storage Growth Trend
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {operationalMetrics.storage_growth.map((bucket: any) => {
+                      const maxGrowth = Math.max(...operationalMetrics.storage_growth.map((item: any) => item.total_bytes_added), 1);
+                      const ratio = maxGrowth > 0 ? (bucket.total_bytes_added / maxGrowth) * 100 : 0;
+                      return (
+                        <Box key={bucket.label}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, gap: 2 }}>
+                            <Typography variant="body2" fontWeight={600}>{bucket.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatBytes(bucket.total_bytes_added)}
+                            </Typography>
+                          </Box>
+                          <LinearProgress variant="determinate" value={Math.max(ratio, bucket.total_bytes_added > 0 ? 4 : 0)} sx={{ height: 8, borderRadius: 999 }} />
+                          <Typography variant="caption" color="text.secondary">
+                            {bucket.top_tenant_name ? `Largest contributor: ${bucket.top_tenant_name} (${formatBytes(bucket.top_tenant_bytes)})` : 'No tracked growth in this bucket'}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} md={7}>
+                <Paper variant="outlined" sx={{ overflow: 'hidden', height: '100%' }}>
+                  <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="subtitle1" fontWeight={700}>Tenant Storage Growth</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Estimated from operational artifacts like usage telemetry, versions, and generation metadata.
+                    </Typography>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Current Footprint</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Added This Window</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Previous Window</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Growth Shift</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {operationalMetrics.tenant_storage.map((tenant: any) => (
+                          <TableRow key={tenant.tenant_id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">{tenant.plan_tier}</Typography>
+                            </TableCell>
+                            <TableCell>{formatBytes(tenant.current_estimated_storage_bytes)}</TableCell>
+                            <TableCell>{formatBytes(tenant.storage_added_bytes_window)}</TableCell>
+                            <TableCell>{formatBytes(tenant.storage_added_bytes_previous_window)}</TableCell>
+                            <TableCell>{tenant.growth_percent === null || tenant.growth_percent === undefined ? 'N/A' : `${tenant.growth_percent > 0 ? '+' : ''}${tenant.growth_percent.toFixed(1)}%`}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+              <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" fontWeight={700}>Conflict Resolution Success Rates</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Based on successful timetable runs in the selected window and whether the resulting timetable is conflict-free.
+                </Typography>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Tenant</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Evaluated Runs</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Conflict-Free</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Success Rate</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Unresolved Runs</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Total Conflicts</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Top Conflict Type</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {operationalMetrics.conflict_resolution.map((tenant: any) => (
+                      <TableRow key={tenant.tenant_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={700}>{tenant.tenant_name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{tenant.plan_tier}</Typography>
+                        </TableCell>
+                        <TableCell>{tenant.evaluated_runs}</TableCell>
+                        <TableCell>{tenant.conflict_free_runs}</TableCell>
+                        <TableCell>{formatPercent(tenant.conflict_free_rate_percent)}</TableCell>
+                        <TableCell>{tenant.unresolved_runs}</TableCell>
+                        <TableCell>{tenant.total_conflicts}</TableCell>
+                        <TableCell>{tenant.top_conflict_type || 'N/A'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </>
+        )}
+      </Box>
+
+      <Box role="tabpanel" id="sa-panel-5" hidden={activeTab !== 5}>
+        <SystemMonitorPage isEmbedded />
+      </Box>
+
+      <Box role="tabpanel" id="sa-panel-6" hidden={activeTab !== 6}>
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>Tenant Dashboard Metrics</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Detailed real-time overview of users, timetables, resource utilization, and recent activity for a selected organization.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Select Tenant"
+                value={dashboardMetricsTenantId}
+                onChange={(e) => setDashboardMetricsTenantId(Number(e.target.value))}
+                sx={{ minWidth: 200 }}
+              >
+                {universities.map((uni: any) => (
+                  <MenuItem key={uni.id} value={uni.id}>{uni.name}</MenuItem>
+                ))}
+              </TextField>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                disabled={!dashboardMetricsTenantId || dashboardMetricsLoading}
+                onClick={() => loadDashboardMetrics(dashboardMetricsTenantId as number)}
+              >
+                Refresh
+              </Button>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {!dashboardMetricsTenantId ? (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+            <DashboardIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="body1" color="text.secondary">Select an organization above to view its dashboard metrics.</Typography>
+          </Box>
+        ) : dashboardMetricsLoading && !dashboardMetrics ? (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </Box>
+        ) : dashboardMetrics && (
+          <Box>
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              {/* Resource Utilization */}
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', border: 'none' }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, textTransform: 'uppercase', color: 'text.primary' }}>
+                    Resource Utilization
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>Total Rooms</Typography>
+                      <Typography variant="h6" fontWeight={700} color="primary.main">{dashboardMetrics.resource_utilization.total_rooms}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>Total Lecturers</Typography>
+                      <Typography variant="h6" fontWeight={700} color="secondary.main">{dashboardMetrics.resource_utilization.total_lecturers}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>Seating Capacity</Typography>
+                      <Typography variant="h6" fontWeight={700} color="success.main">{dashboardMetrics.resource_utilization.total_capacity.toLocaleString()}</Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              {/* Timetable Statistics */}
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 3, textTransform: 'uppercase', color: 'text.secondary' }}>
+                    Timetable Pipeline
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f1f8e9', borderRadius: 2 }}>
+                        <CheckCircleIcon sx={{ color: 'success.main', mb: 1, fontSize: 32 }} />
+                        <Typography variant="h4" fontWeight={800} color="success.main">{dashboardMetrics.timetable_stats.generated_count}</Typography>
+                        <Typography variant="caption" fontWeight={600} color="text.secondary">GENERATED</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 2 }}>
+                        <BoltIcon sx={{ color: 'warning.main', mb: 1, fontSize: 32 }} />
+                        <Typography variant="h4" fontWeight={800} color="warning.main">{dashboardMetrics.timetable_stats.draft_count}</Typography>
+                        <Typography variant="caption" fontWeight={600} color="text.secondary">DRAFT</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* Users by Role */}
+              <Grid item xs={12} md={4}>
+                <Paper variant="outlined" sx={{ p: 2.5, height: '100%' }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, textTransform: 'uppercase', color: 'text.secondary' }}>
+                    Users by Role
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {dashboardMetrics.user_counts.length === 0 ? (
+                       <Typography variant="body2" color="text.secondary">No users found.</Typography>
+                    ) : (
+                      dashboardMetrics.user_counts.map((roleInfo: any, idx: number) => {
+                        const total = dashboardMetrics.user_counts.reduce((acc: number, val: any) => acc + val.count, 0);
+                        const percent = total > 0 ? (roleInfo.count / total) * 100 : 0;
+                        return (
+                          <Box key={idx}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="body2" fontWeight={600} sx={{ textTransform: 'capitalize' }}>{roleInfo.role}</Typography>
+                              <Typography variant="caption" color="text.secondary">{roleInfo.count} users ({percent.toFixed(0)}%)</Typography>
+                            </Box>
+                            <Box sx={{ width: '100%', bgcolor: 'grey.100', borderRadius: 1, height: 6, overflow: 'hidden' }}>
+                              <Box sx={{ width: `${percent}%`, bgcolor: 'primary.main', height: '100%' }} />
+                            </Box>
+                          </Box>
+                        );
+                      })
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            {/* Recent Activity */}
+            <Paper variant="outlined" sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+                <MonitorHeartIcon color="primary" />
+                <Typography variant="subtitle1" fontWeight={700}>Recent Activity Feed</Typography>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Action</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Entity Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Time</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {dashboardMetrics.recent_activity_logs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                          No recent activity recorded for this tenant.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dashboardMetrics.recent_activity_logs.map((log: any, idx: number) => (
+                        <TableRow key={idx} hover>
+                          <TableCell>
+                            <Chip size="small" label={log.action} color={log.action.toLowerCase().includes('error') || log.action.toLowerCase().includes('fail') || log.action.toLowerCase().includes('delete') ? 'error' : 'primary'} variant="outlined" />
+                          </TableCell>
+                          <TableCell sx={{ textTransform: 'capitalize', fontWeight: 500 }}>{log.entity_type}</TableCell>
+                          <TableCell>{log.user_email || <Typography variant="caption" color="text.disabled">System</Typography>}</TableCell>
+                          <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Box>
+        )}
+      </Box>
+
       {/* Copy snackbar */}
       <Snackbar
         open={copySnack}
@@ -907,6 +1944,141 @@ export default function SuperAdminPage() {
                        </Typography>
                     </Grid>
                   </Grid>
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>Generation observability</Typography>
+                  {tenantObservabilityLoading ? (
+                    <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                      <CircularProgress size={22} />
+                    </Box>
+                  ) : tenantObservability ? (
+                    <Stack spacing={2}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Attempts</Typography>
+                          <Typography variant="body2" fontWeight={600}>{tenantObservability.generation.attempts}</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Success Rate</Typography>
+                          <Typography variant="body2" fontWeight={600}>{tenantObservability.generation.success_rate_percent.toFixed(1)}%</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Average Duration</Typography>
+                          <Typography variant="body2" fontWeight={600}>
+                            {tenantObservability.generation.average_duration_ms ? `${(tenantObservability.generation.average_duration_ms / 1000).toFixed(1)} sec` : 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">Fallback Runs</Typography>
+                          <Typography variant="body2" fontWeight={600}>{tenantObservability.generation.fallback_runs}</Typography>
+                        </Grid>
+                      </Grid>
+
+                      {tenantObservability.generation.last_completed_at && (
+                        <Typography variant="body2" color="text.secondary">
+                          Last completed generation: {new Date(tenantObservability.generation.last_completed_at).toLocaleString()}
+                        </Typography>
+                      )}
+
+                      <Stack spacing={1.5}>
+                        {tenantObservability.generation.recent_runs.length > 0 ? tenantObservability.generation.recent_runs.map((run: any) => (
+                          <Paper key={`${run.timetable_id}-${run.completed_at || run.started_at || run.status}`} variant="outlined" sx={{ p: 1.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                              <Box>
+                                <Typography variant="body2" fontWeight={700}>{run.timetable_name}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {run.completed_at ? new Date(run.completed_at).toLocaleString() : 'Run in progress'}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                label={run.status}
+                                size="small"
+                                color={run.status === 'success' ? 'success' : run.status === 'running' ? 'warning' : 'error'}
+                                variant="outlined"
+                                sx={{ textTransform: 'capitalize' }}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                              Duration: {run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)} sec` : 'N/A'} • Slots: {run.saved_slot_count} • Fallback: {run.fallback_used ? 'Yes' : 'No'}
+                            </Typography>
+                            {run.error_message && (
+                              <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
+                                {run.error_message}
+                              </Typography>
+                            )}
+                          </Paper>
+                        )) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No generation telemetry recorded for this tenant yet.
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Observability data is not available for this tenant yet.
+                    </Typography>
+                  )}
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>API performance & SLA</Typography>
+                  {currentTenantPerformance ? (
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Average Response</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.avg_response_ms.toFixed(0)} ms</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">SLA Target</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.sla_target_ms} ms</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Error Rate</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.error_rate_percent.toFixed(2)}%</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">SLA Compliance</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.sla_compliance_percent.toFixed(1)}%</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Server Errors</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.server_errors}</Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">Client Errors</Typography>
+                        <Typography variant="body2" fontWeight={600}>{currentTenantPerformance.client_errors}</Typography>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">Failure hotspots</Typography>
+                        <Stack spacing={1} sx={{ mt: 1 }}>
+                          {currentTenantPerformance.top_failure_endpoints.length > 0 ? currentTenantPerformance.top_failure_endpoints.map((endpoint: any) => (
+                            <Paper key={endpoint.endpoint} variant="outlined" sx={{ p: 1.25 }}>
+                              <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                                {endpoint.endpoint}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {endpoint.count} failures{endpoint.status_codes?.length ? ` • ${endpoint.status_codes.join(', ')}` : ''}
+                              </Typography>
+                            </Paper>
+                          )) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No repeated failure endpoints in the selected reporting window.
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Open the Tenant Performance tab to load SLA analytics for this tenant.
+                    </Typography>
+                  )}
                 </Box>
               </Stack>
             </Box>

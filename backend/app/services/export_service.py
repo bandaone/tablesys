@@ -28,7 +28,7 @@ class ExportService:
     # Public
     # ------------------------------------------------------------------
 
-    def get_traditional_export_data(self, timetable_id: int) -> Dict[str, Any]:
+    def get_traditional_export_data(self, timetable_id: int, university_id=None) -> Dict[str, Any]:
         timetable: Optional[Timetable] = (
             self.db.query(Timetable)
             .filter(Timetable.id == timetable_id)
@@ -37,6 +37,10 @@ class ExportService:
         if timetable is None:
             raise ValueError(f"Timetable {timetable_id} not found.")
 
+        # Ownership check - reject cross-tenant access
+        if university_id is not None and timetable.university_id != university_id:
+            raise PermissionError("You do not have access to this timetable.")
+
         slots = (
             self.db.query(TimetableSlot)
             .filter(TimetableSlot.timetable_id == timetable_id)
@@ -44,10 +48,11 @@ class ExportService:
         )
         return self._build_grid(timetable, slots)
 
-    def get_active_timetable_export_data(self) -> Dict[str, Any]:
-        timetable: Optional[Timetable] = (
-            self.db.query(Timetable).filter(Timetable.is_active == True).first()
-        )
+    def get_active_timetable_export_data(self, university_id=None) -> Dict[str, Any]:
+        query = self.db.query(Timetable).filter(Timetable.is_active == True)
+        if university_id is not None:
+            query = query.filter(Timetable.university_id == university_id)
+        timetable: Optional[Timetable] = query.first()
         if timetable is None:
             raise ValueError("No active timetable found. Activate a timetable first.")
 

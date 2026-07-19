@@ -27,6 +27,7 @@ import TimetableAssignmentPanel from '../components/TimetableAssignmentPanel';
 import { CreateManualSlotModal } from '../components/CreateManualSlotModal';
 import { TimetableSlot } from '../components/TimetableCell';
 import api, { departmentsAPI } from '../api';
+import { useInstitutionSetup } from '../hooks/useInstitutionSetup';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,6 +74,8 @@ interface ConflictSummary {
         lecturer: number;
         room: number;
         group: number;
+        lecturer_transit?: number;
+        group_transit?: number;
     };
     by_severity: {
         high: number;
@@ -214,6 +217,17 @@ const TimetableViewPage: React.FC = () => {
     const [timetableId, setTimetableId] = useState<number | null>(null);
     const [openManualSlotModal, setOpenManualSlotModal] = useState(false);
     const [departments, setDepartments] = useState<{ id: number; name: string; code: string }[]>([]);
+    const { activityTypes, activityTypesByKey } = useInstitutionSetup();
+
+    // Build the layer filter items from live activity types, or fall back to the
+    // three legacy hardcoded types for Engineering tenants without custom config.
+    const layerItems: Array<{ key: string; label: string; color?: string }> = activityTypes.length > 0
+        ? activityTypes.map((at) => ({ key: at.key, label: at.display_name, color: at.color }))
+        : [
+            { key: 'lecture',   label: 'Lectures' },
+            { key: 'practical', label: 'Labs'     },
+            { key: 'tutorial',  label: 'Tutorials' },
+        ];
 
     useEffect(() => {
         const fetchFilters = async () => {
@@ -335,58 +349,33 @@ const TimetableViewPage: React.FC = () => {
         try {
             const response = await api.get(`/timetables/${id}/conflicts`);
             setConflicts(response.data);
-        } catch (err) {
-            console.error('Error fetching conflicts:', err);
-        }
+        } catch (err) { console.error('Error fetching conflicts:', err); }
     };
 
     const fetchValidation = async (id: number) => {
         try {
             const response = await api.get(`/validate/timetable/${id}`);
             setValidation(response.data);
-        } catch (err) {
-            console.error('Error fetching validation:', err);
-        }
+        } catch (err) { console.error('Error fetching validation:', err); }
     };
 
-    useEffect(() => {
-        fetchTimetable();
-    }, [fetchTimetable]);
+    useEffect(() => { fetchTimetable(); }, [fetchTimetable]);
 
-    const handleYearSelect = (year: number) => {
-        setSelectedYear(year);
-    };
-
-    const handleProgramChange = (event: SelectChangeEvent<string>) => {
-        setSelectedProgram(event.target.value);
-    };
-
+    const handleYearSelect = (year: number) => { setSelectedYear(year); };
+    const handleProgramChange = (event: SelectChangeEvent<string>) => { setSelectedProgram(event.target.value); };
     const handleModeChange = (_event: React.MouseEvent<HTMLElement>, newMode: ViewMode | null) => {
-        if (!newMode) {
-            return;
-        }
+        if (!newMode) return;
         setMode(newMode);
-        if (newMode === 'view') {
-            setSelectedSlot(null);
-        }
+        if (newMode === 'view') setSelectedSlot(null);
     };
+    const handleSlotClick = (slot: TimetableSlot) => { setSelectedSlot(slot); };
 
-    const handleSlotClick = (slot: TimetableSlot) => {
-        setSelectedSlot(slot);
-    };
-
-    const yearOptions = buildYearOptions(
-        availableYears.length > 0 ? availableYears : [selectedYear],
-    );
-
+    const yearOptions = buildYearOptions(availableYears.length > 0 ? availableYears : [selectedYear]);
     const hasSlots = !!data && data.slots.length > 0;
 
     return (
         <Box sx={{ padding: 3 }}>
-            {/* Page Header */}
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-                Institution Timetable
-            </Typography>
+            <Typography variant="h5" fontWeight={700} gutterBottom>Institution Timetable</Typography>
 
             {data?.metadata && (
                 <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -395,21 +384,9 @@ const TimetableViewPage: React.FC = () => {
                 </Typography>
             )}
 
-            {/* Conflict Warnings */}
             {conflicts && conflicts.total_conflicts > 0 && (
-                <Alert
-                    severity="warning"
-                    sx={{ mt: 2, mb: 2 }}
-                    action={
-                        <IconButton
-                            aria-label="toggle conflicts"
-                            color="inherit"
-                            size="small"
-                            onClick={() => setShowConflicts(!showConflicts)}
-                        >
-                            {showConflicts ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </IconButton>
-                    }
+                <Alert severity="warning" sx={{ mt: 2, mb: 2 }}
+                    action={<IconButton aria-label="toggle conflicts" color="inherit" size="small" onClick={() => setShowConflicts(!showConflicts)}>{showConflicts ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <WarningIcon />
@@ -417,63 +394,22 @@ const TimetableViewPage: React.FC = () => {
                             {conflicts.total_conflicts} Scheduling Conflict{conflicts.total_conflicts !== 1 ? 's' : ''} Detected
                         </Typography>
                     </Box>
-
                     <Collapse in={showConflicts} sx={{ mt: 2 }}>
                         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                            {conflicts.by_type.lecturer > 0 && (
-                                <Chip
-                                    label={`${conflicts.by_type.lecturer} Lecturer conflicts`}
-                                    color="error"
-                                    size="small"
-                                    variant="outlined"
-                                />
-                            )}
-                            {conflicts.by_type.room > 0 && (
-                                <Chip
-                                    label={`${conflicts.by_type.room} Room conflicts`}
-                                    color="error"
-                                    size="small"
-                                    variant="outlined"
-                                />
-                            )}
-                            {conflicts.by_type.group > 0 && (
-                                <Chip
-                                    label={`${conflicts.by_type.group} Group conflicts`}
-                                    color="error"
-                                    size="small"
-                                    variant="outlined"
-                                />
-                            )}
+                            {conflicts.by_type.lecturer > 0 && <Chip label={`${conflicts.by_type.lecturer} Lecturer conflicts`} color="error" size="small" variant="outlined" />}
+                            {conflicts.by_type.room > 0 && <Chip label={`${conflicts.by_type.room} Room conflicts`} color="error" size="small" variant="outlined" />}
+                            {conflicts.by_type.group > 0 && <Chip label={`${conflicts.by_type.group} Group conflicts`} color="error" size="small" variant="outlined" />}
+                            {(conflicts.by_type.lecturer_transit || 0) > 0 && <Chip label={`${conflicts.by_type.lecturer_transit} Lecturer transit issues`} color="warning" size="small" variant="outlined" />}
+                            {(conflicts.by_type.group_transit || 0) > 0 && <Chip label={`${conflicts.by_type.group_transit} Student transit issues`} color="warning" size="small" variant="outlined" />}
                         </Box>
-
                         <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                             {conflicts.conflicts.map((conflict, idx) => (
-                                <Box
-                                    key={idx}
-                                    sx={{
-                                        mb: 1,
-                                        p: 1.5,
-                                        bgcolor: 'rgba(255, 152, 0, 0.08)',
-                                        borderRadius: 1,
-                                        border: '1px solid',
-                                        borderColor: conflict.severity === 'high' ? 'error.main' : 'warning.main',
-                                    }}
-                                >
+                                <Box key={idx} sx={{ mb: 1, p: 1.5, bgcolor: 'rgba(255,152,0,0.08)', borderRadius: 1, border: '1px solid', borderColor: conflict.severity === 'high' ? 'error.main' : 'warning.main' }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                        <Typography variant="caption" fontWeight="bold">
-                                            {conflict.resource.type.toUpperCase()} CONFLICT
-                                        </Typography>
-                                        <Badge
-                                            badgeContent={conflict.slot_ids.length}
-                                            color={conflict.severity === 'high' ? 'error' : 'warning'}
-                                            sx={{ mr: 1 }}
-                                        >
-                                            <WarningIcon fontSize="small" />
-                                        </Badge>
+                                        <Typography variant="caption" fontWeight="bold">{conflict.resource.type.toUpperCase()} CONFLICT</Typography>
+                                        <Badge badgeContent={conflict.slot_ids.length} color={conflict.severity === 'high' ? 'error' : 'warning'} sx={{ mr: 1 }}><WarningIcon fontSize="small" /></Badge>
                                     </Box>
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                                        {conflict.description}
-                                    </Typography>
+                                    <Typography variant="body2">{conflict.description}</Typography>
                                 </Box>
                             ))}
                         </Box>
@@ -481,21 +417,9 @@ const TimetableViewPage: React.FC = () => {
                 </Alert>
             )}
 
-            {/* Validation Warnings */}
             {validation && validation.total_issues > 0 && (
-                <Alert
-                    severity={validation.errors.length > 0 ? "error" : "warning"}
-                    sx={{ mt: 2, mb: 2 }}
-                    action={
-                        <IconButton
-                            aria-label="toggle validation"
-                            color="inherit"
-                            size="small"
-                            onClick={() => setShowValidation(!showValidation)}
-                        >
-                            {showValidation ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </IconButton>
-                    }
+                <Alert severity={validation.errors.length > 0 ? 'error' : 'warning'} sx={{ mt: 2, mb: 2 }}
+                    action={<IconButton aria-label="toggle validation" color="inherit" size="small" onClick={() => setShowValidation(!showValidation)}>{showValidation ? <ExpandLessIcon /> : <ExpandMoreIcon />}</IconButton>}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <WarningIcon />
@@ -503,105 +427,38 @@ const TimetableViewPage: React.FC = () => {
                             {validation.total_issues} Validation Issue{validation.total_issues !== 1 ? 's' : ''} Found
                         </Typography>
                     </Box>
-
                     <Collapse in={showValidation} sx={{ mt: 2 }}>
                         <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                            {validation.errors.length > 0 && (
-                                <Chip
-                                    label={`${validation.errors.length} Error${validation.errors.length !== 1 ? 's' : ''}`}
-                                    color="error"
-                                    size="small"
-                                />
-                            )}
-                            {validation.warnings.length > 0 && (
-                                <Chip
-                                    label={`${validation.warnings.length} Warning${validation.warnings.length !== 1 ? 's' : ''}`}
-                                    color="warning"
-                                    size="small"
-                                />
-                            )}
-                            {validation.info.length > 0 && (
-                                <Chip
-                                    label={`${validation.info.length} Info`}
-                                    color="info"
-                                    size="small"
-                                />
-                            )}
+                            {validation.errors.length > 0 && <Chip label={`${validation.errors.length} Error${validation.errors.length !== 1 ? 's' : ''}`} color="error" size="small" />}
+                            {validation.warnings.length > 0 && <Chip label={`${validation.warnings.length} Warning${validation.warnings.length !== 1 ? 's' : ''}`} color="warning" size="small" />}
+                            {validation.info.length > 0 && <Chip label={`${validation.info.length} Info`} color="info" size="small" />}
                         </Box>
-
                         <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                            {/* Errors */}
                             {validation.errors.map((issue, idx) => (
-                                <Box
-                                    key={`error-${idx}`}
-                                    sx={{
-                                        mb: 1,
-                                        p: 1.5,
-                                        bgcolor: 'rgba(211, 47, 47, 0.08)',
-                                        borderRadius: 1,
-                                        border: '1px solid',
-                                        borderColor: 'error.main',
-                                    }}
-                                >
+                                <Box key={`e-${idx}`} sx={{ mb: 1, p: 1.5, bgcolor: 'rgba(211,47,47,0.08)', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                        <Typography variant="caption" fontWeight="bold" color="error">
-                                            ERROR • {issue.entity_type.toUpperCase()} #{issue.entity_id}
-                                        </Typography>
+                                        <Typography variant="caption" fontWeight="bold" color="error">ERROR &bull; {issue.entity_type.toUpperCase()} #{issue.entity_id}</Typography>
                                         <Chip label={issue.field} size="small" color="error" variant="outlined" />
                                     </Box>
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                                        {issue.message}
-                                    </Typography>
+                                    <Typography variant="body2">{issue.message}</Typography>
                                 </Box>
                             ))}
-
-                            {/* Warnings */}
                             {validation.warnings.map((issue, idx) => (
-                                <Box
-                                    key={`warning-${idx}`}
-                                    sx={{
-                                        mb: 1,
-                                        p: 1.5,
-                                        bgcolor: 'rgba(255, 152, 0, 0.08)',
-                                        borderRadius: 1,
-                                        border: '1px solid',
-                                        borderColor: 'warning.main',
-                                    }}
-                                >
+                                <Box key={`w-${idx}`} sx={{ mb: 1, p: 1.5, bgcolor: 'rgba(255,152,0,0.08)', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                        <Typography variant="caption" fontWeight="bold" color="warning.dark">
-                                            WARNING • {issue.entity_type.toUpperCase()} #{issue.entity_id}
-                                        </Typography>
+                                        <Typography variant="caption" fontWeight="bold" color="warning.dark">WARNING &bull; {issue.entity_type.toUpperCase()} #{issue.entity_id}</Typography>
                                         <Chip label={issue.field} size="small" color="warning" variant="outlined" />
                                     </Box>
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                                        {issue.message}
-                                    </Typography>
+                                    <Typography variant="body2">{issue.message}</Typography>
                                 </Box>
                             ))}
-
-                            {/* Info */}
                             {validation.info.map((issue, idx) => (
-                                <Box
-                                    key={`info-${idx}`}
-                                    sx={{
-                                        mb: 1,
-                                        p: 1.5,
-                                        bgcolor: 'rgba(2, 136, 209, 0.08)',
-                                        borderRadius: 1,
-                                        border: '1px solid',
-                                        borderColor: 'info.main',
-                                    }}
-                                >
+                                <Box key={`i-${idx}`} sx={{ mb: 1, p: 1.5, bgcolor: 'rgba(2,136,209,0.08)', borderRadius: 1, border: '1px solid', borderColor: 'info.main' }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                        <Typography variant="caption" fontWeight="bold" color="info.dark">
-                                            INFO • {issue.entity_type.toUpperCase()} #{issue.entity_id}
-                                        </Typography>
+                                        <Typography variant="caption" fontWeight="bold" color="info.dark">INFO &bull; {issue.entity_type.toUpperCase()} #{issue.entity_id}</Typography>
                                         <Chip label={issue.field} size="small" color="info" variant="outlined" />
                                     </Box>
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
-                                        {issue.message}
-                                    </Typography>
+                                    <Typography variant="body2">{issue.message}</Typography>
                                 </Box>
                             ))}
                         </Box>
@@ -609,21 +466,13 @@ const TimetableViewPage: React.FC = () => {
                 </Alert>
             )}
 
-            {/* Filter Bar */}
+            {/* ── Filter Bar ── */}
             <Box className="timetable-filter-bar" sx={{ mt: 2, mb: 1, alignItems: 'flex-end' }}>
                 <Box className="timetable-filter-group">
-                    <Typography className="timetable-filter-label" variant="caption">
-                        Year Level
-                    </Typography>
+                    <Typography className="timetable-filter-label" variant="caption">Year Level</Typography>
                     <ButtonGroup variant="outlined" size="small" aria-label="Select year level">
                         {yearOptions.map(({ value, label }) => (
-                            <Button
-                                key={value}
-                                variant={selectedYear === value ? 'contained' : 'outlined'}
-                                onClick={() => handleYearSelect(value)}
-                                aria-pressed={selectedYear === value}
-                                disableElevation
-                            >
+                            <Button key={value} variant={selectedYear === value ? 'contained' : 'outlined'} onClick={() => handleYearSelect(value)} aria-pressed={selectedYear === value} disableElevation>
                                 {label}
                             </Button>
                         ))}
@@ -631,42 +480,40 @@ const TimetableViewPage: React.FC = () => {
                 </Box>
 
                 <Box className="timetable-filter-group" sx={{ minWidth: 220 }}>
-                    <Typography className="timetable-filter-label" variant="caption">
-                        Program
-                    </Typography>
-                    <Select
-                        value={selectedProgram}
-                        onChange={handleProgramChange}
-                        size="small"
-                        fullWidth
-                        inputProps={{ 'aria-label': 'Select program' }}
-                    >
+                    <Typography className="timetable-filter-label" variant="caption">Program</Typography>
+                    <Select value={selectedProgram} onChange={handleProgramChange} size="small" fullWidth inputProps={{ 'aria-label': 'Select program' }}>
                         <MenuItem value="ALL">All Programs</MenuItem>
                         {departments.map((dept) => (
-                            <MenuItem key={dept.id} value={dept.code}>
-                                {dept.name}
-                            </MenuItem>
+                            <MenuItem key={dept.id} value={dept.code}>{dept.name}</MenuItem>
                         ))}
                     </Select>
                 </Box>
-                
-                <Box className="timetable-filter-group" sx={{ minWidth: 200, ml: 2 }}>
-                    <Typography className="timetable-filter-label" variant="caption">
-                        Layer
-                    </Typography>
-                    <ButtonGroup variant="outlined" size="small" sx={{ mt: 0.5 }}>
-                        {['ALL', 'lecture', 'practical', 'tutorial'].map(layer => {
-                            const labels: Record<string, string> = { ALL: 'All', lecture: 'Lectures', practical: 'Labs', tutorial: 'Tutorials' };
-                            return (
-                                <Button
-                                    key={layer}
-                                    variant={selectedLayer === layer ? 'contained' : 'outlined'}
-                                    onClick={() => setSelectedLayer(layer)}
-                                >
-                                    {labels[layer]}
-                                </Button>
-                            );
-                        })}
+
+                {/* Dynamic activity-type layer filter */}
+                <Box className="timetable-filter-group" sx={{ ml: 2 }}>
+                    <Typography className="timetable-filter-label" variant="caption">Layer</Typography>
+                    <ButtonGroup variant="outlined" size="small" sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.25 }}>
+                        <Button variant={selectedLayer === 'ALL' ? 'contained' : 'outlined'} onClick={() => setSelectedLayer('ALL')}>All</Button>
+                        {layerItems.map((item) => (
+                            <Button
+                                key={item.key}
+                                variant={selectedLayer === item.key ? 'contained' : 'outlined'}
+                                onClick={() => setSelectedLayer(item.key)}
+                                sx={selectedLayer === item.key && item.color ? {
+                                    bgcolor: item.color, borderColor: item.color,
+                                    '&:hover': { bgcolor: item.color, filter: 'brightness(0.9)' },
+                                } : {}}
+                            >
+                                {item.color && (
+                                    <Box component="span" sx={{
+                                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                                        bgcolor: selectedLayer === item.key ? '#fff' : item.color,
+                                        mr: 0.75, flexShrink: 0, verticalAlign: 'middle',
+                                    }} />
+                                )}
+                                {item.label}
+                            </Button>
+                        ))}
                     </ButtonGroup>
                 </Box>
 
@@ -674,58 +521,29 @@ const TimetableViewPage: React.FC = () => {
 
                 {mode === 'assign' && timetableId && (
                     <Box sx={{ mr: 2 }}>
-                        <Button
-                            variant="outlined"
-                            color="secondary"
-                            onClick={() => setOpenManualSlotModal(true)}
-                            size="small"
-                            sx={{ mt: 2 }}
-                        >
-                            + Add Lab Session
+                        <Button variant="outlined" color="secondary" onClick={() => setOpenManualSlotModal(true)} size="small" sx={{ mt: 2 }}>
+                            + Add Session
                         </Button>
                     </Box>
                 )}
 
                 <Box className="timetable-filter-group">
-                    <Typography className="timetable-filter-label" variant="caption">
-                        Mode
-                    </Typography>
-                    <ToggleButtonGroup
-                        size="small"
-                        value={mode}
-                        exclusive
-                        onChange={handleModeChange}
-                        aria-label="Timetable mode"
-                    >
-                        <ToggleButton value="view" aria-label="View mode">
-                            View
-                        </ToggleButton>
-                        <ToggleButton value="assign" aria-label="Assignment mode" disabled={!hasSlots}>
-                            Assign
-                        </ToggleButton>
+                    <Typography className="timetable-filter-label" variant="caption">Mode</Typography>
+                    <ToggleButtonGroup size="small" value={mode} exclusive onChange={handleModeChange} aria-label="Timetable mode">
+                        <ToggleButton value="view" aria-label="View mode">View</ToggleButton>
+                        <ToggleButton value="assign" aria-label="Assignment mode" disabled={!hasSlots}>Assign</ToggleButton>
                     </ToggleButtonGroup>
                 </Box>
             </Box>
 
-            {/* Loading State */}
             {loading && (
-                <Box
-                    sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}
-                    aria-label="Loading timetable"
-                    aria-busy="true"
-                >
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }} aria-label="Loading timetable" aria-busy="true">
                     <CircularProgress />
                 </Box>
             )}
 
-            {/* Error State */}
-            {!loading && error && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {error}
-                </Alert>
-            )}
+            {!loading && error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-            {/* Empty State */}
             {!loading && !error && data && data.slots.length === 0 && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                     No timetable data found for {formatYearLabel(selectedYear)}
@@ -734,7 +552,6 @@ const TimetableViewPage: React.FC = () => {
                 </Alert>
             )}
 
-            {/* Timetable Grid + Assignment Panel */}
             {!loading && !error && data && data.slots.length > 0 && (
                 <Box sx={{ display: 'flex', mt: 2 }}>
                     <Box sx={{ flex: 3, pr: 2 }}>
@@ -744,6 +561,7 @@ const TimetableViewPage: React.FC = () => {
                             mode={mode}
                             onSlotClick={handleSlotClick}
                             selectedSlot={selectedSlot}
+                            activityTypesMap={activityTypesByKey}
                         />
                     </Box>
                     {mode === 'assign' && (
@@ -758,14 +576,11 @@ const TimetableViewPage: React.FC = () => {
                 </Box>
             )}
 
-            {/* Create Manual Slot Modal */}
             {timetableId && (
                 <CreateManualSlotModal
                     open={openManualSlotModal}
                     onClose={() => setOpenManualSlotModal(false)}
-                    onSuccess={() => {
-                        fetchTimetable();
-                    }}
+                    onSuccess={() => { fetchTimetable(); }}
                     timetableId={timetableId}
                 />
             )}

@@ -16,6 +16,7 @@ from threading import Lock
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 from typing import Optional
 
@@ -24,7 +25,9 @@ from ..models import University, User, UserRole, PendingRegistration, Notificati
 from ..schemas import TenantRegistrationRequest, TenantVerificationRequest, Token
 from ..auth import get_password_hash, create_access_token
 from ..config import settings
+from ..utils.sanitization import sanitize_input
 from ..tasks.registration_tasks import send_verification_email_task
+from ..services.provisioning import provision_tenant, ProvisioningError
 
 logger = logging.getLogger("app.registration")
 
@@ -82,10 +85,21 @@ def get_university_public_branding(domain: str, db: Session = Depends(get_db)):
     Used by the login page to pre-load school-specific colours/logo
     before authentication.
     """
+    normalized_domain = domain.strip().lower()
     uni = db.query(University).filter(
-        University.domain == domain,
+        University.domain == normalized_domain,
         University.is_active == True
     ).first()
+
+    if not uni and "." in normalized_domain:
+        subdomain = normalized_domain.split(".", 1)[0]
+        if subdomain and subdomain != normalized_domain:
+            uni = db.query(University).filter(
+                (University.domain == subdomain) | 
+                (University.domain == f"{subdomain}.tablesys.cloud"),
+                University.is_active == True
+            ).first()
+
     if not uni:
         raise HTTPException(status_code=404, detail="University not found or inactive.")
 
@@ -106,15 +120,22 @@ def register_tenant(request: TenantRegistrationRequest, req: Request, db: Sessio
             detail="Too many registration attempts. Please try again later."
         )
 
+    # ── Normalize + sanitize inputs ──────────────────────────────────────
+    organization_name = sanitize_input(request.organization_name, max_length=200)
+    subdomain = sanitize_input(request.subdomain, max_length=100).lower()
+    admin_email = sanitize_input(request.admin_email, max_length=200).lower()
+    admin_username = sanitize_input(request.admin_username, max_length=50)
+    admin_full_name = sanitize_input(request.admin_full_name, max_length=200)
+
     # ── Uniqueness checks (generic error to prevent enumeration) ──────────
-    domain_taken = db.query(University).filter(University.domain == request.subdomain).first()
-    username_taken = db.query(User).filter(User.username == request.admin_username).first()
-    email_taken = db.query(User).filter(User.email == request.admin_email).first()
+    domain_taken = db.query(University).filter(University.domain == subdomain).first()
+    username_taken = db.query(User).filter(User.username == admin_username).first()
+    email_taken = db.query(User).filter(User.email == admin_email).first()
 
     # Also check pending registrations that haven't expired
     now = datetime.now(timezone.utc)
     pending_email = db.query(PendingRegistration).filter(
-        PendingRegistration.admin_email == request.admin_email,
+        PendingRegistration.admin_email == admin_email,
         PendingRegistration.status == "pending",
         PendingRegistration.expires_at > now,
     ).first()
@@ -124,7 +145,7 @@ def register_tenant(request: TenantRegistrationRequest, req: Request, db: Sessio
         reason = "domain" if domain_taken else "username" if username_taken else "email" if email_taken else "pending"
         logger.warning(
             "Registration rejected (reason=%s) subdomain=%s email=%s ip=%s",
-            reason, request.subdomain, request.admin_email, client_ip
+            reason, subdomain, admin_email, client_ip
         )
         raise HTTPException(
             status_code=400,
@@ -137,11 +158,11 @@ def register_tenant(request: TenantRegistrationRequest, req: Request, db: Sessio
 
     pending = PendingRegistration(
         token=opaque_token,
-        org_name=request.organization_name,
-        subdomain=request.subdomain,
-        admin_email=request.admin_email,
-        admin_username=request.admin_username,
-        admin_full_name=request.admin_full_name,
+        org_name=organization_name,
+        subdomain=subdomain,
+        admin_email=admin_email,
+        admin_username=admin_username,
+        admin_full_name=admin_full_name,
         hashed_password=get_password_hash(request.admin_password),
         status="pending",
         ip_address=client_ip,
@@ -155,12 +176,19 @@ def register_tenant(request: TenantRegistrationRequest, req: Request, db: Sessio
     frontend_url = settings.FRONTEND_URL or "http://localhost:3002"
     verify_url = f"{frontend_url}/verify?token={opaque_token}"
 
-    logger.info("Registration pending: subdomain=%s email=%s", request.subdomain, request.admin_email)
+    logger.info("Registration pending: subdomain=%s email=%s", subdomain, admin_email)
+    
+    email_enabled = getattr(settings, "EMAIL_ENABLED", False)
+    if not email_enabled:
+        logger.warning(
+            "⚠️ EMAIL_ENABLED is False or SMTP is not configured. Email will be skipped.\n"
+            "⚠️ MANUAL VERIFICATION LINK: %s", verify_url
+        )
 
     try:
         send_verification_email_task.delay(
-            recipient=request.admin_email,
-            organization_name=request.organization_name,
+            recipient=admin_email,
+            organization_name=organization_name,
             verification_link=verify_url,
         )
     except Exception:
@@ -172,8 +200,16 @@ def register_tenant(request: TenantRegistrationRequest, req: Request, db: Sessio
 @router.post("/verify", response_model=Token)
 def verify_tenant(request: TenantVerificationRequest, db: Session = Depends(get_db)):
     """
-    Step 2: Look up the PendingRegistration by opaque token, validate it,
-    provision the tenant + admin, and return an access token.
+    Step 2: Validate the opaque verification token, then delegate all tenant
+    provisioning to the provisioning service.
+
+    The router is responsible only for:
+    - Finding and validating the PendingRegistration
+    - Uniqueness re-checks (domain/email could have been taken during window)
+    - Translating ProvisioningError into an HTTP 500
+
+    All provisioning logic (University, User, seeding, notifications, usage events)
+    lives in backend/app/services/provisioning.py.
     """
     now = datetime.now(timezone.utc)
 
@@ -187,6 +223,12 @@ def verify_tenant(request: TenantVerificationRequest, db: Session = Depends(get_
 
     if pending.status == "verified":
         raise HTTPException(status_code=400, detail="This link has already been used. Please sign in.")
+
+    if pending.status == "failed_provisioning":
+        raise HTTPException(
+            status_code=409,
+            detail="Provisioning previously failed for this registration. Please contact support for manual retry.",
+        )
 
     if pending.status == "expired" or pending.expires_at < now:
         pending.status = "expired"
@@ -204,61 +246,17 @@ def verify_tenant(request: TenantVerificationRequest, db: Session = Depends(get_
         db.commit()
         raise HTTPException(status_code=400, detail="This email is now associated with another account.")
 
-    # ── Provision University ──────────────────────────────────────────────
-    uni = University(
-        name=pending.org_name,
-        domain=pending.subdomain,
-        is_active=True,
-        registered_at=now,
-        plan_tier="pro",
-        max_users=0,  # Unlimited
-    )
-    db.add(uni)
-    db.flush()  # Get uni.id before creating admin
-
-    # ── Provision Admin User ──────────────────────────────────────────────
-    admin_user = User(
-        university_id=uni.id,
-        username=pending.admin_username,
-        email=pending.admin_email,
-        full_name=pending.admin_full_name,
-        hashed_password=pending.hashed_password,
-        role=UserRole.COORDINATOR,
-        is_active=True,
-    )
-    db.add(admin_user)
-
-    # ── Mark pending registration as consumed ─────────────────────────────
-    pending.status = "verified"
-
-    # ── Notify all SuperAdmins ────────────────────────────────────────────
-    superadmins = db.query(User).filter(User.role == UserRole.SUPERADMIN).all()
-    for sa in superadmins:
-        notification = Notification(
-            user_id=sa.id,
-            title="New Tenant Registered",
-            message=f"{pending.org_name} ({pending.subdomain}) has been verified and provisioned. Admin: {pending.admin_email}",
-            type="info",
-            is_read=False,
-            created_at=now,
-            action_link="/superadmin",
+    # ── Delegate provisioning ─────────────────────────────────────────────
+    try:
+        result = provision_tenant(db, pending)
+    except ProvisioningError as exc:
+        logger.error("Tenant provisioning failed for pending_id=%s: %s", pending.id, exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Tenant provisioning encountered an error. Our team has been notified. Please contact support.",
         )
-        db.add(notification)
 
-    db.commit()
-
-    logger.info(
-        "Tenant provisioned: university_id=%d domain=%s admin=%s",
-        uni.id, uni.domain, admin_user.email
-    )
-
-    # ── Generate access token for auto-login ──────────────────────────────
-    access_token = create_access_token(
-        data={"sub": admin_user.username},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": result.access_token, "token_type": result.token_type}
 
 
 @router.post("/resend", status_code=200)
@@ -274,9 +272,10 @@ def resend_verification(request: ResendRequest, req: Request, db: Session = Depe
             detail="Too many attempts. Please try again later."
         )
 
+    sanitized_email = sanitize_input(request.email, max_length=200).lower()
     now = datetime.now(timezone.utc)
     pending = db.query(PendingRegistration).filter(
-        PendingRegistration.admin_email == request.email,
+        PendingRegistration.admin_email == sanitized_email,
         PendingRegistration.status == "pending",
         PendingRegistration.expires_at > now,
     ).first()
@@ -293,6 +292,13 @@ def resend_verification(request: ResendRequest, req: Request, db: Session = Depe
     frontend_url = settings.FRONTEND_URL or "http://localhost:3002"
     verify_url = f"{frontend_url}/verify?token={pending.token}"
 
+    email_enabled = getattr(settings, "EMAIL_ENABLED", False)
+    if not email_enabled:
+        logger.warning(
+            "⚠️ EMAIL_ENABLED is False or SMTP is not configured. Email will be skipped.\n"
+            "⚠️ MANUAL VERIFICATION LINK: %s", verify_url
+        )
+
     try:
         send_verification_email_task.delay(
             recipient=pending.admin_email,
@@ -303,3 +309,41 @@ def resend_verification(request: ResendRequest, req: Request, db: Session = Depe
         logger.warning("Could not dispatch resend email via task queue.")
 
     return {"message": "If a pending registration exists for this email, a verification link has been sent."}
+
+
+@router.get("/legacy-access")
+def get_legacy_access(token: str, db: Session = Depends(get_db)):
+    """
+    Validate a single-use legacy access token and return the associated university_id.
+    Supports admin-issued onboarding links for tenants without DNS configured.
+    """
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+
+    row = db.execute(
+        text(
+            """
+        SELECT id, university_id, expires_at, used_at
+        FROM tenant_access_links
+        WHERE token = :token
+        FOR UPDATE
+        """
+        ),
+        {"token": token},
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid or expired token.")
+
+    link_id, university_id, expires_at, used_at = row
+
+    now = datetime.now(timezone.utc)
+    if used_at is not None:
+        raise HTTPException(status_code=410, detail="Token already used.")
+    if expires_at is not None and expires_at < now:
+        raise HTTPException(status_code=410, detail="Token expired.")
+
+    db.execute(text("UPDATE tenant_access_links SET used_at = now() WHERE id = :id"), {"id": link_id})
+    db.commit()
+
+    return {"university_id": university_id}

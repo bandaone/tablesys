@@ -12,6 +12,8 @@ pydantic-settings==2.1.0
 ortools==9.8.3296
 pandas==2.1.4
 openpyxl==3.1.2
+odfpy==1.4.1
+xlrd==2.0.1
 python-dateutil==2.8.2
 email-validator==2.1.0
 reportlab==4.0.9
@@ -33,3 +35,10 @@ psutil==5.9.8
 prometheus-fastapi-instrumentator
 sentry-sdk[fastapi]
 sentry-sdk==2.0.1
+
+# Observability
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-exporter-otlp

@@ -53,11 +53,25 @@ const LecturerLogin: React.FC = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        background: `radial-gradient(ellipse at top left, ${alpha(secondaryColor, 0.22)} 0%, transparent 50%), radial-gradient(ellipse at bottom right, ${alpha(primaryColor, 0.18)} 0%, transparent 50%), linear-gradient(160deg, #0f172a 0%, ${alpha(primaryColor, 0.92)} 50%, #0f172a 100%)`,
+        background: `radial-gradient(circle at 82% 10%, ${alpha('#fbbf24', 0.3)} 0%, ${alpha('#fbbf24', 0.1)} 12%, transparent 30%), radial-gradient(ellipse at top left, ${alpha(secondaryColor, 0.3)} 0%, transparent 53%), radial-gradient(ellipse at bottom right, ${alpha(primaryColor, 0.34)} 0%, transparent 58%), linear-gradient(145deg, #111827 0%, #1e3a8a 48%, #581c87 100%)`,
+        position: 'relative',
+        overflow: 'hidden',
+        isolation: 'isolate',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         p: 2,
+        '&::before': {
+          content: '""', position: 'absolute', inset: 0, zIndex: 0,
+          background: `radial-gradient(circle at 88% 14%, ${alpha('#ffffff', 0.16)} 0 104px, ${alpha('#ffffff', 0.08)} 105px 235px, transparent 236px), radial-gradient(circle at 7% 90%, ${alpha('#ffffff', 0.12)} 0 86px, ${alpha('#ffffff', 0.05)} 87px 194px, transparent 195px)`,
+        },
+        '&::after': {
+          content: '""', position: 'absolute', width: 500, height: 500,
+          top: -276, right: -245, borderRadius: '50%', zIndex: 0,
+          border: `1px solid ${alpha('#ffffff', 0.16)}`,
+          boxShadow: `0 0 0 62px ${alpha('#ffffff', 0.04)}, 0 0 0 145px ${alpha('#ffffff', 0.025)}`,
+        },
+        '& > *': { position: 'relative', zIndex: 1 },
       }}
     >
       <Container maxWidth="sm">

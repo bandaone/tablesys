@@ -13,13 +13,49 @@ No writes, no model changes, no migrations.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Any, Dict
 
 from ..database import get_db
 from ..auth import get_current_user
 from ..models import User, Course, Department, StudentGroup, Lecturer, Room
+from ..utils.school_scope import (
+    filter_course_query_for_user,
+    filter_department_query_for_user,
+    filter_group_query_for_user,
+    filter_lecturer_query_for_user,
+    filter_room_query_for_user,
+)
+
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
+
+
+def _scoped_counts(current_user: User, db: Session) -> Dict[str, int]:
+    """Return counts using the same tenant/school filters as each resource API."""
+    courses = filter_course_query_for_user(
+        db.query(Course), current_user,
+    ).with_entities(func.count(Course.id)).scalar() or 0
+    departments = filter_department_query_for_user(
+        db.query(Department), current_user,
+    ).with_entities(func.count(Department.id)).scalar() or 0
+    groups = filter_group_query_for_user(
+        db.query(StudentGroup), current_user,
+    ).with_entities(func.count(StudentGroup.id)).scalar() or 0
+    lecturers = filter_lecturer_query_for_user(
+        db.query(Lecturer), current_user,
+    ).with_entities(func.count(Lecturer.id)).scalar() or 0
+    rooms = filter_room_query_for_user(
+        db.query(Room), current_user,
+    ).with_entities(func.count(Room.id)).scalar() or 0
+
+    return {
+        "courses":     courses,
+        "departments": departments,
+        "groups":      groups,
+        "lecturers":   lecturers,
+        "rooms":       rooms,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -42,23 +78,8 @@ async def get_stats_summary(
         "lecturers":   <int>,
         "rooms":       <int>
     }
-
-    Tenant scoping is enforced by the TenantMiddleware at the SQLAlchemy
-    session level — no additional filtering needed here.
     """
-    courses     = db.query(Course).count()
-    departments = db.query(Department).count()
-    groups      = db.query(StudentGroup).count()
-    lecturers   = db.query(Lecturer).count()
-    rooms       = db.query(Room).count()
-
-    return {
-        "courses":     courses,
-        "departments": departments,
-        "groups":      groups,
-        "lecturers":   lecturers,
-        "rooms":       rooms,
-    }
+    return _scoped_counts(current_user, db)
 
 
 # ---------------------------------------------------------------------------
@@ -75,19 +96,13 @@ async def get_readiness_stats(
     to render the coordinator setup-readiness progress strip.
 
     Thresholds mirror what DashboardPage EmptyTimetableLanding expects:
-        courses     ≥ 10
-        departments ≥  3
-        groups      ≥  3
-        lecturers   ≥  5
-        rooms       ≥  3
+        courses     >= 10
+        departments >=  3
+        groups      >=  3
+        lecturers   >=  5
+        rooms       >=  3
     """
-    counts = {
-        "courses":     db.query(Course).count(),
-        "departments": db.query(Department).count(),
-        "groups":      db.query(StudentGroup).count(),
-        "lecturers":   db.query(Lecturer).count(),
-        "rooms":       db.query(Room).count(),
-    }
+    counts = _scoped_counts(current_user, db)
 
     thresholds = {
         "courses":     10,

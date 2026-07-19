@@ -34,7 +34,7 @@ interface BrandingContextType {
 const BrandingContext = createContext<BrandingContextType>({
   branding: defaultBranding,
   loading: false,
-  refreshBranding: async () => {},
+  refreshBranding: async () => { },
   tenantError: false,
 });
 
@@ -49,12 +49,35 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       setLoading(true);
       setTenantError(false);
-      const hostname = window.location.hostname;
+      let hostname = window.location.hostname;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const tenantParam = urlParams.get('tenant');
       
-      // Admin and global domains bypass tenant check
+      if (tenantParam) {
+          localStorage.setItem('tenantOverride', tenantParam);
+      }
+      const override = localStorage.getItem('tenantOverride');
+
       const globalDomains = ['localhost', '127.0.0.1', 'tablesys.com', 'www.tablesys.com'];
+      // nip.io / sslip.io: wildcard DNS — e.g. unza.192.168.0.103.nip.io → IP 192.168.0.103
+      // These carry the tenant slug as the FIRST subdomain, so treat them like real subdomains.
+      const isNipIo = /\.(\d{1,3}\.){3}\d{1,3}\.(nip\.io|sslip\.io)$/.test(hostname);
       const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
-      if (hostname.startsWith('admin.') || globalDomains.includes(hostname) || isIpAddress) {
+      
+      // Only apply override if we are on a plain IP or global domain (not nip.io — those have real subdomains)
+      if ((isIpAddress || globalDomains.includes(hostname)) && !isNipIo) {
+          if (override) {
+              hostname = override;
+          }
+      } else if (!isNipIo) {
+          localStorage.removeItem('tenantOverride');
+      }
+
+      // Re-evaluate if it's STILL an IP address or global domain after potential override
+      const isStillBypass = (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || globalDomains.includes(hostname)) && !isNipIo;
+
+      if (hostname.startsWith('admin.') || isStillBypass) {
         setBranding(defaultBranding);
         localStorage.removeItem('university_id');
         document.title = hostname.startsWith('admin.') ? 'TableSys Superadmin' : 'TableSys';
@@ -70,7 +93,7 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
         plan_tier: data.plan_tier || 'pro',
         max_users: data.max_users || 1000
       };
-      
+
       setBranding(tenantBranding);
       localStorage.setItem('university_id', data.id.toString());
       document.title = data.short_name || data.name || 'TableSys';
@@ -78,7 +101,7 @@ export const BrandingProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to load branding:", err);
       // If 404, we set tenant error flag to hard-block the UI later
       if (err.response && err.response.status === 404) {
-         setTenantError(true);
+        setTenantError(true);
       }
       setBranding(defaultBranding);
       localStorage.removeItem('university_id');

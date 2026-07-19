@@ -2,6 +2,7 @@
 Search Router
 
 Provides global search and advanced filtering endpoints.
+All results are scoped to the authenticated user's university.
 """
 
 from fastapi import APIRouter, Depends, Query, status
@@ -25,23 +26,22 @@ async def global_search(
 ):
     """
     Global search across courses, lecturers, rooms, and groups.
-    
+    Results are always scoped to the requesting user's university.
+
     Query params:
     - q: Search query (minimum 2 characters)
     - types: Entity types to search (courses, lecturers, rooms, groups)
     - limit: Maximum results per entity type (1-100)
     """
-    search_service = SearchService(db)
+    search_service = SearchService(db, university_id=current_user.university_id)
     results = search_service.global_search(q, types, limit)
-    
     return results
 
 
 @router.get("/courses", status_code=status.HTTP_200_OK)
 async def search_courses(
     q: Optional[str] = Query(None, min_length=2, description="Search query"),
-    year: Optional[int] = Query(None, ge=1, le=5, description="Year level"),
-    program: Optional[str] = Query(None, description="Program code"),
+    year: Optional[int] = Query(None, ge=1, le=7, description="Year level"),
     department_id: Optional[int] = Query(None, description="Department ID"),
     course_type: Optional[str] = Query(None, description="Course type"),
     limit: int = Query(100, ge=1, le=200, description="Maximum results"),
@@ -51,20 +51,15 @@ async def search_courses(
     """
     Advanced course search with multiple filters.
     """
-    search_service = SearchService(db)
+    search_service = SearchService(db, university_id=current_user.university_id)
     results = search_service.search_courses(
         query=q,
         year=year,
-        program=program,
         department_id=department_id,
         course_type=course_type,
         limit=limit
     )
-    
-    return {
-        "courses": results,
-        "total": len(results)
-    }
+    return {"courses": results, "total": len(results)}
 
 
 @router.get("/lecturers", status_code=status.HTTP_200_OK)
@@ -80,7 +75,7 @@ async def search_lecturers(
     """
     Advanced lecturer search with multiple filters.
     """
-    search_service = SearchService(db)
+    search_service = SearchService(db, university_id=current_user.university_id)
     results = search_service.search_lecturers(
         query=q,
         department_id=department_id,
@@ -88,21 +83,17 @@ async def search_lecturers(
         max_hours=max_hours,
         limit=limit
     )
-    
-    return {
-        "lecturers": results,
-        "total": len(results)
-    }
+    return {"lecturers": results, "total": len(results)}
 
 
 @router.get("/rooms", status_code=status.HTTP_200_OK)
 async def search_rooms(
     q: Optional[str] = Query(None, min_length=2, description="Search query"),
     building: Optional[str] = Query(None, description="Building name"),
-    category: Optional[str] = Query(None, description="Room category"),
+    room_type: Optional[str] = Query(None, description="Room type"),
     min_capacity: Optional[int] = Query(None, ge=0, description="Minimum capacity"),
     max_capacity: Optional[int] = Query(None, ge=0, description="Maximum capacity"),
-    available_only: bool = Query(False, description="Only available rooms"),
+    available_only: bool = Query(False, description="Only non-blocked rooms"),
     limit: int = Query(100, ge=1, le=200, description="Maximum results"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -110,28 +101,23 @@ async def search_rooms(
     """
     Advanced room search with multiple filters.
     """
-    search_service = SearchService(db)
+    search_service = SearchService(db, university_id=current_user.university_id)
     results = search_service.search_rooms(
         query=q,
         building=building,
-        category=category,
+        room_type=room_type,
         min_capacity=min_capacity,
         max_capacity=max_capacity,
         available_only=available_only,
         limit=limit
     )
-    
-    return {
-        "rooms": results,
-        "total": len(results)
-    }
+    return {"rooms": results, "total": len(results)}
 
 
 @router.get("/groups", status_code=status.HTTP_200_OK)
 async def search_groups(
     q: Optional[str] = Query(None, min_length=2, description="Search query"),
-    year: Optional[int] = Query(None, ge=1, le=5, description="Year level"),
-    program: Optional[str] = Query(None, description="Program code"),
+    level: Optional[int] = Query(None, ge=1, le=7, description="Year level"),
     group_type: Optional[str] = Query(None, description="Group type"),
     limit: int = Query(100, ge=1, le=200, description="Maximum results"),
     current_user: User = Depends(get_current_user),
@@ -140,16 +126,11 @@ async def search_groups(
     """
     Advanced student group search with multiple filters.
     """
-    search_service = SearchService(db)
+    search_service = SearchService(db, university_id=current_user.university_id)
     results = search_service.search_groups(
         query=q,
-        year=year,
-        program=program,
+        level=level,
         group_type=group_type,
         limit=limit
     )
-    
-    return {
-        "groups": results,
-        "total": len(results)
-    }
+    return {"groups": results, "total": len(results)}

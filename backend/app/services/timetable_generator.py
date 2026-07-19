@@ -6,75 +6,113 @@ from typing import Dict, Callable, List, Optional, Any, Tuple, Set
 from datetime import time
 from ..models import (
     Timetable, TimetableSlot, Room, Course, Lecturer,
-    StudentGroup, GroupAssignment, LecturerAssignment,
-    RoomType, UserRole, CourseType, CourseGroupLink
+    StudentGroup, GroupAssignment, LecturerAssignment, LecturerUnavailability,
+    RoomType, UserRole, CourseType, CourseGroupLink, University, ActivityType, Department
 )
+from ..utils.course_profile import COURSE_PROFILE_STATUS_COMPLETE
 from ..utils.department_utils import is_general_department
 from ..utils.room_matching import room_match_rank, room_type_matches
+from ..utils.transit import DEFAULT_TRANSIT_MINUTES, insufficient_transit_time
+from .institution_templates import build_policy
+import time as time_mod
+
+try:
+    from ..observability import (
+        generation_duration_histogram,
+        generation_success_counter,
+        generation_timeout_counter,
+        generation_fallback_counter,
+        generation_variables_histogram,
+    )
+except ImportError:
+    pass
 
 
 class TimetableGenerator:
-    def __init__(self, db: Session, timetable_id: int, progress_callback: Callable = None, components: list = None):
+    def __init__(self, db: Session, timetable_id: int, progress_callback: Callable = None, components: list = None, profile: str = "balanced"):
         self.db = db
         self.timetable_id = timetable_id
         self.progress_callback = progress_callback
         self.requested_components = list(components) if components else None
         self.components = list(components) if components else None
+        self.profile = profile
+        self.is_degraded = False
 
         # Load grid configuration from timetable record.
         # The current API stores this under generation_metadata.grid_config.
         timetable = db.query(Timetable).filter(Timetable.id == timetable_id).first()
+        self.timetable = timetable
+        self.school_id = getattr(timetable, "school_id", None) if timetable else None
         metadata = (getattr(timetable, 'generation_metadata', None) or {}) if timetable else {}
         metadata_grid = metadata.get('grid_config') if isinstance(metadata, dict) else None
         model_grid = getattr(timetable, 'grid_config', None) if timetable else None
+        self.university = None
+        policy_defaults: Dict[str, Any] = {}
+        if timetable and getattr(timetable, "university_id", None):
+            self.university = self.db.query(University).filter(University.id == timetable.university_id).first()
+            policy_defaults = dict(getattr(self.university, "scheduling_policy", None) or {})
 
         grid_config: Dict[str, Any] = {}
+        calendar = getattr(timetable, 'academic_calendar', None) if timetable else None
+        if calendar:
+            grid_config.update({
+                'active_days': calendar.days_of_week,
+                'start_time': calendar.start_time,
+                'end_time': calendar.end_time,
+                'slot_duration_minutes': calendar.slot_duration_minutes,
+            })
         if isinstance(metadata_grid, dict):
             grid_config.update(metadata_grid)
         if isinstance(model_grid, dict):
             # Prefer explicit model values when present, but keep metadata fallback.
             grid_config.update(model_grid)
+        if policy_defaults.get("lunch_start") and "lunch_start" not in grid_config:
+            grid_config["lunch_start"] = policy_defaults["lunch_start"]
+        if policy_defaults.get("lunch_end") and "lunch_end" not in grid_config:
+            grid_config["lunch_end"] = policy_defaults["lunch_end"]
 
         active_days = grid_config.get('active_days', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
         if not isinstance(active_days, list) or not active_days:
             active_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
-        start_raw = grid_config.get('start_time', '07:00')
-        end_raw = grid_config.get('end_time', '17:00')
+        self.slot_duration = self._normalize_slot_duration(
+            grid_config.get('slot_duration_minutes', 60)
+        )
+        self.day_start_time = self._coerce_time(grid_config.get('start_time', '07:00'), time(7, 0))
+        day_end_time = self._coerce_time(grid_config.get('end_time', '17:00'), time(17, 0))
+        self.lunch_start_time = self._coerce_time(grid_config.get('lunch_start', '13:00'), time(13, 0))
+        self.lunch_end_time = self._coerce_time(grid_config.get('lunch_end', '14:00'), time(14, 0))
 
-        def _extract_hour(value: Any, default: int) -> int:
-            if value is None:
-                return default
-            if hasattr(value, 'hour'):
-                try:
-                    return int(value.hour)
-                except Exception:
-                    return default
-            text = str(value).strip()
-            if ':' in text:
-                text = text.split(':', 1)[0]
-            try:
-                return int(text)
-            except Exception:
-                return default
+        self.day_start_minutes = self._time_as_minutes(self.day_start_time)
+        day_end_minutes = self._time_as_minutes(day_end_time)
+        self.lunch_start_minutes = self._time_as_minutes(self.lunch_start_time)
+        self.lunch_end_minutes = self._time_as_minutes(self.lunch_end_time)
 
-        self.start_hour = _extract_hour(start_raw, 7)
-        end_hour = _extract_hour(end_raw, 17)
-        self.lunch_start_hour = _extract_hour(grid_config.get('lunch_start', '13:00'), 13)
-        self.lunch_end_hour = _extract_hour(grid_config.get('lunch_end', '14:00'), 14)
-        if end_hour <= self.start_hour:
-            end_hour = self.start_hour + 1
-        if self.lunch_end_hour <= self.lunch_start_hour:
-            self.lunch_start_hour = 13
-            self.lunch_end_hour = 14
+        if day_end_minutes <= self.day_start_minutes:
+            day_end_minutes = self.day_start_minutes + self.slot_duration
+        if self.lunch_end_minutes <= self.lunch_start_minutes:
+            self.lunch_start_minutes = 13 * 60
+            self.lunch_end_minutes = 14 * 60
         self.days = active_days
+        self.start_hour = self.day_start_time.hour
 
-        num_slots = end_hour - self.start_hour
+        total_day_minutes = day_end_minutes - self.day_start_minutes
+        self.num_slots = max(1, total_day_minutes // self.slot_duration)
         self.time_slots = [
-            (time(self.start_hour + i, 0), time(self.start_hour + i + 1, 0))
-            for i in range(num_slots)
+            (
+                self._idx_to_time(i),
+                self._idx_to_time(i + 1),
+            )
+            for i in range(self.num_slots)
         ]
-        self.num_slots = num_slots
+        self.scheduling_policy = dict(getattr(self.university, "scheduling_policy", None) or build_policy("custom"))
+        self.activity_types_by_key: Dict[str, ActivityType] = {}
+        if timetable and getattr(timetable, "university_id", None):
+            rows = self.db.query(ActivityType).filter(
+                ActivityType.university_id == timetable.university_id,
+                ActivityType.is_active == True,
+            ).all()
+            self.activity_types_by_key = {str(row.key).strip().lower(): row for row in rows}
 
         self.all_slots: List[Dict] = []
         self.existing_slots: List[Dict] = []
@@ -91,9 +129,39 @@ class TimetableGenerator:
         # portion of the class. This blocks absurd assignments such as
         # placing 650 students into a 50-seat room.
         self.oversized_room_min_attendance_ratio = 0.50
+        self._lecturer_unavailability: Dict[int, List[LecturerUnavailability]] = {}
+
+    def _apply_course_scope(self, query):
+        if self.university is not None:
+            query = query.filter(Department.university_id == self.university.id)
+        if self.school_id is not None:
+            query = query.filter(Department.school_id == self.school_id)
+        query = query.filter(Course.profile_status == COURSE_PROFILE_STATUS_COMPLETE)
+        return query
+
+    def _apply_group_scope(self, query):
+        if self.university is not None or self.school_id is not None:
+            query = query.join(StudentGroup.department)
+        if self.university is not None:
+            query = query.filter(Department.university_id == self.university.id)
+        if self.school_id is not None:
+            query = query.filter(Department.school_id == self.school_id)
+        return query
+
+    def _apply_room_scope(self, query):
+        if self.university is not None:
+            query = query.filter(Room.university_id == self.university.id)
+        if self.school_id is not None:
+            query = query.filter((Room.school_id == self.school_id) | (Room.school_id == None))
+        return query
 
     @staticmethod
-    def _session_requires_room(session_type: Optional[str]) -> bool:
+    def _session_requires_room(session_type: Optional[Any]) -> bool:
+        if isinstance(session_type, dict):
+            required_tags = session_type.get("required_room_tags") or []
+            if required_tags:
+                return True
+            session_type = session_type.get("legacy_session_type") or session_type.get("type")
         return str(session_type or "").strip().lower() not in {"practical", "lab"}
 
     def _capacity_penalty(self, required_size: int, room_capacity: Optional[int]) -> int:
@@ -146,31 +214,83 @@ class TimetableGenerator:
             ),
         )
 
-    def _lunch_window_indices(self) -> Optional[Tuple[int, int]]:
-        lunch_start_idx = self.lunch_start_hour - self.start_hour
-        lunch_end_idx = self.lunch_end_hour - self.start_hour
-        if lunch_end_idx <= lunch_start_idx:
-            return None
-        if lunch_end_idx <= 0 or lunch_start_idx >= self.num_slots:
-            return None
-        return max(0, lunch_start_idx), min(self.num_slots, lunch_end_idx)
+    @staticmethod
+    def _time_as_minutes(value: time) -> int:
+        return (value.hour * 60) + value.minute
+
+    @staticmethod
+    def _coerce_time(value: Any, default: time) -> time:
+        if value is None:
+            return default
+        if isinstance(value, time):
+            return value
+        text = str(value).strip()
+        if not text:
+            return default
+        try:
+            parts = text.split(":")
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            return time(hour=hour % 24, minute=minute % 60)
+        except Exception:
+            return default
+
+    @staticmethod
+    def _normalize_slot_duration(value: Any) -> int:
+        try:
+            duration = int(value)
+        except (TypeError, ValueError):
+            duration = 60
+        return duration if duration > 0 else 60
+
+    def _slot_bounds_minutes(self, start_idx: int, duration: int = 1) -> Tuple[int, int]:
+        start_minutes = self.day_start_minutes + (start_idx * self.slot_duration)
+        end_minutes = start_minutes + (duration * self.slot_duration)
+        return start_minutes, end_minutes
 
     def _overlaps_lunch(self, start_idx: int, duration: int) -> bool:
-        lunch_window = self._lunch_window_indices()
-        if not lunch_window:
+        if self.lunch_end_minutes <= self.lunch_start_minutes:
             return False
-        lunch_start_idx, lunch_end_idx = lunch_window
-        session_end_idx = start_idx + duration
-        return start_idx < lunch_end_idx and session_end_idx > lunch_start_idx
+        session_start, session_end = self._slot_bounds_minutes(start_idx, duration)
+        return session_start < self.lunch_end_minutes and session_end > self.lunch_start_minutes
 
     def _component_sequence(self) -> List[str]:
         """Return generation layers in the order they should be scheduled."""
-        selected = self.requested_components or ['lecture', 'practical', 'tutorial']
-        normalized = []
-        for component in selected:
-            name = str(component).strip().lower()
-            if name in {'lecture', 'practical', 'tutorial'} and name not in normalized:
-                normalized.append(name)
+        if self.requested_components:
+            normalized = []
+            for component in self.requested_components:
+                name = self._normalize_key(component)
+                if name and name not in normalized:
+                    normalized.append(name)
+            return normalized or ['lecture', 'practical', 'tutorial']
+
+        normalized: List[str] = []
+        seen = set()
+        course_query = self._apply_course_scope(self.db.query(Course).join(Course.department))
+        courses = course_query.all()
+
+        for course in courses:
+            for requirement in course.activity_requirements or []:
+                key = self._normalize_key(requirement.get("activity_type_key") or requirement.get("type"))
+                if key and key not in seen:
+                    normalized.append(key)
+                    seen.add(key)
+
+        for key in sorted(self.activity_types_by_key.keys()):
+            if key not in seen:
+                normalized.append(key)
+                seen.add(key)
+
+        legacy_components = [
+            ("lecture", any((course.lecture_hours or 0) > 0 for course in courses)),
+            ("practical", any((course.practical_hours or 0) > 0 for course in courses)),
+            ("tutorial", any((course.tutorial_hours or 0) > 0 for course in courses)),
+        ]
+        for key, enabled in legacy_components:
+            if enabled and key not in seen:
+                normalized.append(key)
+                seen.add(key)
+
         return normalized or ['lecture', 'practical', 'tutorial']
 
     def _active_component_name(self) -> str:
@@ -186,7 +306,11 @@ class TimetableGenerator:
         """Normalize optional component selection into a lowercase set."""
         if not self.components:
             return None
-        return {str(component).strip().lower() for component in self.components if str(component).strip()}
+        return {
+            self._normalize_key(component)
+            for component in self.components
+            if self._normalize_key(component)
+        }
 
     def _session_frequency(self, config: Dict[str, Any], session_type: str, default: int) -> int:
         """Read weekly frequency from config with a clear operational default."""
@@ -196,6 +320,121 @@ class TimetableGenerator:
         except (TypeError, ValueError):
             frequency = default
         return max(frequency, 0)
+
+    def _policy_frequency(self, session_type: str, default: int) -> int:
+        key = f"default_{session_type}_frequency"
+        try:
+            value = int(self.scheduling_policy.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return max(value, 0)
+
+    @staticmethod
+    def _normalize_key(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    def _legacy_activity_requirement(self, key: str, duration: int) -> Dict[str, Any]:
+        legacy_map = {
+            "lecture": {
+                "display_name": "Lecture",
+                "requires_subgroups": False,
+                "required_room_tags": [],
+                "subgroup_key": None,
+            },
+            "tutorial": {
+                "display_name": "Tutorial",
+                "requires_subgroups": True,
+                "required_room_tags": [],
+                "subgroup_key": "tutorial_group",
+            },
+            "practical": {
+                "display_name": "Practical",
+                "requires_subgroups": True,
+                "required_room_tags": [],
+                "subgroup_key": "lab_group",
+            },
+        }
+        base = legacy_map[key]
+        return {
+            "activity_type_key": key,
+            "activity_display_name": base["display_name"],
+            "duration": duration,
+            "requires_subgroups": base["requires_subgroups"],
+            "required_room_tags": list(base["required_room_tags"]),
+            "legacy_session_type": key,
+            "subgroup_key": base["subgroup_key"],
+        }
+
+    def _session_descriptor(self, requirement: Dict[str, Any], index: int) -> Dict[str, Any]:
+        activity_key = self._normalize_key(requirement.get("activity_type_key") or requirement.get("type"))
+        activity = self.activity_types_by_key.get(activity_key)
+        duration = int(
+            requirement.get("hours_per_session")
+            or requirement.get("duration")
+            or (activity.default_duration_periods if activity else 1)
+            or 1
+        )
+        legacy_type = self._normalize_key(requirement.get("legacy_session_type"))
+        if not legacy_type and activity_key in {"lecture", "tutorial", "practical"}:
+            legacy_type = activity_key
+        requires_subgroups = bool(
+            requirement.get("requires_subgroups")
+            if requirement.get("requires_subgroups") is not None
+            else (activity.requires_subgroups if activity else False)
+        )
+        room_tags = requirement.get("required_room_tags")
+        if room_tags is None and activity:
+            room_tags = activity.resource_tags_required
+        display_name = requirement.get("activity_display_name") or (activity.display_name if activity else activity_key.title())
+        subgroup_key = requirement.get("subgroup_key")
+        if subgroup_key is None and requires_subgroups:
+            subgroup_key = activity_key or legacy_type
+        return {
+            "type": activity_key or legacy_type,
+            "duration": max(duration, 1),
+            "course_id": requirement.get("course_id"),
+            "s_id": index,
+            "activity_type_key": activity_key or legacy_type,
+            "activity_display_name": display_name,
+            "frequency": requirement.get("frequency_per_week"),
+            "requires_subgroups": requires_subgroups,
+            "required_room_tags": list(room_tags or []),
+            "legacy_session_type": legacy_type or None,
+            "subgroup_key": subgroup_key,
+        }
+
+    def _session_identity(self, session: Dict[str, Any]) -> str:
+        return self._normalize_key(session.get("legacy_session_type") or session.get("activity_type_key") or session.get("type"))
+
+    def _find_subgroups_for_session(
+        self,
+        base_group_id: int,
+        session: Dict[str, Any],
+        children_by_parent_type: Dict[Tuple[int, str], List[StudentGroup]],
+    ) -> List[StudentGroup]:
+        session_key = self._normalize_key(session.get("subgroup_key"))
+        legacy_type = self._normalize_key(session.get("legacy_session_type"))
+        selectors: List[str] = []
+        if session_key:
+            selectors.append(session_key)
+        if legacy_type == "tutorial":
+            selectors.append("tutorial_group")
+        if legacy_type == "practical":
+            selectors.extend(["lab_group", "drawing_group"])
+        normalized = []
+        for selector in selectors:
+            key = self._normalize_key(selector)
+            if key and key not in normalized:
+                normalized.append(key)
+
+        matches: List[StudentGroup] = []
+        seen_ids: Set[int] = set()
+        for selector in normalized:
+            for subgroup in children_by_parent_type.get((base_group_id, selector), []):
+                if subgroup.id not in seen_ids:
+                    matches.append(subgroup)
+                    seen_ids.add(subgroup.id)
+        return matches
 
     def _normalize_shared_group_ids(self, value: Any) -> List[int]:
         """Return shared group ids as a plain list regardless of legacy storage shape."""
@@ -212,34 +451,38 @@ class TimetableGenerator:
                 return []
         return []
 
-    def _slots_overlap(self, day_idx: int, start_hour: int, end_hour: int, slot: Dict) -> bool:
+    def _slots_overlap(self, day_idx: int, start_idx: int, end_idx: int, slot: Dict) -> bool:
         """Check whether a candidate placement overlaps an existing booking."""
         if slot['day_of_week'] != day_idx:
             return False
         slot_start = self._time_to_idx(slot['start_time'])
         slot_end = self._time_to_idx(slot['end_time'])
-        return start_hour < slot_end and end_hour > slot_start
+        return start_idx < slot_end and end_idx > slot_start
 
     def _resource_blocked(self, resource_kind: str, resource_id: int, day_idx: int,
-                          start_hour: int, end_hour: int) -> bool:
+                          start_idx: int, end_idx: int, candidate_room_id: Optional[int] = None) -> bool:
         """Check whether a room, lecturer, or group is already blocked by prior placements."""
         if resource_id is None:
             return False
 
         for slot in self.all_slots + self.existing_slots:
-            if not self._slots_overlap(day_idx, start_hour, end_hour, slot):
-                continue
+            overlaps = self._slots_overlap(day_idx, start_idx, end_idx, slot)
+            candidate_start = self._idx_to_time(start_idx)
+            candidate_end = self._idx_to_time(end_idx)
+            needs_transit = insufficient_transit_time(
+                candidate_start, candidate_end, candidate_room_id,
+                slot['start_time'], slot['end_time'], slot.get('room_id'),
+            )
 
-            if resource_kind == 'room' and slot.get('room_id') == resource_id:
+            if resource_kind == 'room' and overlaps and slot.get('room_id') == resource_id:
                 return True
-            if resource_kind == 'lecturer' and slot.get('lecturer_id') == resource_id:
+            if resource_kind == 'lecturer' and slot.get('lecturer_id') == resource_id and (overlaps or needs_transit):
                 return True
             if resource_kind == 'group':
-                if slot.get('group_id') == resource_id:
-                    return True
-                if resource_id in self._normalize_shared_group_ids(slot.get('shared_group_ids')):
-                    return True
-                if resource_id in self._normalize_shared_group_ids(slot.get('rotation_group_ids')):
+                matches_group = slot.get('group_id') == resource_id
+                matches_group = matches_group or resource_id in self._normalize_shared_group_ids(slot.get('shared_group_ids'))
+                matches_group = matches_group or resource_id in self._normalize_shared_group_ids(slot.get('rotation_group_ids'))
+                if matches_group and (overlaps or needs_transit):
                     return True
         return False
 
@@ -293,21 +536,14 @@ class TimetableGenerator:
                 if self._overlaps_lunch(start_t, duration):
                     continue
 
-                start_hour = self.start_hour + start_t
-                end_hour = start_hour + duration
                 compat_rooms = self._get_compatible_rooms(
-                    course, session_type, group_size_required, all_rooms, day_idx, start_hour, end_hour
+                    course, session_type, group_size_required, all_rooms, day_idx, start_t, start_t + duration
                 )
 
                 if compat_rooms:
                     compatible_room_count += len(compat_rooms)
                 else:
                     room_filter_blocked += 1
-                    continue
-
-                if any(self._resource_blocked('group', gid, day_idx, start_t, start_t + duration)
-                       for gid in covered_group_ids):
-                    group_booking_blocked += 1
                     continue
 
                 window_has_candidate = False
@@ -320,9 +556,14 @@ class TimetableGenerator:
                         continue
                     room_free_found = True
 
+                    if any(self._resource_blocked('group', gid, day_idx, start_t, start_t + duration, room.id)
+                           for gid in covered_group_ids):
+                        group_booking_blocked += 1
+                        continue
+
                     for lecturer_id in lecturer_ids:
                         if lecturer_id is not None and self._resource_blocked(
-                            'lecturer', lecturer_id, day_idx, start_t, start_t + duration
+                            'lecturer', lecturer_id, day_idx, start_t, start_t + duration, room.id
                         ):
                             continue
                         lecturer_free_found = True
@@ -375,8 +616,12 @@ class TimetableGenerator:
             unschedulable_sessions = []
 
         level_values = self._level_values(level)
-        level_courses = self.db.query(Course).filter(Course.level.in_(level_values)).all()
-        level_groups = self.db.query(StudentGroup).filter(StudentGroup.level.in_(level_values)).all()
+        level_courses = self._apply_course_scope(
+            self.db.query(Course).join(Course.department).filter(Course.level.in_(level_values))
+        ).all()
+        level_groups = self._apply_group_scope(
+            self.db.query(StudentGroup).filter(StudentGroup.level.in_(level_values))
+        ).all()
         group_weekly_load = {g.id: 0 for g in level_groups}
         course_breakdown = []
 
@@ -432,10 +677,38 @@ class TimetableGenerator:
 
     def generate_timetable(self) -> bool:
         """Generate timetable level-by-level and component-by-component."""
-        level_rows = self.db.query(Course.level).distinct().all()
+        start_time = time_mod.time()
+        timetable = self.db.query(Timetable).filter(Timetable.id == self.timetable_id).first()
+        tenant_id = getattr(timetable, "university_id", "none") if timetable else "none"
+        plan_tier = "free"
+        if tenant_id != "none":
+            uni = self.db.query(University).filter(University.id == tenant_id).first()
+            if uni and uni.plan_tier:
+                plan_tier = uni.plan_tier
+        self.metrics_tags = {"tenant_id": str(tenant_id), "plan_tier": plan_tier}
+        
+        level_rows = self._apply_course_scope(
+            self.db.query(Course.level).join(Course.department)
+        ).distinct().all()
         levels = sorted({r[0] for r in level_rows if r[0]}, reverse=True)
         if not levels:
-            self.send_progress(0, 'success', 100, 'No scheduled courses found. Nothing to process.')
+            incomplete_query = self.db.query(Course).join(Course.department).filter(
+                Course.profile_status != COURSE_PROFILE_STATUS_COMPLETE,
+            )
+            if self.university is not None:
+                incomplete_query = incomplete_query.filter(Department.university_id == self.university.id)
+            if self.school_id is not None:
+                incomplete_query = incomplete_query.filter(Department.school_id == self.school_id)
+            incomplete_count = incomplete_query.count()
+            if incomplete_count:
+                self.send_progress(
+                    0,
+                    'success',
+                    100,
+                    'No complete courses found. Profile-seeded courses must be completed by the school coordinator or HOD before generation.',
+                )
+            else:
+                self.send_progress(0, 'success', 100, 'No scheduled courses found. Nothing to process.')
             return True
         component_layers = self._component_sequence()
 
@@ -494,6 +767,12 @@ class TimetableGenerator:
 
                 if not success:
                     self.fallback_levels.append(self._scope_key(level))
+                    try:
+                        level_tags = self.metrics_tags.copy()
+                        level_tags.update({"level": str(level), "component_type": component})
+                        generation_fallback_counter.add(1, level_tags)
+                    except NameError: pass
+                    
                     self.send_progress(level, 'retrying', unit_pct_start,
                                        f'Year {level} {component}s: Applying extended scheduling strategy...')
                     success = self.generate_level_timetable_greedy(level)
@@ -501,6 +780,9 @@ class TimetableGenerator:
                 if not success:
                     self.send_progress(level, 'failed', unit_pct_start,
                                        f'Year {level} {component}s: Unable to produce a valid schedule.')
+                    try:
+                        generation_duration_histogram.record((time_mod.time() - start_time) * 1000, self.metrics_tags)
+                    except NameError: pass
                     return False
 
                 self.send_progress(level, 'completed', unit_pct_end,
@@ -510,6 +792,10 @@ class TimetableGenerator:
         self.send_progress(0, 'finalizing', 95, 'Finalising and saving timetable...')
         self.save_timetable()
         self.send_progress(0, 'success', 100, 'Timetable generated successfully!')
+        try:
+            generation_duration_histogram.record((time_mod.time() - start_time) * 1000, self.metrics_tags)
+            generation_success_counter.add(1, self.metrics_tags)
+        except NameError: pass
         return True
 
     def _parse_course_sessions(self, course: Course) -> List[Dict]:
@@ -527,51 +813,57 @@ class TimetableGenerator:
         config = course.session_configuration or {}
         selected_components = self._selected_components()
 
+        if course.activity_requirements:
+            for req in course.activity_requirements:
+                session = self._session_descriptor({**req, "course_id": course.id}, len(sessions))
+                session_component = self._session_identity(session)
+                if selected_components is not None and session_component not in selected_components:
+                    continue
+                frequency = req.get("frequency_per_week")
+                if frequency is None and session["activity_type_key"] in self.activity_types_by_key:
+                    frequency = self.activity_types_by_key[session["activity_type_key"]].default_frequency_per_week
+                if frequency is None and session.get("legacy_session_type"):
+                    frequency = self._policy_frequency(session["legacy_session_type"], 1)
+                try:
+                    frequency = int(frequency or 1)
+                except (TypeError, ValueError):
+                    frequency = 1
+                for _ in range(max(frequency, 0)):
+                    sessions.append({**session, "s_id": len(sessions), "frequency": max(frequency, 0)})
+            return sessions
+
         # --- Lectures ---
         duration = course.lecture_hours or 0
         if duration > 0 and (selected_components is None or 'lecture' in selected_components):
-            frequency = self._session_frequency(config, 'lecture', 2)
+            frequency = self._session_frequency(config, 'lecture', self._policy_frequency('lecture', 2))
+            descriptor = self._session_descriptor(self._legacy_activity_requirement("lecture", duration), len(sessions))
             for _ in range(frequency):
-                sessions.append({
-                    'type': 'lecture',
-                    'duration': duration,
-                    'course_id': course.id,
-                    's_id': len(sessions)
-                })
+                sessions.append({**descriptor, 'course_id': course.id, 's_id': len(sessions), 'frequency': frequency})
 
         # --- Tutorials ---
         tut_hours = course.tutorial_hours or 0
         if tut_hours > 0 and (selected_components is None or 'tutorial' in selected_components):
-            tut_freq = self._session_frequency(config, 'tutorial', 1)
+            tut_freq = self._session_frequency(config, 'tutorial', self._policy_frequency('tutorial', 1))
+            descriptor = self._session_descriptor(self._legacy_activity_requirement("tutorial", tut_hours), len(sessions))
             for _ in range(tut_freq):
-                sessions.append({
-                    'type': 'tutorial',
-                    'duration': tut_hours,
-                    'course_id': course.id,
-                    's_id': len(sessions)
-                })
+                sessions.append({**descriptor, 'course_id': course.id, 's_id': len(sessions), 'frequency': tut_freq})
 
         # --- Practicals ---
         prac_hours = course.practical_hours or 0
         if prac_hours > 0 and (selected_components is None or 'practical' in selected_components):
-            prac_freq = self._session_frequency(config, 'practical', 1)
+            prac_freq = self._session_frequency(config, 'practical', self._policy_frequency('practical', 1))
+            descriptor = self._session_descriptor(self._legacy_activity_requirement("practical", prac_hours), len(sessions))
             for _ in range(prac_freq):
-                sessions.append({
-                    'type': 'practical',
-                    'duration': prac_hours,
-                    'course_id': course.id,
-                    's_id': len(sessions)
-                })
+                sessions.append({**descriptor, 'course_id': course.id, 's_id': len(sessions), 'frequency': prac_freq})
 
         return sessions
 
     def _build_level_group_context(self, level: int) -> Dict[str, Any]:
         """Load all groups for a level and index them by parent/type."""
-        level_groups = (
-            self.db.query(StudentGroup)
-            .filter(StudentGroup.level.in_(self._level_values(level)))
-            .all()
+        query = self._apply_group_scope(
+            self.db.query(StudentGroup).filter(StudentGroup.level.in_(self._level_values(level)))
         )
+        level_groups = query.all()
         groups_by_id = {g.id: g for g in level_groups}
         children_by_parent: Dict[int, List[StudentGroup]] = defaultdict(list)
         children_by_parent_type: Dict[Tuple[int, str], List[StudentGroup]] = defaultdict(list)
@@ -786,7 +1078,7 @@ class TimetableGenerator:
     def _resolve_session_units(
         self,
         course: Course,
-        session_type: str,
+        session_type: Any,
         group_ctx: Dict[str, Any],
         lecture_units: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
@@ -811,11 +1103,14 @@ class TimetableGenerator:
         group_size_map = group_ctx['group_size_map']
         children_by_parent_type = group_ctx['children_by_parent_type']
 
-        explicit_units = self._build_explicit_session_units(course, session_type, groups_by_id, group_size_map)
+        session_key = session_type if isinstance(session_type, str) else self._session_identity(session_type)
+        legacy_session_type = session_key if isinstance(session_type, str) else self._normalize_key(session_type.get("legacy_session_type"))
+        explicit_lookup = legacy_session_type or session_key
+        explicit_units = self._build_explicit_session_units(course, explicit_lookup, groups_by_id, group_size_map)
         if explicit_units:
             return explicit_units
 
-        if session_type == 'lecture':
+        if explicit_lookup == 'lecture' or (not legacy_session_type and not isinstance(session_type, str) and not session_type.get("requires_subgroups")):
             return self._resolve_default_lecture_units(course, group_ctx)
 
         lecture_units = lecture_units or self._resolve_session_units(course, 'lecture', group_ctx, [])
@@ -827,8 +1122,8 @@ class TimetableGenerator:
 
         resolved_units: List[Dict[str, Any]] = []
         for base_group_id in base_group_ids:
-            if session_type == 'tutorial':
-                subgroup_candidates = children_by_parent_type.get((base_group_id, 'tutorial_group'), [])
+            if explicit_lookup == 'tutorial':
+                subgroup_candidates = self._find_subgroups_for_session(base_group_id, session_type if isinstance(session_type, dict) else {"legacy_session_type": "tutorial"}, children_by_parent_type)
                 if subgroup_candidates:
                     for subgroup in subgroup_candidates:
                         resolved_units.append({
@@ -852,10 +1147,13 @@ class TimetableGenerator:
                     })
                 continue
 
-            practical_subgroups = (
-                children_by_parent_type.get((base_group_id, 'lab_group'), []) +
-                children_by_parent_type.get((base_group_id, 'drawing_group'), [])
-            )
+            if isinstance(session_type, dict) and session_type.get("requires_subgroups"):
+                practical_subgroups = self._find_subgroups_for_session(base_group_id, session_type, children_by_parent_type)
+            else:
+                practical_subgroups = (
+                    children_by_parent_type.get((base_group_id, 'lab_group'), []) +
+                    children_by_parent_type.get((base_group_id, 'drawing_group'), [])
+                )
             if len(practical_subgroups) > 1:
                 subgroup_ids = [g.id for g in practical_subgroups]
                 resolved_units.append({
@@ -890,9 +1188,9 @@ class TimetableGenerator:
                 })
         return resolved_units
 
-    def _get_compatible_rooms(self, course: Course, session_type: str,
+    def _get_compatible_rooms(self, course: Course, session_type: Any,
                               group_size: int, all_rooms: List[Room],
-                              day_idx: int, start_hour: int, end_hour: int) -> List[Dict]:
+                              day_idx: int, start_idx: int, end_idx: int) -> List[Dict]:
         """
         Filter rooms by type, capacity, and availability window.
         Returns list of dicts: {'room': Room, 'capacity_penalty': int}
@@ -900,16 +1198,24 @@ class TimetableGenerator:
         """
         # Fix #3: Accept day+time to check room availability blocks
         compatible = []
+        session_start_minutes, session_end_minutes = self._slot_bounds_minutes(start_idx, end_idx - start_idx)
+        required_tags = set((session_type or {}).get("required_room_tags") or []) if isinstance(session_type, dict) else set()
+        match_session_type = session_type if isinstance(session_type, str) else (session_type.get("legacy_session_type") or session_type.get("activity_type_key") or session_type.get("type"))
         for room in all_rooms:
-            # Type match
-            match_rank = room_match_rank(
-                course.preferred_room_type,
-                session_type,
-                room.room_type,
-                group_size=group_size,
-            )
-            if match_rank is None:
-                continue
+            room_tags = set(room.tags or [])
+            if required_tags:
+                if not required_tags.issubset(room_tags):
+                    continue
+                match_rank = 0
+            else:
+                match_rank = room_match_rank(
+                    course.preferred_room_type,
+                    match_session_type,
+                    room.room_type,
+                    group_size=group_size,
+                )
+                if match_rank is None:
+                    continue
 
             # Oversized fallback still needs a realistic lower bound.
             if not self._room_meets_fallback_capacity(group_size, room.capacity):
@@ -921,10 +1227,14 @@ class TimetableGenerator:
                 blocked = False
                 for block in room.availability_blocks:
                     if block.get('day') == day_name:
-                        b_start = int(str(block.get('start', '00:00')).split(':')[0])
-                        b_end = int(str(block.get('end', '00:00')).split(':')[0])
+                        b_start = self._time_as_minutes(
+                            self._coerce_time(block.get('start') or block.get('start_time'), time(0, 0))
+                        )
+                        b_end = self._time_as_minutes(
+                            self._coerce_time(block.get('end') or block.get('end_time'), time(0, 0))
+                        )
                         # Session overlaps block?
-                        if start_hour < b_end and end_hour > b_start:
+                        if session_start_minutes < b_end and session_end_minutes > b_start:
                             blocked = True
                             break
                 if blocked:
@@ -946,27 +1256,61 @@ class TimetableGenerator:
     def _is_lecturer_available(self, lecturer: Lecturer, day_idx: int,
                                 start_hour: int, end_hour: int) -> bool:
         """
-        Check lecturer hard availability.
-        The Lecturer model stores unavailability as a relationship (not a column).
-        teaching_preferences handles soft preferences via the objective.
-        Hard day/time blocking via unavailability rows is handled by the
-        external slot checks in C3. This method always returns True — 
-        the solver's double-booking constraints (C3) already prevent conflicts.
+        Check lecturer hard availability against LecturerUnavailability rows.
         """
-        return lecturer is not None
+        if lecturer is None:
+            return False
+        start_minutes = self.day_start_minutes + (start_hour * self.slot_duration)
+        end_minutes = self.day_start_minutes + (end_hour * self.slot_duration)
+        for block in self._lecturer_unavailability.get(lecturer.id, []):
+            if block.day_of_week != day_idx:
+                continue
+            block_start = self._time_as_minutes(block.start_time)
+            block_end = self._time_as_minutes(block.end_time)
+            if start_minutes < block_end and end_minutes > block_start:
+                return False
+        return True
 
     def generate_level_timetable(self, level: int, progress_start: float, progress_end: float) -> bool:
         """Generate timetable for a specific level using CP-SAT solver"""
         range_span = progress_end - progress_start
 
-        courses = self.db.query(Course).filter(Course.level.in_(self._level_values(level))).all()
+        course_query = self._apply_course_scope(
+            self.db.query(Course).join(Course.department).filter(Course.level.in_(self._level_values(level)))
+        )
+        courses = course_query.all()
         if not courses:
             return True
+        lecturer_ids_for_level = sorted(
+            {
+                row[0]
+                for row in self.db.query(LecturerAssignment.lecturer_id)
+                .join(LecturerAssignment.course)
+                .filter(LecturerAssignment.course_id.in_([course.id for course in courses]))
+                .all()
+                if row[0] is not None
+            }
+        )
+        lecturer_cache = {
+            row.id: row
+            for row in self.db.query(Lecturer).filter(Lecturer.id.in_(lecturer_ids_for_level)).all()
+        } if lecturer_ids_for_level else {}
+        if lecturer_ids_for_level:
+            rows = self.db.query(LecturerUnavailability).filter(
+                LecturerUnavailability.lecturer_id.in_(lecturer_ids_for_level)
+            ).all()
+            availability_map: Dict[int, List[LecturerUnavailability]] = defaultdict(list)
+            for row in rows:
+                availability_map[row.lecturer_id].append(row)
+            self._lecturer_unavailability = availability_map
+        else:
+            self._lecturer_unavailability = {}
 
         group_ctx = self._build_level_group_context(level)
         if not group_ctx['all_groups']:
             return True
-        all_rooms = self.db.query(Room).all()
+        room_query = self._apply_room_scope(self.db.query(Room))
+        all_rooms = room_query.all()
         group_size_map = group_ctx['group_size_map']
 
         self.send_progress(level, 'building', progress_start + range_span * 0.1,
@@ -974,6 +1318,7 @@ class TimetableGenerator:
 
         model = cp_model.CpModel()
         vars_store = {}
+        session_var_index: Dict[Tuple[int, int, int], List[Any]] = defaultdict(list)
         var_meta: Dict[Tuple[int, int, int, int, int, int, Optional[int]], Dict[str, Any]] = {}
         # Used for C4 to know which variables conflict
         var_group_map: Dict[str, List[int]] = {}
@@ -981,6 +1326,15 @@ class TimetableGenerator:
         unschedulable_sessions: List[Dict[str, Any]] = []
         room_candidate_vars: Dict[int, List[Any]] = {}
         lecturer_candidate_vars: Dict[int, List[Any]] = {}
+
+        # Pre-load lecturers for this level into a cache so that the variable-
+        # creation loop (which checks hard unavailability) and the soft-objective
+        # loop (which reads teaching preferences) both use the same in-memory dict
+        # instead of issuing per-variable SQL queries.
+        lecturer_cache = {
+            row.id: row
+            for row in self.db.query(Lecturer).filter(Lecturer.id.in_(lecturer_ids_for_level)).all()
+        } if lecturer_ids_for_level else {}
 
         # ── 1. Create Variables ─────────────────────────────────────────────
         for course in courses:
@@ -992,8 +1346,9 @@ class TimetableGenerator:
                 duration = session['duration']
                 s_id = session['s_id']
                 session_type = session['type']
-                lecturer_ids = self._lecturer_ids_for_session(course.id, session_type)
-                session_units = self._resolve_session_units(course, session_type, group_ctx, lecture_units)
+                lecturer_lookup = session.get("legacy_session_type") or session.get("activity_type_key") or session_type
+                lecturer_ids = self._lecturer_ids_for_session(course.id, lecturer_lookup)
+                session_units = self._resolve_session_units(course, session, group_ctx, lecture_units)
 
                 if not session_units:
                     continue
@@ -1010,20 +1365,17 @@ class TimetableGenerator:
                             if self._overlaps_lunch(start_t, duration):
                                 continue
 
-                            start_hour = self.start_hour + start_t
-                            end_hour = start_hour + duration
-
-                            if self._session_requires_room(session_type):
+                            if self._session_requires_room(session):
                                 room_entries = self._get_compatible_rooms(
-                                    course, session_type, group_size_required, all_rooms,
-                                    day_idx, start_hour, end_hour
+                                    course, session, group_size_required, all_rooms,
+                                    day_idx, start_t, start_t + duration
                                 )
                                 if not room_entries:
                                     fallback_rooms = [
                                         room for room in all_rooms
                                         if room_match_rank(
                                             course.preferred_room_type,
-                                            session_type,
+                                            session.get("legacy_session_type") or session_type,
                                             room.room_type,
                                             group_size=group_size_required,
                                         ) is not None
@@ -1031,7 +1383,7 @@ class TimetableGenerator:
                                     fallback_rank_lookup = {
                                         room.id: room_match_rank(
                                             course.preferred_room_type,
-                                            session_type,
+                                            session.get("legacy_session_type") or session_type,
                                             room.room_type,
                                             group_size=group_size_required,
                                         ) or 99
@@ -1056,7 +1408,23 @@ class TimetableGenerator:
 
                             for room_entry in room_entries:
                                 room = room_entry['room']
+                                room_id = room.id if room else None
+                                if room is not None and self._resource_blocked(
+                                    'room', room.id, day_idx, start_t, start_t + duration
+                                ):
+                                    continue
+                                if any(self._resource_blocked(
+                                    'group', covered_group_id, day_idx, start_t, start_t + duration, room_id
+                                ) for covered_group_id in covered_group_ids):
+                                    continue
                                 for lec_id in lecturer_ids:
+                                    lecturer = lecturer_cache.get(lec_id) if lec_id is not None else None
+                                    if lec_id is not None and not self._is_lecturer_available(lecturer, day_idx, start_t, start_t + duration):
+                                        continue
+                                    if lec_id is not None and self._resource_blocked(
+                                        'lecturer', lec_id, day_idx, start_t, start_t + duration, room_id
+                                    ):
+                                        continue
                                     var_name = (
                                         f'c{course.id}_g{group_id}_s{s_id}'
                                         f'_d{day_idx}_t{start_t}_r{room.id if room else "none"}_l{lec_id}'
@@ -1064,6 +1432,7 @@ class TimetableGenerator:
                                     var = model.NewBoolVar(var_name)
                                     key = (course.id, group_id, s_id, day_idx, start_t, room.id if room else None, lec_id)
                                     vars_store[key] = var
+                                    session_var_index[(course.id, group_id, s_id)].append(var)
                                     var_meta[key] = {
                                         'covered_group_ids': list(covered_group_ids),
                                         'required_group_size': group_size_required,
@@ -1089,7 +1458,7 @@ class TimetableGenerator:
                         diagnostic = self._diagnose_zero_candidate_session(
                             level=level,
                             course=course,
-                            session_type=session_type,
+                            session_type=session.get("activity_type_key") or session_type,
                             duration=duration,
                             primary_group_id=group_id,
                             covered_group_ids=list(covered_group_ids),
@@ -1100,6 +1469,8 @@ class TimetableGenerator:
                         diagnostic['grouping_mode'] = unit['grouping_mode']
                         diagnostic['rotation_group_ids'] = list(unit.get('rotation_group_ids') or [])
                         diagnostic['rotation_cycle_weeks'] = unit.get('rotation_cycle_weeks')
+                        diagnostic['activity_display_name'] = session.get('activity_display_name')
+                        diagnostic['legacy_session_type'] = session.get('legacy_session_type')
                         unschedulable_sessions.append(diagnostic)
 
         if unschedulable_sessions:
@@ -1126,10 +1497,7 @@ class TimetableGenerator:
         for c_id, session_map in c1_targets.items():
             for s_id, g_ids in session_map.items():
                 for g_id in g_ids:
-                    session_vars = [
-                        v for k, v in vars_store.items()
-                        if k[0] == c_id and k[1] == g_id and k[2] == s_id
-                    ]
+                    session_vars = session_var_index.get((c_id, g_id, s_id), [])
                     if session_vars:
                         model.Add(sum(session_vars) == 1)
 
@@ -1215,8 +1583,72 @@ class TimetableGenerator:
                     elif active_group_vars:
                         model.Add(sum(active_group_vars) <= 1)
 
+        # ── C4b. Physical transit between different rooms ──────────────────
+        # Resource constraints above prevent overlap.  They do not catch a
+        # 09:00–11:00 event followed by an 11:00–13:00 event in another
+        # building, so add an explicit incompatibility for people who would
+        # need to move.  The same room remains valid at the shared boundary.
+        def _variable_name(key: Tuple) -> str:
+            room_key = key[5] if key[5] is not None else "none"
+            return f'c{key[0]}_g{key[1]}_s{key[2]}_d{key[3]}_t{key[4]}_r{room_key}_l{key[6]}'
+
+        def _covered_groups(key: Tuple) -> Set[int]:
+            return set(var_group_map.get(_variable_name(key), [key[1]]))
+
+        transit_candidate_keys: Dict[Tuple[str, int, int], List[Tuple]] = defaultdict(list)
+        for key in vars_store:
+            if key[6] is not None:
+                transit_candidate_keys[("lecturer", key[6], key[3])].append(key)
+            for covered_group_id in _covered_groups(key):
+                transit_candidate_keys[("group", covered_group_id, key[3])].append(key)
+
+        constrained_pairs: Set[Tuple[Tuple, Tuple]] = set()
+        transit_slot_window = max(1, (DEFAULT_TRANSIT_MINUTES + self.slot_duration - 1) // self.slot_duration)
+        for (_, _, _), candidates in transit_candidate_keys.items():
+            ordered = sorted(candidates, key=lambda key: key[4])
+            for index, first_key in enumerate(ordered):
+                first_duration = course_sessions[first_key[0]][first_key[2]]["duration"]
+                first_end_idx = first_key[4] + first_duration
+                for second_key in ordered[index + 1:]:
+                    # Later candidates cannot be too close once this point is passed.
+                    if second_key[4] > first_end_idx + transit_slot_window:
+                        break
+                    if first_key[5] is not None and first_key[5] == second_key[5]:
+                        continue
+                    first_start = self._idx_to_time(first_key[4])
+                    first_end = self._idx_to_time(first_end_idx)
+                    second_duration = course_sessions[second_key[0]][second_key[2]]["duration"]
+                    second_start = self._idx_to_time(second_key[4])
+                    second_end = self._idx_to_time(second_key[4] + second_duration)
+                    if not insufficient_transit_time(
+                        first_start, first_end, first_key[5], second_start, second_end, second_key[5],
+                    ):
+                        continue
+                    pair = tuple(sorted((first_key, second_key), key=str))
+                    if pair in constrained_pairs:
+                        continue
+                    constrained_pairs.add(pair)
+                    model.Add(vars_store[first_key] + vars_store[second_key] <= 1)
+
         objective_terms = []
         objective_penalties = []
+
+        # Define dynamic penalty weights based on selected scheduling profile
+        if self.profile == "compact":
+            ACTIVE_DAY_WEIGHT = 1500
+            GAP_WEIGHT = 800
+            OVERLOAD_PENALTY = 500
+            FATIGUE_PENALTY = 300
+        elif self.profile == "wellbeing":
+            ACTIVE_DAY_WEIGHT = 200
+            GAP_WEIGHT = 400
+            OVERLOAD_PENALTY = 2000
+            FATIGUE_PENALTY = 1000
+        else: # balanced
+            ACTIVE_DAY_WEIGHT = 800
+            GAP_WEIGHT = 500
+            OVERLOAD_PENALTY = 1000
+            FATIGUE_PENALTY = 500
 
         # ── C5. Daily load cap (outside day loop — manages its own iteration) ─
         all_active_groups = set()
@@ -1238,6 +1670,8 @@ class TimetableGenerator:
                     for t in range(s_t, s_t + dur):
                         group_hourly_occupancy_vars[d][t].append(var)
 
+            group_active_days = []
+
             for d_idx in range(len(self.days)):
                 hourly_load = []
                 for t_idx in range(self.num_slots):
@@ -1258,7 +1692,31 @@ class TimetableGenerator:
                 daily_diff = model.NewIntVar(-self.num_slots, self.num_slots, f'g{group_id}_d{d_idx}_diff')
                 model.Add(daily_diff == daily_load - 8)
                 model.AddMaxEquality(overload_var, [0, daily_diff])
-                objective_penalties.append(overload_var * 1000)
+                objective_penalties.append(overload_var * OVERLOAD_PENALTY)
+
+                # Track active day
+                d_active = model.NewBoolVar(f'g{group_id}_d{d_idx}_active')
+                model.AddMaxEquality(d_active, hourly_load)
+                group_active_days.append(d_active)
+
+                # Track intra-day gaps
+                min_t = model.NewIntVar(0, self.num_slots - 1, f'g{group_id}_d{d_idx}_min_t')
+                max_t = model.NewIntVar(0, self.num_slots - 1, f'g{group_id}_d{d_idx}_max_t')
+
+                for t_idx, h_var in enumerate(hourly_load):
+                    model.Add(min_t <= t_idx).OnlyEnforceIf(h_var)
+                    model.Add(max_t >= t_idx).OnlyEnforceIf(h_var)
+
+                model.Add(min_t == 0).OnlyEnforceIf(d_active.Not())
+                model.Add(max_t == 0).OnlyEnforceIf(d_active.Not())
+
+                span = model.NewIntVar(0, self.num_slots, f'g{group_id}_d{d_idx}_span')
+                model.Add(span == max_t - min_t + 1).OnlyEnforceIf(d_active)
+                model.Add(span == 0).OnlyEnforceIf(d_active.Not())
+
+                gaps = model.NewIntVar(0, self.num_slots, f'g{group_id}_d{d_idx}_gaps')
+                model.Add(gaps == span - daily_load)
+                objective_penalties.append(gaps * GAP_WEIGHT)
 
                 # C6: Elastic Sliding Window Fatigue (Ideally max 4 continuous hours)
                 for start_w in range(self.num_slots - 4):
@@ -1266,13 +1724,19 @@ class TimetableGenerator:
                     b_fatigue = model.NewBoolVar(f'fatigue_g{group_id}_d{d_idx}_w{start_w}')
                     # If sum(window) is 5, it exceeds 4, so b_fatigue MUST be 1.
                     model.Add(sum(window) <= 4 + b_fatigue)
-                    objective_penalties.append(b_fatigue * 500)
+                    objective_penalties.append(b_fatigue * FATIGUE_PENALTY)
+
+            total_active_days = sum(group_active_days)
+            objective_penalties.append(total_active_days * ACTIVE_DAY_WEIGHT)
 
         # C7a: Hard lecture spread rule.
         # Standard timetable practice expects a course's two weekly lectures
         # to land on different days for the same group whenever lectures exist.
         for course in courses:
-            lecture_s_ids = [idx for idx, s in enumerate(course_sessions[course.id]) if s['type'] == 'lecture']
+            lecture_s_ids = [
+                idx for idx, s in enumerate(course_sessions[course.id])
+                if (s.get('legacy_session_type') or s['type']) == 'lecture'
+            ]
             if len(lecture_s_ids) <= 1:
                 continue
             for group_id in all_active_groups:
@@ -1289,9 +1753,16 @@ class TimetableGenerator:
         # C7b: Soft distribution for any repeated session type on the same day.
         for course in courses:
             c_sessions = course_sessions[course.id]
-            for stype in {'lecture', 'practical', 'tutorial'}:
+            repeated_types = sorted(
+                {
+                    self._session_identity(session)
+                    for session in c_sessions
+                    if self._session_identity(session)
+                }
+            )
+            for stype in repeated_types:
                 # get all session IDs belonging to this course & type
-                s_ids = [idx for idx, s in enumerate(c_sessions) if s['type'] == stype]
+                s_ids = [idx for idx, s in enumerate(c_sessions) if self._session_identity(s) == stype]
                 if len(s_ids) <= 1:
                     continue  # Only one session exists, naturally can't recur today
                 for group_id in all_active_groups:
@@ -1366,7 +1837,7 @@ class TimetableGenerator:
 
             # Lecturer preferences
             if lecturer_id is not None:
-                lecturer = self.db.query(Lecturer).get(lecturer_id)
+                lecturer = lecturer_cache.get(lecturer_id)
                 if lecturer and lecturer.teaching_preferences:
                     prefs = lecturer.teaching_preferences
                     if isinstance(prefs, dict):
@@ -1380,8 +1851,19 @@ class TimetableGenerator:
         self.send_progress(level, 'solving', progress_start + range_span * 0.6,
                            f'Year {level} {self._active_component_name()}s: Generating schedule...')
 
+        try:
+            level_tags = getattr(self, "metrics_tags", {}).copy()
+            level_tags.update({"level": str(level), "component_type": self._active_component_name()})
+            generation_variables_histogram.record(len(vars_store), level_tags)
+        except NameError: pass
+
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 120.0
+        timeout_seconds = self.scheduling_policy.get("solver_timeout_seconds", 120)
+        try:
+            timeout_seconds = max(10, min(600, int(timeout_seconds)))
+        except (TypeError, ValueError):
+            timeout_seconds = 120
+        solver.parameters.max_time_in_seconds = float(timeout_seconds)
         solver.parameters.num_search_workers = 4
         solver.parameters.log_search_progress = True
         solver.parameters.cp_model_presolve = True
@@ -1389,6 +1871,13 @@ class TimetableGenerator:
 
         status = solver.Solve(model)
         self.solver_status_by_level[self._scope_key(level)] = solver.StatusName(status)
+
+        if solver.StatusName(status) == 'UNKNOWN':
+            try:
+                level_tags = getattr(self, "metrics_tags", {}).copy()
+                level_tags.update({"level": str(level), "component_type": self._active_component_name()})
+                generation_timeout_counter.add(1, level_tags)
+            except NameError: pass
 
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             self.send_progress(level, 'extracting', progress_start + range_span * 0.9,
@@ -1413,7 +1902,9 @@ class TimetableGenerator:
                         'day_of_week': day_idx,
                         'start_time': self.time_slots[start_t][0],
                         'end_time': self.time_slots[start_t + duration - 1][1],
-                        'session_type': session_meta['type'],
+                        'session_type': session_meta.get('legacy_session_type') or session_meta['type'],
+                        'activity_type_key': session_meta.get('activity_type_key'),
+                        'activity_display_name': session_meta.get('activity_display_name'),
                         'shared_group_ids': shared_group_ids,
                         'combined_size': meta.get('combined_size'),
                         'shared_batch_id': meta.get('shared_batch_id'),
@@ -1441,13 +1932,42 @@ class TimetableGenerator:
         This approach ALWAYS produces a schedule - it cannot return INFEASIBLE.
         Sessions that genuinely cannot be placed are logged but non-fatal.
         """
-        courses = self.db.query(Course).filter(Course.level.in_(self._level_values(level))).all()
+        course_query = self._apply_course_scope(
+            self.db.query(Course).join(Course.department).filter(Course.level.in_(self._level_values(level)))
+        )
+        courses = course_query.all()
         if not courses:
             return True
+
+        lecturer_ids_for_level = sorted(
+            {
+                row[0]
+                for row in self.db.query(LecturerAssignment.lecturer_id)
+                .join(LecturerAssignment.course)
+                .filter(LecturerAssignment.course_id.in_([course.id for course in courses]))
+                .all()
+                if row[0] is not None
+            }
+        )
+        lecturer_cache = {
+            row.id: row
+            for row in self.db.query(Lecturer).filter(Lecturer.id.in_(lecturer_ids_for_level)).all()
+        } if lecturer_ids_for_level else {}
+        if lecturer_ids_for_level:
+            rows = self.db.query(LecturerUnavailability).filter(
+                LecturerUnavailability.lecturer_id.in_(lecturer_ids_for_level)
+            ).all()
+            availability_map: Dict[int, List[LecturerUnavailability]] = defaultdict(list)
+            for row in rows:
+                availability_map[row.lecturer_id].append(row)
+            self._lecturer_unavailability = availability_map
+        else:
+            self._lecturer_unavailability = {}
         group_ctx = self._build_level_group_context(level)
         if not group_ctx['all_groups']:
             return True
-        all_rooms = self.db.query(Room).all()
+        room_query = self._apply_room_scope(self.db.query(Room))
+        all_rooms = room_query.all()
         if not all_rooms:
             return False
 
@@ -1547,8 +2067,9 @@ class TimetableGenerator:
             lecture_units = self._resolve_session_units(course, 'lecture', group_ctx)
             for session in sessions:
                 stype = session['type']
-                lec_ids = self._lecturer_ids_for_session(course.id, stype)
-                session_units = self._resolve_session_units(course, stype, group_ctx, lecture_units)
+                lecturer_lookup = session.get("legacy_session_type") or session.get("activity_type_key") or stype
+                lec_ids = self._lecturer_ids_for_session(course.id, lecturer_lookup)
+                session_units = self._resolve_session_units(course, session, group_ctx, lecture_units)
 
                 for unit in session_units:
                     work.append({
@@ -1578,16 +2099,16 @@ class TimetableGenerator:
             lec_ids  = item['lec_ids']
             stype    = item['stype']
 
-            requires_room = self._session_requires_room(stype)
+            requires_room = self._session_requires_room(session)
             if requires_room:
                 compat = [
                     r for r in all_rooms
-                    if self._room_type_matches(course.preferred_room_type, stype, r, item['group_size'])
+                    if self._room_type_matches(course.preferred_room_type, session, r, item['group_size'])
                 ]
                 match_rank_lookup = {
                     room.id: room_match_rank(
                         course.preferred_room_type,
-                        stype,
+                        session.get("legacy_session_type") or stype,
                         room.room_type,
                         group_size=item['group_size'],
                     ) or 99
@@ -1608,12 +2129,12 @@ class TimetableGenerator:
                 else:
                     compat = [
                         r for r in all_rooms
-                        if self._room_type_matches(course.preferred_room_type, stype, r, item['group_size'])
+                        if self._room_type_matches(course.preferred_room_type, session, r, item['group_size'])
                     ]
                     match_rank_lookup = {
                         room.id: room_match_rank(
                             course.preferred_room_type,
-                            stype,
+                            session.get("legacy_session_type") or stype,
                             room.room_type,
                             group_size=item['group_size'],
                         ) or 99
@@ -1677,6 +2198,8 @@ class TimetableGenerator:
                     chosen_lid: Optional[int] = None
                     found_lec = False
                     for lid in ordered_lec_ids:
+                        if lid is not None and not self._is_lecturer_available(lecturer_cache.get(lid), day, s, s + dur):
+                            continue
                         if lid is None or _free(lecturer_grid, lid, day, s, dur):
                             chosen_lid = lid
                             found_lec = True
@@ -1707,7 +2230,9 @@ class TimetableGenerator:
                         'day_of_week': day,
                         'start_time': start_t,
                         'end_time':   end_t,
-                        'session_type': stype,
+                        'session_type': session.get('legacy_session_type') or stype,
+                        'activity_type_key': session.get('activity_type_key'),
+                        'activity_display_name': session.get('activity_display_name'),
                         'shared_group_ids': (
                             [g for g in item['covered'] if g != gid]
                             if item.get('grouping_mode') == 'shared' else None
@@ -1738,6 +2263,9 @@ class TimetableGenerator:
             )
             return False
 
+        if attempted_slots > 0 and placed_slots < attempted_slots:
+            self.is_degraded = True
+
         self._record_level_diagnostic(
             level,
             fallback_status,
@@ -1747,18 +2275,25 @@ class TimetableGenerator:
         )
         return True
 
-    def _room_type_matches(self, pref: RoomType, session_type: str, room: Room, group_size: Optional[int] = None) -> bool:
+    def _room_type_matches(self, pref: RoomType, session_type: Any, room: Room, group_size: Optional[int] = None) -> bool:
         """Quick room-type check used by the greedy scheduler."""
-        return room_type_matches(pref, session_type, room.room_type, group_size=group_size)
+        required_tags = set((session_type or {}).get("required_room_tags") or []) if isinstance(session_type, dict) else set()
+        if required_tags:
+            return required_tags.issubset(set(room.tags or []))
+        match_session_type = session_type if isinstance(session_type, str) else (session_type.get("legacy_session_type") or session_type.get("activity_type_key") or session_type.get("type"))
+        return room_type_matches(pref, match_session_type, room.room_type, group_size=group_size)
 
     def _time_to_idx(self, t: time) -> int:
-        """Convert time object to index based on dynamic start_hour"""
-        return t.hour - self.start_hour
+        """Convert a wall-clock time into a slot index using the configured slot size."""
+        delta_minutes = self._time_as_minutes(t) - self.day_start_minutes
+        return delta_minutes // self.slot_duration
 
     def _idx_to_time(self, idx: int) -> time:
-        """Convert a slot index back to a time object (inverse of _time_to_idx)"""
-        hour = self.start_hour + idx
-        return time(hour=min(hour, 23), minute=0)
+        """Convert a slot index back to a wall-clock time."""
+        total_minutes = self.day_start_minutes + (idx * self.slot_duration)
+        hour = min(total_minutes // 60, 23)
+        minute = total_minutes % 60
+        return time(hour=hour, minute=minute)
 
     def save_timetable(self):
         """Save all generated slots to the database"""
@@ -1813,7 +2348,10 @@ class TimetableGenerator:
     @staticmethod
     def _group_type_value(group: StudentGroup) -> Optional[str]:
         """Normalize enum-backed group types to their raw string values."""
+        custom_subtype = getattr(group, 'custom_subtype', None)
+        if custom_subtype:
+            return str(custom_subtype).strip().lower()
         raw_value = getattr(group, 'group_type', None)
         if raw_value is None:
             return None
-        return getattr(raw_value, 'value', raw_value)
+        return str(getattr(raw_value, 'value', raw_value)).strip().lower()

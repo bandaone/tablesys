@@ -249,7 +249,7 @@ class EmailService:
             logger.info("Email sent to '%s' (subject: %s).", recipient, subject)
             return True
 
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             logger.error(
                 "Failed to send email to '%s' (subject: %s): %s",
                 recipient,
@@ -337,3 +337,85 @@ class EmailService:
 </body>
 </html>"""
         return EmailService._send(recipient, subject, body_text, body_html)
+
+    @staticmethod
+    def send_lecturer_welcome_email(
+        recipient: str,
+        user_name: str,
+        staff_number: str,
+        login_url: str,
+        organization_name: str = "TABLESYS",
+        assigned_courses: list = None,
+    ) -> bool:
+        """
+        Notify a new lecturer of their portal access details.
+        """
+        subject = f"Welcome to TABLESYS - Your Lecturer Portal Access for {organization_name}"
+        
+        courses_text = ""
+        courses_html = ""
+        if assigned_courses:
+            courses_text = "\nAssigned Courses:\n" + "\n".join(f"- {c}" for c in assigned_courses) + "\n"
+            courses_html_list = "".join(f"<li style='margin-bottom: 4px; color: #111827;'>{c}</li>" for c in assigned_courses)
+            courses_html = f"""
+        <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 32px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px; color: #374151; font-size: 16px;">Assigned Courses</h3>
+            <ul style="margin: 0; padding-left: 20px;">
+                {courses_html_list}
+            </ul>
+        </div>
+"""
+
+        body_text = (
+            f"Welcome to TABLESYS!\n\n"
+            f"Hello {user_name},\n\n"
+            f"You have been added to the system for {organization_name} as a Lecturer.\n\n"
+            f"Here are your access details:\n"
+            f"Staff Number: {staff_number}\n"
+            f"Login Portal: {login_url}\n{courses_text}\n"
+            f"Please log in to view your timetable.\n\n"
+            f"TABLESYS Timetable Management System"
+        )
+        body_html = f"""\
+<html>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 20px; margin: 0;">
+  <table style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; border-spacing: 0; width: 100%; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <tr>
+      <td style="padding: 32px 40px; text-align: center; border-bottom: 1px solid #e5e7eb;">
+        <span style="color: #111827; font-size: 22px; font-weight: 800; letter-spacing: 1px;">TABLESYS</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 40px 40px;">
+        <h2 style="color: #111827; font-size: 24px; font-weight: 700; margin-top: 0; margin-bottom: 16px; text-align: center;">Lecturer Portal Access</h2>
+        <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px 0;">
+          Hello <strong>{user_name}</strong>,
+        </p>
+        <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 24px 0;">
+          You have been added to the system for <strong>{organization_name}</strong> as a Lecturer.
+        </p>
+        <div style="background-color: #f3f4f6; border-left: 4px solid #4f46e5; padding: 16px; margin-bottom: 24px;">
+            <p style="margin: 0 0 8px 0; color: #111827;"><strong>Staff Number:</strong> {staff_number}</p>
+            <p style="margin: 0; color: #111827;"><strong>Login Portal:</strong> <a href="{login_url}">{login_url}</a></p>
+        </div>
+{courses_html}
+        <p style="color: #4b5563; font-size: 16px; line-height: 24px; margin: 0 0 32px 0;">
+          Please log in to view your timetable.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+        try:
+            return EmailService._send(
+                recipient=recipient,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(f"Unexpected error formatting lecturer welcome email for {recipient}: {exc}")
+            return False

@@ -7,10 +7,11 @@ import io
 from ..database import get_db
 from ..schemas import Room, RoomCreate, RoomUpdate
 from ..models import UserRole, Room as RoomModel, User, Department, University
-from ..auth import get_current_user, get_current_active_coordinator
+from ..auth import get_current_user, get_current_active_school_operator, is_tenant_admin
 from ..utils.sanitization import sanitize_input
 from ..utils.audit_logger import AuditLogger
 from ..services.notification_service import NotificationService
+from ..utils.school_scope import ensure_user_can_manage_school, filter_room_query_for_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,11 +39,8 @@ def validate_room_fields(name: str, capacity: int, room_type: str) -> Optional[d
         return {"detail": "Room name must be 100 characters or less", "field": "name"}
     if not (1 <= capacity <= 1000):
         return {"detail": "Capacity must be between 1 and 1000", "field": "capacity"}
-    if room_type not in VALID_ROOM_TYPES:
-        return {
-            "detail": f"Invalid room type '{room_type}'. Must be one of: {', '.join(sorted(VALID_ROOM_TYPES))}",
-            "field": "room_type",
-        }
+    if not room_type or not str(room_type).strip():
+        return {"detail": "Room type cannot be empty", "field": "room_type"}
     return None
 
 
@@ -53,6 +51,59 @@ def resolve_university_id(db: Session, current_user: User) -> int:
     if not uni:
         raise HTTPException(status_code=500, detail="No university found for room creation")
     return uni.id
+
+
+def enforce_room_ownership(
+    db: Session,
+    current_user: User,
+    department_id: Optional[int],
+    school_id: Optional[int],
+) -> tuple[Optional[int], Optional[int]]:
+    """Resolve room ownership without allowing staff to create global rooms.
+
+    Global rooms are an explicit tenant-admin-only decision. All school and
+    department operators create rooms inside their own school; a department
+    assignment must agree with that school's ownership.
+    """
+    department = None
+    if department_id is not None:
+        department = db.query(Department).filter(Department.id == department_id).first()
+        if not department:
+            raise HTTPException(status_code=422, detail="Invalid department_id")
+        if current_user.university_id and department.university_id != current_user.university_id:
+            raise HTTPException(status_code=403, detail="Department does not belong to your institution")
+        if school_id is None:
+            school_id = department.school_id
+        elif school_id != department.school_id:
+            raise HTTPException(status_code=422, detail="The room's department must belong to the selected school")
+
+    if not is_tenant_admin(current_user):
+        user_school_id = getattr(current_user, "school_id", None)
+        if user_school_id is None:
+            raise HTTPException(status_code=403, detail="Assign this coordinator to a school before creating or updating rooms.")
+        if school_id is None:
+            school_id = user_school_id
+        if school_id != user_school_id:
+            raise HTTPException(status_code=403, detail="You can only create rooms for your assigned school.")
+        if department_id is None and getattr(current_user, "department_id", None) is not None:
+            department_id = current_user.department_id
+            department = db.query(Department).filter(Department.id == department_id).first()
+            if department and department.school_id != school_id:
+                raise HTTPException(status_code=403, detail="Your department does not belong to your assigned school.")
+
+    ensure_user_can_manage_school(db, current_user, school_id)
+    return department_id, school_id
+
+
+def ensure_user_can_manage_room(current_user: User, room: RoomModel) -> None:
+    """Prevent direct-ID access to unowned or another school's room."""
+    if getattr(current_user, "university_id", None) and room.university_id != current_user.university_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if is_tenant_admin(current_user):
+        return
+    school_id = getattr(current_user, "school_id", None)
+    if school_id is None or room.school_id != school_id:
+        raise HTTPException(status_code=403, detail="You can only manage rooms assigned to your school.")
 
 
 # ---------------------------------------------------------------------------
@@ -67,12 +118,9 @@ async def get_rooms(
     db: Session = Depends(get_db),
 ):
     """Get all rooms. HODs see only their department + unrestricted rooms."""
-    query = db.query(RoomModel)
+    query = filter_room_query_for_user(db.query(RoomModel), current_user)
     if current_user.role == UserRole.HOD and current_user.department_id:
-        query = query.filter(
-            (RoomModel.department_id == None) |
-            (RoomModel.department_id == current_user.department_id)
-        )
+        query = query.filter(RoomModel.department_id == current_user.department_id)
     rooms = query.order_by(RoomModel.priority_level.desc(), RoomModel.name).offset(skip).limit(limit).all()
     return rooms
 
@@ -85,7 +133,7 @@ async def get_rooms(
 async def create_room(
     request: Request,
     room: RoomCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """Create a new room. Coordinator only."""
@@ -93,21 +141,25 @@ async def create_room(
     if err:
         raise HTTPException(status_code=422, detail=err["detail"])
 
-    if room.department_id:
-        if not db.query(Department).filter(Department.id == room.department_id).first():
-            raise HTTPException(status_code=422, detail="Invalid department_id")
+    room.department_id, room.school_id = enforce_room_ownership(
+        db, current_user, room.department_id, room.school_id,
+    )
 
-    if db.query(RoomModel).filter(RoomModel.name == room.name).first():
-        raise HTTPException(status_code=409, detail=f"Room '{room.name}' already exists")
+    resolved_university_id = resolve_university_id(db, current_user)
+    if db.query(RoomModel).filter(
+        RoomModel.university_id == resolved_university_id,
+        RoomModel.name == room.name,
+    ).first():
+        raise HTTPException(status_code=409, detail=f"Room '{room.name}' already exists in this institution")
 
     room_data = room.model_dump()
     # Backward compatibility: legacy model versions do not expose text availability.
     room_data.pop("availability", None)
-    room_data["university_id"] = resolve_university_id(db, current_user)
+    room_data["university_id"] = resolved_university_id
     room_data["name"] = sanitize_input(room.name, max_length=100)
     room_data["building"] = sanitize_input(room.building, max_length=100)
 
-    db_room = RoomModel(**room_data)
+    db_room = RoomModel(**room_data, created_by_id=current_user.id)
     db.add(db_room)
     db.commit()
     db.refresh(db_room)
@@ -139,13 +191,14 @@ async def update_room(
     request: Request,
     room_id: int,
     room_update: RoomUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """Update a room. Coordinator only."""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
+    ensure_user_can_manage_room(current_user, db_room)
 
     update_data = room_update.model_dump(exclude_unset=True)
     # Backward compatibility: ignore removed text availability field on ORM writes.
@@ -159,12 +212,24 @@ async def update_room(
     if err:
         raise HTTPException(status_code=422, detail=err["detail"])
 
-    if "department_id" in update_data and update_data["department_id"]:
-        if not db.query(Department).filter(Department.id == update_data["department_id"]).first():
-            raise HTTPException(status_code=422, detail="Invalid department_id")
+    resolved_department_id, resolved_school_id = enforce_room_ownership(
+        db,
+        current_user,
+        update_data.get("department_id", db_room.department_id),
+        update_data.get("school_id", db_room.school_id),
+    )
+    update_data["department_id"] = resolved_department_id
+    update_data["school_id"] = resolved_school_id
 
     if "name" in update_data:
         update_data["name"] = sanitize_input(update_data["name"], max_length=100)
+        existing = db.query(RoomModel).filter(
+            RoomModel.university_id == db_room.university_id,
+            RoomModel.name == update_data["name"],
+            RoomModel.id != db_room.id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail=f"Room '{update_data['name']}' already exists in this institution")
 
     for field, value in update_data.items():
         setattr(db_room, field, value)
@@ -193,13 +258,14 @@ async def update_room(
 async def toggle_room_block(
     request: Request,
     room_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """Toggle the is_blocked flag on a room. Coordinator only."""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
+    ensure_user_can_manage_room(current_user, db_room)
     db_room.is_blocked = not db_room.is_blocked
     db.commit()
     db.refresh(db_room)
@@ -231,13 +297,17 @@ async def toggle_room_block(
 async def delete_room(
     request: Request,
     room_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """Delete a room. Coordinator only."""
-    db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    db_room = db.query(RoomModel).filter(
+        RoomModel.id == room_id,
+        RoomModel.university_id == current_user.university_id,
+    ).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
+    ensure_user_can_manage_room(current_user, db_room)
     db.delete(db_room)
     db.commit()
     
@@ -267,12 +337,15 @@ async def delete_room(
 @router.delete("/", status_code=status.HTTP_200_OK)
 async def delete_all_rooms(
     request: Request,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """Delete all rooms. Coordinator only. Use before bulk re-upload."""
-    count = db.query(RoomModel).count()
-    db.query(RoomModel).delete()
+    query = filter_room_query_for_user(db.query(RoomModel), current_user)
+    rooms = query.all()
+    count = len(rooms)
+    for room in rooms:
+        db.delete(room)
     db.commit()
     
     AuditLogger.log_data_modification(
@@ -374,7 +447,7 @@ def _parse_equipment(equipment_raw: str) -> dict:
 @router.post("/bulk-upload", response_model=dict)
 async def bulk_upload_rooms(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     """
@@ -397,6 +470,14 @@ async def bulk_upload_rooms(
     }
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="File must be CSV or Excel format")
+
+    upload_department_id, upload_school_id = enforce_room_ownership(
+        db,
+        current_user,
+        getattr(current_user, "department_id", None),
+        getattr(current_user, "school_id", None),
+    )
+    upload_university_id = resolve_university_id(db, current_user)
 
     try:
         contents = await file.read()
@@ -475,7 +556,9 @@ async def bulk_upload_rooms(
                         return default
 
                 room_data: dict = {
-                    "university_id":  resolve_university_id(db, current_user),
+                    "university_id":  upload_university_id,
+                    "school_id":      upload_school_id,
+                    "department_id":  upload_department_id,
                     "name":           sanitize_input(row_name, max_length=100),
                     "building":       sanitize_input(str(row.get("building", "")), max_length=100)
                                       if "building" in df.columns and pd.notna(row.get("building"))
@@ -486,16 +569,24 @@ async def bulk_upload_rooms(
                                       if "priority_level" in df.columns and pd.notna(row.get("priority_level"))
                                       else 5,
                     "is_blocked":     False,
+                    "created_by_id":  current_user.id,
                     **equip_flags,
                 }
 
                 # Upsert: match by code (stored as name = code) or name
-                existing = (
-                    db.query(RoomModel).filter(RoomModel.name == row_code).first()
-                    or db.query(RoomModel).filter(RoomModel.name == row_name).first()
+                existing_query = db.query(RoomModel).filter(
+                    RoomModel.university_id == upload_university_id,
+                    RoomModel.name.in_([row_code, row_name]),
                 )
+                if not is_tenant_admin(current_user):
+                    existing_query = existing_query.filter(RoomModel.school_id == upload_school_id)
+                existing = existing_query.first()
                 if existing:
                     for key, value in room_data.items():
+                        # Preserve original uploader provenance when updating
+                        # an existing venue through a later bulk upload.
+                        if key == "created_by_id" and existing.created_by_id is not None:
+                            continue
                         setattr(existing, key, value)
                     updated_count += 1
                 else:

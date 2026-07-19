@@ -74,7 +74,7 @@ def export_timetable_docx(
     export_service = ExportService(db)
 
     try:
-        data = export_service.get_traditional_export_data(timetable_id)
+        data = export_service.get_traditional_export_data(timetable_id, university_id=current_user.university_id)
     except ValueError as exc:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Timetable not found.")
 
@@ -107,7 +107,7 @@ def export_timetable_pdf(
     export_service = ExportService(db)
 
     try:
-        data = export_service.get_traditional_export_data(timetable_id)
+        data = export_service.get_traditional_export_data(timetable_id, university_id=current_user.university_id)
     except ValueError as exc:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Timetable not found.")
 
@@ -141,7 +141,7 @@ def export_active_docx(
     export_service = ExportService(db)
 
     try:
-        data = export_service.get_active_timetable_export_data()
+        data = export_service.get_active_timetable_export_data(university_id=current_user.university_id)
     except ValueError as exc:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Timetable not found.")
 
@@ -171,7 +171,7 @@ def export_active_pdf(
     export_service = ExportService(db)
 
     try:
-        data = export_service.get_active_timetable_export_data()
+        data = export_service.get_active_timetable_export_data(university_id=current_user.university_id)
     except ValueError as exc:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Timetable not found.")
 
@@ -204,7 +204,7 @@ def export_active_json(
     export_service = ExportService(db)
 
     try:
-        data = export_service.get_active_timetable_export_data()
+        data = export_service.get_active_timetable_export_data(university_id=current_user.university_id)
     except ValueError as exc:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Timetable not found.")
 

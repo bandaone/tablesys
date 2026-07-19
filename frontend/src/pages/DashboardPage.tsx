@@ -37,6 +37,7 @@ import TimetableGrid from '../components/TimetableGrid';
 import { TimetableSlot } from '../components/TimetableCell';
 import { useAuth } from '../contexts/AuthContext';
 import { useBranding } from '../contexts/BrandingContext';
+import { useInstitutionSetup } from '../hooks/useInstitutionSetup';
 
 interface TimetableMetadata {
     term: string;
@@ -230,8 +231,8 @@ const EmptyTimetableLanding: React.FC<{ stats: SystemStats; isCoordinator: boole
 
     const statCards = [
         { label: 'Courses',        value: stats.courses,     icon: <CourseIcon />, color: primaryColor },
-        { label: 'Departments',    value: stats.departments, icon: <DeptIcon />,   color: '#6a1b9a'    },
-        { label: 'Student Groups', value: stats.groups,      icon: <GroupIcon />,  color: '#00838f'    },
+        { label: 'Departments',    value: stats.departments, icon: <DeptIcon />,   color: '#1976d2'    },
+        { label: 'Student Groups', value: stats.groups,      icon: <GroupIcon />,  color: '#9c27b0'    },
         { label: 'Lecturers',      value: stats.lecturers,   icon: <SchoolIcon />, color: '#2e7d32'    },
         { label: 'Rooms',          value: stats.rooms,       icon: <RoomIcon />,   color: '#e65100'    },
     ];
@@ -245,7 +246,7 @@ const EmptyTimetableLanding: React.FC<{ stats: SystemStats; isCoordinator: boole
                     position: 'relative',
                     borderRadius: 4,
                     overflow: 'hidden',
-                    background: `linear-gradient(135deg, ${primaryColor} 0%, #5c35cc 55%, #7c3aed 100%)`,
+                    background: `linear-gradient(135deg, ${primaryColor} 0%, #1976d2 55%, #9c27b0 100%)`,
                     boxShadow: `0 12px 40px ${primaryColor}55`,
                     minHeight: { xs: 200, md: 240 },
                     display: 'flex',
@@ -434,7 +435,7 @@ const EmptyTimetableLanding: React.FC<{ stats: SystemStats; isCoordinator: boole
                                             {showBlock && (
                                                 <Box sx={{
                                                     height: 36, borderRadius: 1,
-                                                    background: `linear-gradient(90deg, ${primaryColor}22, #7c3aed22)`,
+                                                    background: `linear-gradient(90deg, ${primaryColor}22, #9c27b022)`,
                                                     animation: `shimmer ${(2.2 + seed * 0.28).toFixed(1)}s ease-in-out infinite`,
                                                     animationDelay: `${(hi * 0.14).toFixed(2)}s`,
                                                 }} />
@@ -478,7 +479,18 @@ const DashboardPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [noActiveTimetable, setNoActiveTimetable] = useState<boolean>(false);
 
-    const isCoordinator = user?.role?.toUpperCase() === 'COORDINATOR';
+    const isCoordinator = ['COORDINATOR', 'SCHOOL_COORDINATOR', 'TENANT_ADMIN'].includes(user?.role?.toUpperCase() || '');
+
+    const { activityTypes, activityTypesByKey } = useInstitutionSetup();
+
+    // Dynamic layer items — falls back to engineering defaults when no custom types
+    const layerItems: Array<{ key: string; label: string; color?: string }> = activityTypes.length > 0
+        ? activityTypes.map((at) => ({ key: at.key, label: at.display_name, color: at.color }))
+        : [
+            { key: 'lecture',   label: 'Lectures' },
+            { key: 'practical', label: 'Labs'     },
+            { key: 'tutorial',  label: 'Tutorials' },
+        ];
 
     useEffect(() => {
         // Fetch supporting data in parallel
@@ -580,7 +592,9 @@ const DashboardPage: React.FC = () => {
             }
 
             const response = await api.get<TimetableViewData>('/timetables/view', {
-                params: { year: selectedYear, program: selectedProgram },
+                // Always render the timetable returned by the scoped list,
+                // rather than relying on a server-side global active default.
+                params: { year: selectedYear, program: selectedProgram, timetable_id: activeTt.id },
             });
 
             const payload: any = response.data;
@@ -674,22 +688,31 @@ const DashboardPage: React.FC = () => {
                             ))}
                         </Select>
                     </Box>
-                    <Box sx={{ minWidth: 200 }}>
+                    <Box sx={{ minWidth: 180 }}>
                         <Typography variant="caption" color="text.secondary">Layer</Typography>
                         <br />
-                        <ButtonGroup variant="outlined" size="small" sx={{ mt: 0.5 }}>
-                            {['ALL', 'lecture', 'practical', 'tutorial'].map(layer => {
-                                const labels: Record<string, string> = { ALL: 'All', lecture: 'Lectures', practical: 'Labs', tutorial: 'Tutorials' };
-                                return (
-                                    <Button
-                                        key={layer}
-                                        variant={selectedLayer === layer ? 'contained' : 'outlined'}
-                                        onClick={() => setSelectedLayer(layer)}
-                                    >
-                                        {labels[layer]}
-                                    </Button>
-                                );
-                            })}
+                        <ButtonGroup variant="outlined" size="small" sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.25 }}>
+                            <Button variant={selectedLayer === 'ALL' ? 'contained' : 'outlined'} onClick={() => setSelectedLayer('ALL')}>All</Button>
+                            {layerItems.map((item) => (
+                                <Button
+                                    key={item.key}
+                                    variant={selectedLayer === item.key ? 'contained' : 'outlined'}
+                                    onClick={() => setSelectedLayer(item.key)}
+                                    sx={selectedLayer === item.key && item.color ? {
+                                        bgcolor: item.color, borderColor: item.color,
+                                        '&:hover': { bgcolor: item.color, filter: 'brightness(0.9)' },
+                                    } : {}}
+                                >
+                                    {item.color && (
+                                        <Box component="span" sx={{
+                                            display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                                            bgcolor: selectedLayer === item.key ? '#fff' : item.color,
+                                            mr: 0.75, flexShrink: 0, verticalAlign: 'middle',
+                                        }} />
+                                    )}
+                                    {item.label}
+                                </Button>
+                            ))}
                         </ButtonGroup>
                     </Box>
                 </Box>
@@ -708,6 +731,7 @@ const DashboardPage: React.FC = () => {
                         gridConfig={data?.metadata?.grid_config}
                         mode="view"
                         showCurrentTime={true}
+                        activityTypesMap={activityTypesByKey}
                     />
                 </Box>
             )}

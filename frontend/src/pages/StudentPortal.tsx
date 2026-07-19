@@ -66,9 +66,17 @@ import {
   StudentTodayPanel,
   StudentWeekPanel,
   StudentQuickActionCard,
+  StudentExamsPanel,
   type SessionFilter,
 } from '../components/student/StudentPortalPanels';
+import StudentSubgroupSelector from '../components/student/StudentSubgroupSelector';
 import { formatDepartmentName, formatGroupLabel, formatGroupName } from '../utils/displayFormatters';
+import {
+  activityChipSx,
+  buildActivityFilterOptions,
+  matchesActivityFilter,
+  resolveActivityPresentation,
+} from '../utils/activityPresentation';
 import type {
   Course,
   FreeRoomsData,
@@ -96,7 +104,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
-type PortalTab = 'home' | 'today' | 'week' | 'search' | 'more';
+type PortalTab = 'home' | 'today' | 'week' | 'search' | 'more' | 'exams';
 
 interface TimetableData {
   student: {
@@ -147,6 +155,13 @@ interface OnboardingDepartment {
   }[];
 }
 
+interface OnboardingSchool {
+  id: number;
+  name: string;
+  code: string;
+  departments: OnboardingDepartment[];
+}
+
 interface GroupMeta {
   group_id: number;
   group_name: string;
@@ -158,15 +173,15 @@ interface GroupMeta {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const PORTAL_TABS: PortalTab[] = ['home', 'today', 'week', 'search', 'more'];
-const SESSION_FILTERS: SessionFilter[] = ['all', 'lecture', 'tutorial', 'lab'];
+const PORTAL_TABS: PortalTab[] = ['home', 'today', 'week', 'search', 'more', 'exams'];
 
 const TAB_META: Record<PortalTab, { label: string; icon: React.ReactElement }> = {
   home: { label: 'Home', icon: <DashboardIcon /> },
   today: { label: 'Today', icon: <CalendarTodayIcon /> },
   week: { label: 'Week', icon: <DateRangeIcon /> },
+  exams: { label: 'Exams', icon: <AutoStoriesIcon /> },
   search: { label: 'Search', icon: <SearchIcon /> },
-  more: { label: 'Courses', icon: <AutoStoriesIcon /> },
+  more: { label: 'My Groups', icon: <GroupsIcon /> },
 };
 
 // ── Pure helpers ───────────────────────────────────────────────────────────
@@ -214,34 +229,12 @@ const getSessionTone = (
   return { label: 'Today', color: 'default' };
 };
 
-type NormalizedSession = 'lecture' | 'tutorial' | 'lab';
-
-const normalizeSessionType = (value?: string): NormalizedSession => {
-  const normalized = (value || '').toLowerCase();
-  if (normalized.includes('lab')) return 'lab';
-  if (normalized.includes('tutorial')) return 'tutorial';
-  return 'lecture';
-};
-
 const matchesSessionFilter = (slot: TimetableSlot, filter: SessionFilter): boolean => {
-  if (filter === 'all') return true;
-  return normalizeSessionType(slot.session_type) === filter;
-};
-
-const getSessionTypeChipColor = (value?: string): 'primary' | 'secondary' | 'success' | 'warning' => {
-  switch (normalizeSessionType(value)) {
-    case 'lab':
-      return 'success';
-    case 'tutorial':
-      return 'warning';
-    default:
-      return 'primary';
-  }
+  return matchesActivityFilter(slot, filter);
 };
 
 const formatSessionTypeLabel = (value?: string): string => {
-  const normalized = normalizeSessionType(value);
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  return resolveActivityPresentation(value).displayName;
 };
 
 const getNextSlot = (
@@ -284,6 +277,7 @@ interface OnboardingWizardProps {
   primaryColor: string;
   secondaryColor: string;
   brandingName: string;
+  universityId: number;
   onComplete: (meta: GroupMeta) => void;
 }
 
@@ -291,22 +285,34 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   primaryColor,
   secondaryColor,
   brandingName,
+  universityId,
   onComplete,
 }) => {
-  const [departments, setDepartments] = useState<OnboardingDepartment[]>([]);
+  const [schools, setSchools] = useState<OnboardingSchool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [selectedLevel, setSelectedLevel] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
   useEffect(() => {
+    if (!universityId) {
+      setSchools([]);
+      setError(null);
+      setLoading(true);
+      return;
+    }
+
     const load = async () => {
       setLoading(true);
       try {
-        const data = await studentPortalApi.getOnboardingGroups();
-        setDepartments(data.departments || []);
+        const data = await studentPortalApi.getOnboardingGroups(universityId);
+        // Student self-identification is always school-first. Departments
+        // without a school assignment must be corrected by management before
+        // they can be selected in the public timetable.
+        setSchools(data.schools || []);
       } catch (err: any) {
         console.error('Failed to load onboarding groups:', err);
         setError('Unable to load available groups. Please try again later.');
@@ -315,22 +321,27 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       }
     };
     load();
-  }, []);
+  }, [universityId]);
+
+  const selectedSchool = useMemo(
+    () => schools.find((school) => String(school.id) === selectedSchoolId) || null,
+    [schools, selectedSchoolId],
+  );
 
   const selectedDept = useMemo(
-    () => departments.find((d) => String(d.id) === selectedDeptId) || null,
-    [departments, selectedDeptId],
+    () => selectedSchool?.departments.find((d) => String(d.id) === selectedDeptId) || null,
+    [selectedSchool, selectedDeptId],
   );
 
   const deptOptions = useMemo(
     () =>
-      [...departments]
+      [...(selectedSchool?.departments || [])]
         .map((dept) => ({
           ...dept,
           normalizedName: formatDepartmentName(dept.name),
         }))
         .sort((a, b) => a.normalizedName.localeCompare(b.normalizedName)),
-    [departments],
+    [selectedSchool],
   );
 
   const levelOptions = useMemo(
@@ -351,6 +362,13 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ),
     [selectedLevelBucket],
   );
+
+  const handleSchoolChange = (e: SelectChangeEvent) => {
+    setSelectedSchoolId(e.target.value);
+    setSelectedDeptId('');
+    setSelectedLevel('');
+    setSelectedGroupId('');
+  };
 
   const handleDeptChange = (e: SelectChangeEvent) => {
     setSelectedDeptId(e.target.value);
@@ -380,17 +398,31 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     });
   };
 
-  const canSubmit = selectedDeptId !== '' && selectedLevel !== '' && selectedGroupId !== '';
+  const canSubmit = selectedSchoolId !== '' && selectedDeptId !== '' && selectedLevel !== '' && selectedGroupId !== '';
 
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: `radial-gradient(ellipse at top left, ${alpha(secondaryColor, 0.22)} 0%, transparent 50%), radial-gradient(ellipse at bottom right, ${alpha(primaryColor, 0.18)} 0%, transparent 50%), linear-gradient(160deg, #0f172a 0%, ${alpha(primaryColor, 0.92)} 50%, #0f172a 100%)`,
+        background: `radial-gradient(circle at 82% 10%, ${alpha('#fbbf24', 0.32)} 0%, ${alpha('#fbbf24', 0.12)} 12%, transparent 30%), radial-gradient(ellipse at top left, ${alpha(secondaryColor, 0.32)} 0%, transparent 53%), radial-gradient(ellipse at bottom right, ${alpha(primaryColor, 0.34)} 0%, transparent 58%), linear-gradient(145deg, #111827 0%, #1e3a8a 48%, #581c87 100%)`,
+        position: 'relative',
+        overflow: 'hidden',
+        isolation: 'isolate',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         p: 2,
+        '&::before': {
+          content: '""', position: 'absolute', inset: 0, zIndex: 0,
+          background: `radial-gradient(circle at 88% 14%, ${alpha('#ffffff', 0.16)} 0 104px, ${alpha('#ffffff', 0.08)} 105px 235px, transparent 236px), radial-gradient(circle at 7% 90%, ${alpha('#ffffff', 0.12)} 0 86px, ${alpha('#ffffff', 0.05)} 87px 194px, transparent 195px)`,
+        },
+        '&::after': {
+          content: '""', position: 'absolute', width: 500, height: 500,
+          top: -276, right: -245, borderRadius: '50%', zIndex: 0,
+          border: `1px solid ${alpha('#ffffff', 0.16)}`,
+          boxShadow: `0 0 0 62px ${alpha('#ffffff', 0.04)}, 0 0 0 145px ${alpha('#ffffff', 0.025)}`,
+        },
+        '& > *': { position: 'relative', zIndex: 1 },
       }}
     >
       <Container maxWidth="sm">
@@ -427,7 +459,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     Student Timetable
                   </Typography>
                   <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.7) }}>
-                    Select your department to get started
+                    Choose your school, department, year and stream
                   </Typography>
                 </Box>
               </Stack>
@@ -443,15 +475,35 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress sx={{ color: '#fff' }} />
               </Box>
-            ) : departments.length === 0 ? (
+            ) : schools.length === 0 ? (
               <Alert severity="info" sx={{ borderRadius: 3 }}>
-                No timetable groups are available yet. Please check back once a timetable has been published by your coordinator.
+                No school-linked timetable groups are available yet. Ask your coordinator to assign the department to its School and publish its timetable.
               </Alert>
             ) : (
               <Stack spacing={2.5}>
+                {/* School */}
+                <FormControl
+                  fullWidth
+                  sx={{
+                    '& .MuiInputLabel-root': { color: alpha('#ffffff', 0.65) },
+                    '& .MuiInputLabel-root.Mui-focused': { color: '#fff' },
+                    '& .MuiOutlinedInput-root': {
+                      color: '#fff', borderRadius: 3, backgroundColor: alpha('#ffffff', 0.06), backdropFilter: 'blur(8px)',
+                      '& fieldset': { borderColor: alpha('#ffffff', 0.2) }, '&:hover fieldset': { borderColor: alpha('#ffffff', 0.4) }, '&.Mui-focused fieldset': { borderColor: '#fff' },
+                    },
+                    '& .MuiSelect-icon': { color: alpha('#ffffff', 0.6) },
+                  }}
+                >
+                  <InputLabel id="school-label">School</InputLabel>
+                  <Select labelId="school-label" value={selectedSchoolId} label="School" onChange={handleSchoolChange}>
+                    {schools.map((school) => <MenuItem key={school.id} value={String(school.id)}>{school.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+
                 {/* Department */}
                 <FormControl
                   fullWidth
+                  disabled={!selectedSchool}
                   sx={{
                     '& .MuiInputLabel-root': { color: alpha('#ffffff', 0.65) },
                     '& .MuiInputLabel-root.Mui-focused': { color: '#fff' },
@@ -467,11 +519,11 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     '& .MuiSelect-icon': { color: alpha('#ffffff', 0.6) },
                   }}
                 >
-                  <InputLabel id="dept-label">Department / School</InputLabel>
+                  <InputLabel id="dept-label">Department</InputLabel>
                   <Select
                     labelId="dept-label"
                     value={selectedDeptId}
-                    label="Department / School"
+                    label="Department"
                     onChange={handleDeptChange}
                     MenuProps={{ PaperProps: { sx: { maxHeight: 280 } } }}
                   >
@@ -482,6 +534,12 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     ))}
                   </Select>
                 </FormControl>
+
+                {selectedSchool && deptOptions.length === 0 && (
+                  <Alert severity="info" sx={{ borderRadius: 3 }}>
+                    {selectedSchool.name} is available. Its departments will appear here once their student groups are prepared and published.
+                  </Alert>
+                )}
 
                 {/* Year */}
                 <FormControl
@@ -536,11 +594,11 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     '& .MuiSelect-icon': { color: alpha('#ffffff', 0.6) },
                   }}
                 >
-                  <InputLabel id="group-label">Group / Stream</InputLabel>
+                  <InputLabel id="group-label">Your Stream</InputLabel>
                   <Select
                     labelId="group-label"
                     value={selectedGroupId}
-                    label="Group / Stream"
+                    label="Your Stream"
                     onChange={handleGroupChange}
                     MenuProps={{ PaperProps: { sx: { maxHeight: 280 } } }}
                   >
@@ -551,6 +609,28 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     ))}
                   </Select>
                 </FormControl>
+
+                {selectedSchool && selectedDept && selectedLevelBucket && selectedGroupId && (
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      background: alpha('#ffffff', 0.1),
+                      border: `1px solid ${alpha('#ffffff', 0.2)}`,
+                      boxShadow: `inset 0 1px 0 ${alpha('#ffffff', 0.12)}`,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: alpha('#ffffff', 0.66), display: 'block', mb: 0.75 }}>
+                      Your timetable will include your shared lectures, selected stream, and any lab or tutorial groups you add next.
+                    </Typography>
+                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                      <Chip size="small" label={selectedSchool.name} sx={{ color: '#fff', bgcolor: alpha('#ffffff', 0.12) }} />
+                      <Chip size="small" label={formatDepartmentName(selectedDept.name)} sx={{ color: '#fff', bgcolor: alpha('#ffffff', 0.12) }} />
+                      <Chip size="small" label={`Year ${normalizeYearLevel(selectedLevel)}`} sx={{ color: '#fff', bgcolor: alpha('#ffffff', 0.12) }} />
+                      <Chip size="small" label={formatGroupLabel(groupOptions.find((group) => String(group.id) === selectedGroupId)!)} sx={{ color: '#fff', bgcolor: alpha('#ffffff', 0.16) }} />
+                    </Stack>
+                  </Box>
+                )}
 
                 {selectedDept && selectedLevelBucket && groupOptions.length === 0 && (
                   <Typography variant="caption" sx={{ color: alpha('#ffffff', 0.65), mt: -0.5 }}>
@@ -607,7 +687,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 // ═══════════════════════════════════════════════════════════════════════════
 
 const StudentPortal: React.FC = () => {
-  const { branding } = useBranding();
+  const { branding, loading: brandingLoading, tenantError } = useBranding();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [searchParams, setSearchParams] = useSearchParams();
@@ -650,6 +730,8 @@ const StudentPortal: React.FC = () => {
   const [freeRoomsLoading, setFreeRoomsLoading] = useState(false);
   const [freeRoomsSource, setFreeRoomsSource] = useState<EtagFetchSource | null>(null);
   const [lastRefreshSource, setLastRefreshSource] = useState<EtagFetchSource | null>(null);
+  const [examData, setExamData] = useState<{ period: any; slots: any[] } | null>(null);
+  const [examsLoading, setExamsLoading] = useState(false);
   const [todayFilter, setTodayFilter] = useState<SessionFilter>('all');
   const [weekFilter, setWeekFilter] = useState<SessionFilter>('all');
   const [offlineReady, setOfflineReady] = useState(false);
@@ -660,6 +742,11 @@ const StudentPortal: React.FC = () => {
     () => localStorage.getItem(STUDENT_REMINDERS_KEY) === 'enabled',
   );
   const [reminderMinutes, setReminderMinutes] = useState<number>(30);
+  const [academicWeek, setAcademicWeek] = useState<number>(() => studentPortalApi.getAcademicWeek() || 1);
+  const [selectedLabSubgroups, setSelectedLabSubgroups] = useState<number[]>(() => {
+    const raw = localStorage.getItem('student_selected_lab_subgroups');
+    return raw ? raw.split(',').map(Number).filter((value) => Number.isFinite(value)) : [];
+  });
 
   const primaryColor = branding.primary_color || '#1976d2';
   const secondaryColor = branding.secondary_color || '#ff8c00';
@@ -731,6 +818,37 @@ const StudentPortal: React.FC = () => {
 
   const firstTodaySlot = todaysSlots[0] || null;
   const lastTodaySlot = todaysSlots[todaysSlots.length - 1] || null;
+  const sessionFilterOptions = useMemo(
+    () => buildActivityFilterOptions({ sessionInputs: sortedSlots }),
+    [sortedSlots],
+  );
+  const sessionFilters = useMemo(
+    () => sessionFilterOptions.map((option) => option.filterKey),
+    [sessionFilterOptions],
+  );
+
+  const getFilterLabel = useCallback(
+    (filter: SessionFilter) =>
+      sessionFilterOptions.find((option) => option.filterKey === filter)?.displayName || 'All sessions',
+    [sessionFilterOptions],
+  );
+
+  const getFilterChipSx = useCallback(
+    (filter: SessionFilter) => {
+      const option = sessionFilterOptions.find((entry) => entry.filterKey === filter);
+      return activityChipSx({
+        activity_type_key: option?.key,
+        activity_display_name: option?.displayName,
+        activity_color: option?.color,
+      });
+    },
+    [sessionFilterOptions],
+  );
+
+  const getSessionTypeChipSx = useCallback(
+    (slot: TimetableSlot) => activityChipSx(slot),
+    [],
+  );
 
   // ── Clear all cached data ──────────────────────────────────────────────
 
@@ -804,6 +922,18 @@ const StudentPortal: React.FC = () => {
     }
   };
 
+  const fetchExamTimetable = async () => {
+    setExamsLoading(true);
+    try {
+      const response = await studentPortalApi.getExamTimetable();
+      setExamData(response.data);
+    } catch {
+      setExamData(null);
+    } finally {
+      setExamsLoading(false);
+    }
+  };
+
   const refreshPortalData = useCallback(async () => {
     if (!groupReady) return;
     setPageLoading(true);
@@ -814,6 +944,7 @@ const StudentPortal: React.FC = () => {
         fetchTimetable(),
         fetchCourses(),
         fetchAnnouncements(),
+        fetchExamTimetable(),
       ]);
       setLastRefreshSource(
         dashboardSource === 'cache-304' && timetableSource === 'cache-304' ? 'cache-304' : 'network',
@@ -834,12 +965,6 @@ const StudentPortal: React.FC = () => {
   }, [groupReady]);
 
   // ── Effects ────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (groupReady) {
-      refreshPortalData();
-    }
-  }, [groupReady, refreshPortalData]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -912,6 +1037,20 @@ const StudentPortal: React.FC = () => {
     return () => window.clearInterval(interval);
   }, [currentDay, nextSlot, reminderMinutes, remindersEnabled]);
 
+  useEffect(() => {
+    studentPortalApi.setAcademicWeek(academicWeek);
+  }, [academicWeek]);
+
+  useEffect(() => {
+    studentPortalApi.setLabSubgroups(selectedLabSubgroups);
+  }, [selectedLabSubgroups]);
+
+  useEffect(() => {
+    if (groupReady) {
+      refreshPortalData();
+    }
+  }, [academicWeek, selectedLabSubgroups, groupReady, refreshPortalData]);
+
   // ── Search effects ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -963,6 +1102,8 @@ const StudentPortal: React.FC = () => {
     setTimetableData(null);
     setDashboardData(null);
     setCourses([]);
+    setSelectedLabSubgroups([]);
+    setAcademicWeek(1);
     setActiveTab('home');
     setAnchorEl(null);
   };
@@ -1040,7 +1181,7 @@ const StudentPortal: React.FC = () => {
       calendarLines.push(`DTSTART:${start.format('YYYYMMDDTHHmmss')}`);
       calendarLines.push(`DTEND:${end.format('YYYYMMDDTHHmmss')}`);
       calendarLines.push(`SUMMARY:${slot.course_code} ${slot.course_name}`);
-      calendarLines.push(`DESCRIPTION:${slot.lecturer_name} | ${formatSessionTypeLabel(slot.session_type)}`);
+      calendarLines.push(`DESCRIPTION:${slot.lecturer_name} | ${formatSessionTypeLabel(slot.activity_display_name || slot.activity_type_key || slot.session_type)}`);
       calendarLines.push(`LOCATION:${slot.room_number} ${slot.building}`);
       calendarLines.push('END:VEVENT');
     });
@@ -1076,6 +1217,15 @@ const StudentPortal: React.FC = () => {
     setRemindersEnabled(false);
   };
 
+  const handleAcademicWeekChange = (week: number) => {
+    const normalized = Number.isFinite(week) && week > 0 ? Math.floor(week) : 1;
+    setAcademicWeek(normalized);
+  };
+
+  const handleLabSubgroupSelection = (next: number[]) => {
+    setSelectedLabSubgroups(next);
+  };
+
   const handleSelectLookup = async (result: LookupResult) => {
     setSelectedLookup(null);
     setSearchLoading(true);
@@ -1107,11 +1257,58 @@ const StudentPortal: React.FC = () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   if (!groupReady) {
+    if (brandingLoading) {
+      return (
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `linear-gradient(180deg, ${alpha(branding.primary_color, 0.08)} 0%, #f6f8fb 100%)`,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    if (tenantError || branding.university_id === 0) {
+      return (
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 2,
+            background: `linear-gradient(180deg, ${alpha(branding.primary_color, 0.08)} 0%, #f6f8fb 100%)`,
+          }}
+        >
+          <Paper sx={{ maxWidth: 560, width: '100%', p: 4, borderRadius: 4 }} elevation={8}>
+            <Stack spacing={2}>
+              <Typography variant="h5" fontWeight={800}>
+                Student portal is not available for this domain
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                This student portal must be opened from a university-specific tenant domain so the correct groups
+                can be loaded without crossing institutions.
+              </Typography>
+              <Alert severity="warning">
+                If this is your institution&apos;s domain, ask your coordinator to confirm the tenant branding setup.
+              </Alert>
+            </Stack>
+          </Paper>
+        </Box>
+      );
+    }
+
     return (
       <OnboardingWizard
         primaryColor={primaryColor}
         secondaryColor={secondaryColor}
         brandingName={brandingName}
+        universityId={branding.university_id}
         onComplete={handleOnboardingComplete}
       />
     );
@@ -1476,27 +1673,42 @@ const StudentPortal: React.FC = () => {
           </Card>
 
           {activeTab === 'home' && (
-            <StudentHomePanel
-              currentSlot={currentSlot}
-              nextSlot={nextSlot}
-              gapUntilNext={gapUntilNext}
-              weeklyHours={weeklyHours}
-              firstTodaySlot={firstTodaySlot}
-              lastTodaySlot={lastTodaySlot}
-              currentDay={currentDay}
-              currentMinutes={currentMinutes}
-              formatDuration={formatDuration}
-              formatTimeRange={formatTimeRange}
-              exportTimetable={exportTimetable}
-              openSearchWithPreset={openSearchWithPreset}
-              setActiveTab={setActiveTab as (tab: 'today' | 'week' | 'more' | 'search') => void}
-            />
+            <Stack spacing={2}>
+              <Alert
+                severity={selectedLabSubgroups.length > 0 ? 'success' : 'info'}
+                action={
+                  <Button color="inherit" size="small" onClick={() => setActiveTab('more')}>
+                    {selectedLabSubgroups.length > 0 ? 'Review' : 'Select'}
+                  </Button>
+                }
+                sx={{ borderRadius: 3 }}
+              >
+                {selectedLabSubgroups.length > 0
+                  ? `Your lab/tutorial group selection is saved for this device. Week ${academicWeek} is currently selected.`
+                  : 'Need a lab or tutorial group? Open My Groups to select it and view its rotation week.'}
+              </Alert>
+              <StudentHomePanel
+                currentSlot={currentSlot}
+                nextSlot={nextSlot}
+                gapUntilNext={gapUntilNext}
+                weeklyHours={weeklyHours}
+                firstTodaySlot={firstTodaySlot}
+                lastTodaySlot={lastTodaySlot}
+                currentDay={currentDay}
+                currentMinutes={currentMinutes}
+                formatDuration={formatDuration}
+                formatTimeRange={formatTimeRange}
+                exportTimetable={exportTimetable}
+                openSearchWithPreset={openSearchWithPreset}
+                setActiveTab={setActiveTab as (tab: 'today' | 'week' | 'more' | 'search') => void}
+              />
+            </Stack>
           )}
 
           {activeTab === 'today' && (
             <StudentTodayPanel
               currentDay={currentDay}
-              filters={SESSION_FILTERS}
+              filters={sessionFilters}
               todayFilter={todayFilter}
               onFilterChange={setTodayFilter}
               filteredTodaySlots={filteredTodaySlots}
@@ -1504,21 +1716,25 @@ const StudentPortal: React.FC = () => {
               formatTimeRange={formatTimeRange}
               getSessionTone={getSessionTone}
               formatSessionTypeLabel={formatSessionTypeLabel}
-              getSessionTypeChipColor={getSessionTypeChipColor}
+              getSessionTypeChipSx={getSessionTypeChipSx}
+              getFilterLabel={getFilterLabel}
+              getFilterChipSx={getFilterChipSx}
             />
           )}
 
           {activeTab === 'week' && (
             <StudentWeekPanel
               currentDay={currentDay}
-              filters={SESSION_FILTERS}
+              filters={sessionFilters}
               weekFilter={weekFilter}
               onFilterChange={setWeekFilter}
               filteredWeekGroups={filteredWeekGroups}
               dayOrder={DAY_ORDER}
               formatTimeRange={formatTimeRange}
               formatSessionTypeLabel={formatSessionTypeLabel}
-              getSessionTypeChipColor={getSessionTypeChipColor}
+              getSessionTypeChipSx={getSessionTypeChipSx}
+              getFilterLabel={getFilterLabel}
+              getFilterChipSx={getFilterChipSx}
               primaryColor={primaryColor}
             />
           )}
@@ -1542,19 +1758,36 @@ const StudentPortal: React.FC = () => {
           )}
 
           {activeTab === 'more' && (
-            <StudentMorePanel
-              timetableGroup={groupDisplayName}
-              timetableSemester={timetableData?.timetable?.semester}
-              timetableDepartment={groupDepartment || timetableData?.timetable?.department}
-              lastSyncedAt={lastSyncedAt}
-              weeklyHours={weeklyHours}
-              remindersEnabled={remindersEnabled}
-              reminderMinutes={reminderMinutes}
-              onReminderToggle={toggleReminders}
-              onReminderMinutesChange={setReminderMinutes}
-              courses={courses}
-              exportTimetable={exportTimetable}
-              exportCalendar={exportCalendar}
+            <Stack spacing={2.25}>
+              <StudentSubgroupSelector
+                groupId={groupMeta?.group_id ?? studentPortalApi.getGroupId()}
+                value={selectedLabSubgroups}
+                onChange={handleLabSubgroupSelection}
+                academicWeek={academicWeek}
+                onAcademicWeekChange={handleAcademicWeekChange}
+              />
+              <StudentMorePanel
+                timetableGroup={groupDisplayName}
+                timetableSemester={timetableData?.timetable?.semester}
+                timetableDepartment={groupDepartment || timetableData?.timetable?.department}
+                lastSyncedAt={lastSyncedAt}
+                weeklyHours={weeklyHours}
+                remindersEnabled={remindersEnabled}
+                reminderMinutes={reminderMinutes}
+                onReminderToggle={toggleReminders}
+                onReminderMinutesChange={setReminderMinutes}
+                courses={courses}
+                exportTimetable={exportTimetable}
+                exportCalendar={exportCalendar}
+              />
+            </Stack>
+          )}
+
+          {activeTab === 'exams' && (
+            <StudentExamsPanel
+              loading={examsLoading}
+              exams={examData?.slots || []}
+              period={examData?.period}
             />
           )}
 
@@ -1592,8 +1825,9 @@ const StudentPortal: React.FC = () => {
           <DockButton active={activeTab === 'home'} icon={<DashboardIcon />} label="Home" onClick={() => setActiveTab('home')} primaryColor={primaryColor} />
           <DockButton active={activeTab === 'today'} icon={<CalendarTodayIcon />} label="Today" onClick={() => setActiveTab('today')} primaryColor={primaryColor} />
           <DockButton active={activeTab === 'search'} icon={<SearchIcon />} label="Search" onClick={() => setActiveTab('search')} primaryColor={primaryColor} isCenter />
+          <DockButton active={activeTab === 'exams'} icon={<AutoStoriesIcon />} label="Exams" onClick={() => setActiveTab('exams')} primaryColor={primaryColor} />
           <DockButton active={activeTab === 'week'} icon={<DateRangeIcon />} label="Week" onClick={() => setActiveTab('week')} primaryColor={primaryColor} />
-          <DockButton active={activeTab === 'more'} icon={<AutoStoriesIcon />} label="Courses" onClick={() => setActiveTab('more')} primaryColor={primaryColor} />
+          <DockButton active={activeTab === 'more'} icon={<MenuBookRoundedIcon />} label="Courses" onClick={() => setActiveTab('more')} primaryColor={primaryColor} />
         </Box>
       )}
     </Box>

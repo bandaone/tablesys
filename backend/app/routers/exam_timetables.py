@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, selectinload
 
-from ..auth import get_current_active_coordinator, get_current_active_hod, get_current_user
+from ..auth import get_current_active_hod, get_current_active_school_operator, get_current_user, is_school_operator
 from ..database import get_db
 from ..models import (
     Course,
@@ -45,7 +45,9 @@ from ..services.exam_validation_service import ExamValidationService
 from ..services.course_mapping_service import CourseMappingService
 from ..services.notification_service import NotificationService
 from ..utils.audit_logger import AuditLogger
+from ..middleware.quota import enforce_generation_quota
 from ..utils.department_utils import find_general_department, is_general_department
+from ..utils.school_scope import filter_course_query_for_user, filter_group_query_for_user
 
 router = APIRouter(prefix="/api/v1/exam-timetables", tags=["exam-timetables"])
 
@@ -59,7 +61,8 @@ def resolve_university_id(db: Session, current_user: User) -> int:
     return university.id
 
 
-def get_period_or_404(db: Session, period_id: int) -> ExamPeriod:
+def get_period_or_404(db: Session, current_user: User, period_id: int) -> ExamPeriod:
+    university_id = resolve_university_id(db, current_user)
     period = (
         db.query(ExamPeriod)
         .options(
@@ -70,8 +73,12 @@ def get_period_or_404(db: Session, period_id: int) -> ExamPeriod:
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.paper),
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.session_window),
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.seating_profile),
+            selectinload(ExamPeriod.slots).selectinload(ExamSlot.chief_invigilator),
         )
-        .filter(ExamPeriod.id == period_id)
+        .filter(
+            ExamPeriod.id == period_id,
+            ExamPeriod.university_id == university_id,
+        )
         .first()
     )
     if not period:
@@ -91,7 +98,7 @@ def _room_type_value(value):
 
 
 def _course_visible_to_exam_user(db: Session, current_user: User, course: Course) -> bool:
-    if current_user.role in [UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERADMIN]:
+    if current_user.role in [UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN, UserRole.SUPERADMIN]:
         return True
     if current_user.role != UserRole.HOD or current_user.department_id is None:
         return False
@@ -116,12 +123,13 @@ def _course_visible_to_exam_user(db: Session, current_user: User, course: Course
 
 
 def _course_manageable_by_exam_user(current_user: User, course: Course) -> bool:
-    if current_user.role == UserRole.COORDINATOR:
+    if current_user.role in {UserRole.COORDINATOR, UserRole.SCHOOL_COORDINATOR, UserRole.TENANT_ADMIN}:
         return True
     return current_user.role == UserRole.HOD and current_user.department_id == course.department_id
 
 
 def build_exam_paper_candidates(db: Session, period: ExamPeriod, current_user: User) -> List[ExamPaperCandidate]:
+    from ..routers.groups import _effective_course_ids_for_group
     mapping_service = CourseMappingService(db)
     existing_papers = {
         paper.course_id: paper
@@ -130,29 +138,41 @@ def build_exam_paper_candidates(db: Session, period: ExamPeriod, current_user: U
     }
 
     courses = (
-        db.query(Course)
-        .join(Course.department)
+        filter_course_query_for_user(db.query(Course), current_user)
         .filter(Course.department.has(university_id=period.university_id))
         .order_by(Course.level.asc(), Course.code.asc())
         .all()
     )
+
+    all_uni_groups = db.query(StudentGroup).filter(StudentGroup.university_id == period.university_id).all()
+    parents_with_streams = {
+        g.parent_group_id for g in all_uni_groups if getattr(g.group_type, "value", str(g.group_type)) == "stream" and g.parent_group_id
+    }
+    
+    valid_groups = []
+    for g in all_uni_groups:
+        g_type = getattr(g.group_type, "value", str(g.group_type)) if g.group_type else None
+        if g_type == "stream":
+            valid_groups.append(g)
+        elif g.parent_group_id is None and g_type in ["general", "department", None]:
+            if g.id not in parents_with_streams:
+                valid_groups.append(g)
+
+    group_courses = {
+        g.id: _effective_course_ids_for_group(db, g)
+        for g in valid_groups
+    }
 
     candidates: List[ExamPaperCandidate] = []
     for course in courses:
         if not _course_visible_to_exam_user(db, current_user, course):
             continue
 
-        eligible_groups = mapping_service.eligible_main_groups_for_course(course)
-        eligible_group_ids = [item.group.id for item in eligible_groups]
-        selected_group_ids = mapping_service.current_selected_main_group_ids(course, eligible_group_ids)
-        if not selected_group_ids:
-            continue
-
-        group_lookup = {item.group.id: item.group for item in eligible_groups}
-        selected_groups = [group_lookup[group_id] for group_id in selected_group_ids if group_id in group_lookup]
+        selected_groups = [g for g in valid_groups if course.id in group_courses.get(g.id, set())]
         if not selected_groups:
             continue
 
+        selected_group_ids = [g.id for g in selected_groups]
         candidate_count = sum(int(group.size or 0) for group in selected_groups)
         existing_paper = existing_papers.get(course.id)
 
@@ -200,6 +220,7 @@ async def get_exam_periods(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    university_id = resolve_university_id(db, current_user)
     return (
         db.query(ExamPeriod)
         .options(
@@ -210,7 +231,9 @@ async def get_exam_periods(
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.paper),
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.session_window),
             selectinload(ExamPeriod.slots).selectinload(ExamSlot.seating_profile),
+            selectinload(ExamPeriod.slots).selectinload(ExamSlot.chief_invigilator),
         )
+        .filter(ExamPeriod.university_id == university_id)
         .order_by(ExamPeriod.start_date.desc(), ExamPeriod.id.desc())
         .all()
     )
@@ -220,7 +243,7 @@ async def get_exam_periods(
 async def create_exam_period(
     request: Request,
     payload: ExamPeriodCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     period = ExamPeriod(
@@ -259,7 +282,7 @@ async def get_exam_period(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return get_period_or_404(db, period_id)
+    return get_period_or_404(db, current_user, period_id)
 
 
 @router.put("/periods/{period_id}", response_model=ExamPeriodSchema)
@@ -267,10 +290,10 @@ async def update_exam_period(
     request: Request,
     period_id: int,
     payload: ExamPeriodUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
@@ -303,10 +326,12 @@ async def update_exam_period(
 async def delete_exam_period(
     request: Request,
     period_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
+    if period.is_locked or period.is_published:
+        raise HTTPException(status_code=409, detail="Published or locked exam periods cannot be deleted")
     period_name = period.name
     slot_ids = [slot.id for slot in (period.slots or [])]
 
@@ -334,10 +359,10 @@ async def create_session_window(
     request: Request,
     period_id: int,
     payload: ExamSessionWindowCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
@@ -366,13 +391,13 @@ async def update_session_window(
     request: Request,
     session_window_id: int,
     payload: ExamSessionWindowUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     session_window = db.query(ExamSessionWindow).filter(ExamSessionWindow.id == session_window_id).first()
     if not session_window:
         raise HTTPException(status_code=404, detail="Exam session window not found")
-    period = get_period_or_404(db, session_window.exam_period_id)
+    period = get_period_or_404(db, current_user, session_window.exam_period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
@@ -417,7 +442,7 @@ async def get_seating_profiles(
 async def create_seating_profile(
     request: Request,
     payload: ExamSeatingProfileCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     university_id = resolve_university_id(db, current_user)
@@ -445,7 +470,7 @@ async def update_seating_profile(
     request: Request,
     profile_id: int,
     payload: ExamSeatingProfileUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     profile = db.query(ExamSeatingProfile).filter(ExamSeatingProfile.id == profile_id).first()
@@ -479,17 +504,19 @@ async def create_exam_paper(
     request: Request,
     period_id: int,
     payload: ExamPaperCreate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
     if payload.course_id and not db.query(Course).filter(Course.id == payload.course_id).first():
         raise HTTPException(status_code=422, detail="Invalid course_id")
 
-    groups = db.query(StudentGroup).filter(StudentGroup.id.in_(payload.group_ids)).all() if payload.group_ids else []
+    groups = filter_group_query_for_user(
+        db.query(StudentGroup), current_user
+    ).filter(StudentGroup.id.in_(payload.group_ids)).all() if payload.group_ids else []
     if len(groups) != len(set(payload.group_ids)):
         raise HTTPException(status_code=422, detail="One or more group_ids are invalid")
 
@@ -518,13 +545,13 @@ async def update_exam_paper(
     request: Request,
     paper_id: int,
     payload: ExamPaperUpdate,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
     paper = db.query(ExamPaper).filter(ExamPaper.id == paper_id).first()
     if not paper:
         raise HTTPException(status_code=404, detail="Exam paper not found")
-    period = get_period_or_404(db, paper.exam_period_id)
+    period = get_period_or_404(db, current_user, paper.exam_period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
@@ -557,7 +584,7 @@ async def get_exam_paper_candidates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     return build_exam_paper_candidates(db, period, current_user)
 
 
@@ -569,7 +596,7 @@ async def sync_exam_papers(
     current_user: User = Depends(get_current_active_hod),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if period.is_locked:
         raise HTTPException(status_code=409, detail="Exam period is locked")
 
@@ -699,7 +726,7 @@ async def get_exam_slots(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     return period.slots
 
 
@@ -707,10 +734,10 @@ async def get_exam_slots(
 async def clear_exam_draft_slots(
     request: Request,
     period_id: int,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if period.is_locked or period.is_published:
         raise HTTPException(status_code=409, detail="Published or locked exam periods cannot have their draft cleared")
 
@@ -736,15 +763,19 @@ async def generate_exam_timetable(
     request: Request,
     period_id: int,
     payload: ExamGenerateRequest,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
+    quota_info = enforce_generation_quota(db, getattr(current_user, "university_id", None))
     generator = ExamTimetableGenerator(db, period.id)
     try:
         result = generator.generate(replace_existing=payload.replace_existing)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if quota_info and isinstance(result, dict):
+        result["quota"] = quota_info
 
     AuditLogger.log_data_modification(
         request=request,
@@ -763,12 +794,26 @@ async def publish_exam_timetable(
     request: Request,
     period_id: int,
     payload: ExamPublishRequest,
-    current_user: User = Depends(get_current_active_coordinator),
+    current_user: User = Depends(get_current_active_school_operator),
     db: Session = Depends(get_db),
 ):
-    period = get_period_or_404(db, period_id)
+    period = get_period_or_404(db, current_user, period_id)
     if not period.slots:
         raise HTTPException(status_code=422, detail="Generate the exam timetable before publishing")
+    if period.is_published:
+        raise HTTPException(status_code=409, detail="Exam period is already published")
+
+    scheduled_paper_ids = {slot.exam_paper_id for slot in (period.slots or [])}
+    unscheduled_papers = [
+        paper
+        for paper in (period.papers or [])
+        if paper.id not in scheduled_paper_ids
+    ]
+    if unscheduled_papers:
+        raise HTTPException(
+            status_code=422,
+            detail="Resolve all unscheduled papers before publishing the exam timetable",
+        )
 
     period.is_published = True
     period.published_at = datetime.utcnow()
@@ -794,3 +839,35 @@ async def publish_exam_timetable(
         type="success",
     )
     return period
+
+
+@router.post("/periods/{period_id}/unpublish", response_model=ExamPeriodSchema)
+async def unpublish_exam_timetable(
+    request: Request,
+    period_id: int,
+    current_user: User = Depends(get_current_active_school_operator),
+    db: Session = Depends(get_db),
+):
+    period = get_period_or_404(db, current_user, period_id)
+    if not period.is_published:
+        raise HTTPException(status_code=409, detail="Exam period is not published")
+
+    period.is_published = False
+    period.published_at = None
+    period.is_locked = False
+    for slot in period.slots:
+        slot.status = "draft"
+
+    db.commit()
+    db.refresh(period)
+    AuditLogger.log_data_modification(
+        request=request,
+        user_id=current_user.id,
+        username=current_user.username,
+        operation="UNPUBLISH",
+        resource_type="exam_period",
+        resource_id=period.id,
+        details={},
+    )
+    return period
+
